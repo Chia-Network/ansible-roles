@@ -1,0 +1,14 @@
+---
+- name: Install Nginx
+  become: yes
+  ansible.builtin.apt:
+    name:
+      - nginx
+    state: present
+- name: Ensure service is in desired boot and current state
+  become: yes
+  ansible.builtin.systemd:
+    name: nginx
+    daemon_reload: yes
+    enabled: "{{ start_on_boot }}"
+    state: "{{ start_now | ternary('started','stopped') }}"

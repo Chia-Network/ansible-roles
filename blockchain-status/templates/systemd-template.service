@@ -1,0 +1,11 @@
+[Unit]
+Description={{ bin_name }} service
+
+[Service]
+Type={{ service_type }}
+ExecStart=/usr/local/bin/{{ bin_name }}
+User={{ user }}
+Group={{ group }}
+
+[Install]
+WantedBy=multi-user.target

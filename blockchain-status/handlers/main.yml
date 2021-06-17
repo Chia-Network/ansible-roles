@@ -1,0 +1,5 @@
+- name: restart-blockchain-status
+  become: yes
+  service:
+    name: "{{ bin_name }}"
+    state: restarted

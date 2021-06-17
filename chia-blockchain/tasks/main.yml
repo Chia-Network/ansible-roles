@@ -1,0 +1,104 @@
+---
+- name: Install Deps
+  become: yes
+  ansible.builtin.apt:
+    name:
+      - git
+    state: present
+
+- name: Ensure chia directories exist
+  # become, in case ownership is incorrect
+  become: yes
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ user }}"
+    group: "{{ group }}"
+    recurse: yes
+  with_items:
+    - "{{ chia_root }}/db"
+    - "/home/{{ user }}/chia-blockchain"
+
+- name: Ensure CHIA_ROOT is set in .bashrc
+  ansible.builtin.lineinfile:
+    path: "/home/{{ user }}/.bashrc"
+    regexp: '^export CHIA_ROOT='
+    line: "export CHIA_ROOT={{ chia_root }}"
+
+- name: Copy latest blockchain DB from S3
+  shell: |
+    aws s3 cp s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite {{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite
+  args:
+    creates: "{{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite"
+  when: download_blockchain_db
+
+- name: Ensure correct ref is checked out
+  ansible.builtin.git:
+    repo: "{{ repo_url }}"
+    dest: "/home/{{ user }}/chia-blockchain"
+    version: "{{ repo_ref }}"
+    update: yes
+    force: yes
+  register: git_output
+  notify: restart-chia
+
+- name: Chia Install and Init
+  shell: |
+    sh install.sh
+    chia init
+  args:
+    chdir: "/home/{{ user }}/chia-blockchain"
+  environment:
+    PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    CHIA_ROOT: "{{ chia_root }}"
+  when: git_output.changed
+
+- name: Install timelord
+  shell: |
+    . ./activate
+    sh install-timelord.sh
+  args:
+    chdir: "/home/{{ user }}/chia-blockchain"
+  environment:
+    PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    CHIA_ROOT: "{{ chia_root }}"
+  when: # List is AND
+    - git_output.changed
+    - component == "timelord"
+
+- name: Chia Config
+  template:
+    src: config.yaml.j2
+    dest: "{{ chia_root }}/config/config.yaml"
+  notify: restart-chia
+
+- name: Add Keys
+  shell: |
+    echo "{{ item }}" | chia keys add
+  args:
+    chdir: "/home/{{ user }}/chia-blockchain"
+  environment:
+    PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    CHIA_ROOT: "{{ chia_root }}"
+  when:
+    - keys | length
+  with_items: "{{ keys }}"
+  notify: restart-chia # @TODO would be better to have this only restart if we could tell keys changed
+
+- name: Chia Systemd Config
+  become: yes
+  ansible.builtin.template:
+    src: "chia.service.j2"
+    dest: "/etc/systemd/system/chia.service"
+    owner: root
+    group: root
+  notify: restart-chia
+
+- name: Ensure service is in desired boot and current state
+  become: yes
+  ansible.builtin.systemd:
+    name: chia
+    daemon_reload: yes
+    enabled: "{{ start_on_boot }}"
+    state: "{{ start_now | ternary('started','stopped') }}"
+# Sleep?

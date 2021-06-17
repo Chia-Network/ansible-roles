@@ -1,0 +1,31 @@
+---
+# AWS can't do UDP healthchecks, so this app checks for the DNS server to be ready for the healthcheck
+- name: healthcheck binary
+  become: yes
+  ansible.posix.synchronize:
+    src: "./app/healthcheck"
+    dest: /usr/local/bin/healthcheck
+    checksum: yes
+  notify: restart-dns-healthcheck
+- name: Ensure permissions are correct on the binary
+  become: yes
+  ansible.builtin.file:
+    state: file
+    mode: '0755'
+    path: /usr/local/bin/healthcheck
+  notify: restart-dns-healthcheck
+- name: Healthcheck Systemd Config
+  become: yes
+  ansible.builtin.template:
+    src: "dns-healthcheck.service"
+    dest: "/etc/systemd/system/dns-healthcheck.service"
+    owner: root
+    group: root
+  notify: restart-dns-healthcheck
+- name: Ensure services start on boot and are started now
+  become: yes
+  ansible.builtin.systemd:
+    name: dns-healthcheck
+    daemon_reload: yes
+    enabled: yes
+    state: started

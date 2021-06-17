@@ -1,0 +1,11 @@
+[Unit]
+Description=DNS Introducer Healthcheck
+
+[Service]
+Environment=DNS_HOSTNAME={{ dns_hostname }}
+ExecStart=/usr/local/bin/healthcheck
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

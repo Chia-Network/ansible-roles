@@ -1,0 +1,8 @@
+---
+- name: reload-timers
+  become: yes
+  ansible.builtin.systemd:
+    name: logrotate-hourly.timer
+    state: started
+    enabled: yes
+    daemon_reload: yes
