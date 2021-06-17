@@ -1,0 +1,15 @@
+---
+start_on_boot: yes
+start_now: yes
+
+user: ubuntu
+group: ubuntu
+
+# Path to the file to upload
+local_bin_path: ""
+bin_name: "blockchain-status"
+
+# simple, exec, forking, oneshot, dbus, notify or idle:
+service_type: "simple"
+
+http_endpoints: []

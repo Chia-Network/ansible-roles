@@ -1,0 +1,4 @@
+- name: Wait for ssh connection to be ready
+  wait_for_connection:
+    timeout: 900 # waits up to 15 minutes
+    sleep: 10 # attempts a connection every 10 seconds

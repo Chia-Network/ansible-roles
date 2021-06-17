@@ -1,0 +1,8 @@
+---
+- name: Install SQLite3
+  become: yes
+  ansible.builtin.apt:
+    name:
+      - sqlite3
+    state: present
+    update_cache: yes

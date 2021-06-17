@@ -1,0 +1,13 @@
+---
+- name: Copy logrotate timer
+  become: yes
+  template:
+    src: logrotate.timer
+    dest: /etc/systemd/system/logrotate-hourly.timer
+  notify: reload-timers
+
+- name: Copy rsyslog rotate settings
+  become: yes
+  template:
+    src: rsyslog
+    dest: /etc/logrotate.d/rsyslog

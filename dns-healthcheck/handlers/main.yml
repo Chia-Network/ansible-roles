@@ -1,0 +1,5 @@
+- name: restart-dns-healthcheck
+  become: yes
+  service:
+    name: dns-healthcheck
+    state: restarted

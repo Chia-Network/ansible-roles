@@ -1,0 +1,5 @@
+http-endpoints:
+  {{ http_endpoints | to_nice_yaml | indent(2) }}
+
+# @TODO this should just be set on the env for the app, and config will pick it up automatically
+chia-root: /home/{{ user }}/.chia

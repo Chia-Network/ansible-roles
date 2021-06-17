@@ -1,0 +1,6 @@
+- name: restart-chia
+  become: yes
+  service:
+    name: chia
+    state: restarted
+  when: start_now
