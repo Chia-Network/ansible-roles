@@ -1,0 +1,8 @@
+[Unit]
+Description=Userify Service
+
+[Service]
+ExecStart=/opt/userify/shim.sh
+
+[Install]
+WantedBy=multi-user.target
