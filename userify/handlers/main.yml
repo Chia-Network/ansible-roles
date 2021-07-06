@@ -1,0 +1,9 @@
+---
+
+# userify/handlers/main.yml
+
+- name: start_userify
+  systemd:
+    name: userify
+    state: started
+    enabled: yes

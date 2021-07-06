@@ -1,6 +1,6 @@
 galaxy_info:
   author: justin@chia.net
-  description: Setup colo arm instances
+  description: Setup arm runners
   company: Chia
 
   # If the issue tracker for your role is not on github, uncomment the
