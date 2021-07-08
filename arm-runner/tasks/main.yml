@@ -1,0 +1,19 @@
+---
+  # chia-runner/tasks/main.yml
+  - name: Clone runner code and unzip
+    shell: mkdir actions-runner && cd actions-runner && curl -O -L https://github.com/actions/runner/releases/download/v"{{runner-release-version}}/actions-runner-linux-arm64-"{{runner-release-version}}.tar.gz && tar xzf ./actions-runner-linux-arm64-"{{runner-release-version}}.tar.gz
+    become: yes
+    become_user: ubuntu
+
+  - name: Copy Service File TO AMI
+    copy:
+      src: files/runner-service
+      dest: /etc/systemd/system/github-runner.service
+      owner: root
+      group: root
+      mode: 0755
+
+  - name: Extend Packer Max Timeout
+    shell: export AWS_POLL_DELAY_SECONDS=60 && export AWS_MAX_ATTEMPTS=180
+    become: yes
+    become_user: ubuntu
