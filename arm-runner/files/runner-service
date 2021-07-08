@@ -1,0 +1,8 @@
+[Unit]
+Description=Chia Github Action Runner
+
+[Service]
+ExecStart=/home/ubuntu/actions-runner/run.sh
+
+[Install]
+WantedBy=multi-user.target

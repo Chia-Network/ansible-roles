@@ -1,0 +1,6 @@
+---
+# chia-runner/tasks/main.yml
+- name: Clone runner code and unzip
+  shell: mkdir actions-runner && cd actions-runner && curl -O -L https://github.com/actions/runner/releases/download/v"{{runner-release-version}}/actions-runner-osx-x64-"{{runner-release-version}}.tar.gz && tar xzf ./actions-runner-osx-x64-"{{runner-release-version}}.tar.gz
+  become: yes
+  become_user: chia
