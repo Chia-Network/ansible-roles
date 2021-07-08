@@ -1,5 +1,9 @@
 ---
-# userify/tasks/main.yml
+- name: Ensure old config is removed if present
+  ansible.builtin.file:
+    path: /opt/userify/creds.py
+    state: absent
+
 - name: get userify shim
   get_url:
     url: https://shim.userify.com/installer.sh
