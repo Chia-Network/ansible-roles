@@ -20,6 +20,12 @@ sqlite3 {{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite ".backup '/tmp/blo
 echo "Backup complete, starting upload to s3"
 aws s3 cp /tmp/blockchain_v1_{{ network }}.sqlite.backup "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
 
+{% if network != "mainnet" %}
+{% if secondary_backup_bucket != "" %}
+aws s3 cp /tmp/blockchain_v1_{{ network }}.sqlite.backup "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
+{% endif %}
+{% endif %}
+
 rm /tmp/blockchain_v1_{{ network }}.sqlite.backup
 
 rm -f $LOCK_FILE
