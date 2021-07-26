@@ -11,3 +11,4 @@ network: "mainnet"
 
 # The name of the bucket that blockchain backups can be found in
 blockchain_backup_bucket: "blockchain-backup-bucket-name"
+secondary_backup_bucket: ""
