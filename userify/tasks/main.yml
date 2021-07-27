@@ -14,22 +14,31 @@
   environment:
     api_id: "{{userify_api_id}}"
     api_key: "{{userify_api_key}}"
-  notify: start_userify
+  notify:
+    - start_userify
+    - start_userify_timer
 
 - name: wrap shim with systemd
   copy:
-    src: files/userify
-    dest: /etc/systemd/system/userify.service
+    src: "files/{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
     owner: root
     group: root
     mode: 0755
-  notify: start_userify
+  notify:
+    - start_userify
+    - start_userify_timer
+  with_items:
+    - userify.service
+    - userify.timer
 
 - name: Template userify creds config file
   template:
     src: "{{ item.src }}"
     dest: "{{ item.dest }}"
-  notify: start_userify
+  notify:
+    - start_userify
+    - start_userify_timer
   with_items:
     - src: creds.py
       dest: /opt/userify/creds.py

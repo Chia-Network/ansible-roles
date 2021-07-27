@@ -1,7 +1,7 @@
 # Userify Shim Configuration
 
-company = "ChiaNetwork"
-project = "Default"
+company="ChiaNetwork"
+project="Default"
 
 # This file sourced by both Python and Bash scripts, so please ensure changes
 # are loadable by each.
