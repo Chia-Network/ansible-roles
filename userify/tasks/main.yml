@@ -27,6 +27,11 @@
 
 - name: Template userify creds config file
   template:
-    src: creds.py
-    dest: /opt/userify/creds.py
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
   notify: start_userify
+  with_items:
+    - src: creds.py
+      dest: /opt/userify/creds.py
+    - src: userify_config.py
+      dest: /opt/userify/userify_config.py

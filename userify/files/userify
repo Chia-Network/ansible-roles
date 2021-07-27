@@ -3,6 +3,7 @@ Description=Userify Service
 
 [Service]
 ExecStart=/opt/userify/shim.sh
+Type=forking
 
 [Install]
 WantedBy=multi-user.target
