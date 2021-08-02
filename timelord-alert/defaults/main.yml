@@ -1,0 +1,5 @@
+---
+path_to_logfile: "/home/ubuntu/.chia/log/debug.log"
+webhook_url: ""
+install_path: "/home/ubuntu/"
+timelord_bucket_path: ""
