@@ -1,7 +1,10 @@
 ---
 - name: Get timelord-alert artifact
+  become: yes
   shell: |
     aws s3 cp s3://{{timelord_bucket_path}} {{ install_path }}
+    chown ubuntu:ubuntu {{ install_path }}/timelord-alerts
+    chmod 755 {{ install_path }}/timelord-alerts
   notify: start-timelord-alerts
 
 - name: Install the timelord-alerts unit file
