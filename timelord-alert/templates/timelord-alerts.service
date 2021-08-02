@@ -1,0 +1,12 @@
+[Unit]
+Description=Timelord-Alert Service
+
+[Service]
+Env=PATH_TO_LOGFILE={{ path_to_logfile }}
+Env=WEBHOOK_URL={{ webhook_url }}
+ExecStart={{ install_path }}timelord-alerts
+User=ubuntu
+Group=ubuntu
+
+[Install]
+WantedBy=multi-user.target

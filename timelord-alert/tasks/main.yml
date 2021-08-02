@@ -1,0 +1,14 @@
+---
+- name: Get timelord-alert artifact
+  shell: |
+    aws s3 cp s3://{{timelord_bucket_path}} {{ install_path }}
+  notify: start-timelord-alerts
+
+- name: Install the timelord-alerts unit file
+  become: yes
+  template:
+    src: "timelord-alerts.service"
+    dest: "/etc/systemd/system/timelord-alerts.service"
+    owner: root
+    group: root
+    mode: 0755
