@@ -4,6 +4,7 @@ Description=Timelord-Alert Service
 [Service]
 Environment=PATH_TO_LOGFILE={{ path_to_logfile }}
 Environment=WEBHOOK_URL={{ webhook_url }}
+Environment=WEBHOOK_MSG={{ webhook_msg }}
 ExecStart={{ install_path }}timelord-alerts
 User=ubuntu
 Group=ubuntu
