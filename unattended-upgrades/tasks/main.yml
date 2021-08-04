@@ -1,0 +1,11 @@
+---
+- name: Wait for any possibly running unattended upgrade to finish
+  become: yes
+  raw: systemd-run --property="After=apt-daily.service apt-daily-upgrade.service" --wait /bin/true
+
+- name: remove unattended-upgrades
+  become: yes
+  ansible.builtin.apt:
+    name:
+      - unattended-upgrades
+    state: absent
