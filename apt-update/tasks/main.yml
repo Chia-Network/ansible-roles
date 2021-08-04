@@ -1,0 +1,7 @@
+---
+- name: Ensure apt packages are all up to date
+  become: yes
+  ansible.builtin.apt:
+    name: "*"
+    update_cache: yes
+    state: latest

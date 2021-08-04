@@ -1,0 +1,9 @@
+---
+- name: Install python deps
+  become: yes
+  ansible.builtin.apt:
+    name:
+      - python3.8-venv
+      - python3.8-distutils
+    update_cache: yes
+    cache_valid_time: 3600
