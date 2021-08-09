@@ -4,6 +4,8 @@ LOCK_FILE="/tmp/blockchain-backup.lock"
 
 cleanup() {
     rm -f "$LOCK_FILE"
+    rm -f /tmp/*.sqlite
+    sudo systemctl start chia
 }
 
 if [ -e $LOCK_FILE ] ; then
@@ -12,22 +14,76 @@ if [ -e $LOCK_FILE ] ; then
 fi
 
 trap cleanup EXIT
+
 touch $LOCK_FILE
 
-echo "Starting backup..."
-sqlite3 {{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite ".backup '/tmp/blockchain_v1_{{ network }}.sqlite.backup'"
+echo "Stopping chia services..."
+sudo systemctl stop chia
 
-echo "Backup complete, starting upload to s3"
-aws s3 cp /tmp/blockchain_v1_{{ network }}.sqlite.backup "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
+count=1
+while : ; do
+    processes=$(ps -aux | grep chia | grep -v grep | wc -l)
+    echo "found $processes running chia processes. Waiting for all processes to stop..."
+
+    # Exit conditions
+    [[ $processes > 0 ]] || break
+    [[ $count -lt 30 ]] || exit 2
+
+    count=$(expr $count + 1)
+    sleep 1
+done
+
+echo "Getting hash of local database..."
+HASH=$(shasum -a 256 {{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite | cut -f 1 -d " ")
+echo "Database hash is $HASH..."
+
+echo "Renaming old database on s3..."
+aws s3 mv "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite.previous"
+
+echo "Starting upload to s3..."
+aws s3 cp {{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
+
+echo "Downloading s3 database to validate hash..."
+aws s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite" "/tmp/blockchain_v1_{{ network }}.sqlite"
+
+echo "Validating hash..."
+NEWHASH=$(shasum -a 256 "/tmp/blockchain_v1_{{ network }}.sqlite" | cut -f 1 -d " ")
+echo "Hash from s3 is $NEWHASH..."
+
+if [[ "$HASH" == "$NEWHASH" ]]; then
+    echo "Hashes match, upload successful!"
+else
+    echo "Hashes do not match, reverting to previous database..."
+    echo "Local hash was $HASH..."
+    echo "S3 hash is     $NEWHASH..."
+    aws s3 rm "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
+    aws s3 mv "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite.previous" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
+fi
 
 {% if network != "mainnet" %}
 {% if secondary_backup_bucket != "" %}
-aws s3 cp /tmp/blockchain_v1_{{ network }}.sqlite.backup "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
+echo "Uploading database to secondary backup bucket..."
+aws s3 mv "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite" "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite.previous"
+aws s3 cp {{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
+
+echo "Downloading secondary s3 database to validate hash..."
+aws s3 cp "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite" "/tmp/secondary.sqlite"
+
+echo "Validating secondary hash..."
+SECHASH=$(shasum -a 256 "/tmp/secondary.sqlite" | cut -f 1 -d " ")
+echo "Hash from s3 is $SECHASH..."
+
+if [[ "$HASH" == "$SECHASH" ]]; then
+    echo "Hashes match, upload successful!"
+else
+    echo "Hashes do not match, reverting to previous database..."
+    echo "Local hash was $HASH..."
+    echo "S3 hash is     $SECHASH..."
+    aws s3 rm "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
+    aws s3 mv "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite.previous" "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
+fi
+
 {% endif %}
 {% endif %}
-
-rm /tmp/blockchain_v1_{{ network }}.sqlite.backup
-
-rm -f $LOCK_FILE
 
 echo "Backup Complete!"
