@@ -65,3 +65,13 @@ network_overrides:
       address_prefix: "xch"
     testnet7:
       address_prefix: "txch"
+
+# If set 'True', the timelord will create compact proofs of time, instead of
+# extending the chain.
+sanitizer_mode: False
+
+# Number of VDF client processes to keep alive in the local machine.
+process_count: 3
+
+# 'send_uncompact_interval' seconds. Set to 0 if you don't use this feature. Recommended is 300
+send_uncompact_interval: 0
