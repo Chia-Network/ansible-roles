@@ -115,7 +115,7 @@ timelord_launcher:
   # The server where the VDF clients will connect to.
   port: 8000
   # Number of VDF client processes to keep alive in the local machine.
-  process_count: 3
+  process_count: {{ process_count }}
   logging: *logging
 
 
@@ -158,7 +158,7 @@ timelord:
   # is running in sanitizer_mode.
   # You must set 'send_uncompact_interval' in 'full_node' > 0 in the full_node
   # section below to have full_node send existing time proofs to be sanitized.
-  sanitizer_mode: False
+  sanitizer_mode: {{ sanitizer_mode }}
 
   ssl:
     private_crt:  "config/ssl/timelord/private_timelord.crt"
@@ -205,9 +205,9 @@ full_node:
   # Only connect to peers who we have heard about in the last recent_peer_threshold seconds
   recent_peer_threshold: 6000
 
-  # Send to a Bluebox (sanatizing timelord) uncompact blocks once every
+  # Send to a Bluebox (sanitizing timelord) uncompact blocks once every
   # 'send_uncompact_interval' seconds. Set to 0 if you don't use this feature.
-  send_uncompact_interval: 0
+  send_uncompact_interval: {{ send_uncompact_interval }}
   # At every 'send_uncompact_interval' seconds, send blueboxes 'target_uncompact_proofs' proofs to be normalized.
   target_uncompact_proofs: 100
   # Setting this flag as True, blueboxes will sanitize only data needed in weight proof calculation, as opposed to whole blocks.
