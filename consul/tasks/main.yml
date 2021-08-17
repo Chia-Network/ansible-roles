@@ -22,3 +22,11 @@
     dest: /etc/consul.d/consul.hcl
     owner: consul
     group: consul
+
+- name: Template server config
+  ansible.builtin.template:
+    src: server.hcl.j2
+    dest: /etc/consul.d/server.hcl
+    owner: consul
+    group: consul
+  when: consul_server
