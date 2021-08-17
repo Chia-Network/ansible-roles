@@ -1,0 +1,21 @@
+---
+- name: Install Vault
+  ansible.builtin.apt:
+    name: vault={{ vault_version }}
+    update_cache: yes
+    state: present
+  notify: restart-vault
+
+- name: Template vault config
+  ansible.builtin.template:
+    src: vault.hcl
+    dest: /etc/vault.d/vault.hcl
+    owner: vault
+    group: vault
+  notify: restart-vault
+
+- name: Set to start on boot
+  ansible.builtin.systemd:
+    name: vault
+    enabled: "{{ vault_start_on_boot }}"
+    state: "{{ vault_start_now | ternary('started','stopped') }}"
