@@ -2,6 +2,7 @@
 Description=DB Pull Service
 
 [Service]
+type=oneshot
 ExecStart=/home/ubuntu/db-push.sh
 User=ubuntu
 Group=ubuntu
