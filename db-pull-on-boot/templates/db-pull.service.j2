@@ -1,0 +1,10 @@
+[Unit]
+Description=DB Pull Service
+
+[Service]
+ExecStart=/home/ubuntu/db-push.sh
+User=ubuntu
+Group=ubuntu
+
+[Install]
+WantedBy=multi-user.target
