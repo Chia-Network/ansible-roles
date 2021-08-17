@@ -1,0 +1,24 @@
+---
+- name: Install Consul
+  ansible.builtin.apt:
+    name: consul={{ consul_version }}
+    update_cache: yes
+    state: present
+
+- name: Distribute Certificates
+  ansible.builtin.copy:
+    src: "{{ consul_pem_source_dir }}/{{ item }}"
+    dest: "/etc/consul.d/{{ item }}"
+    owner: consul
+    group: consul
+  with_items:
+    - "{{ consul_ca_file }}"
+    - "{{ consul_cert_file }}"
+    - "{{ consul_key_file }}"
+
+- name: Template consul config
+  ansible.builtin.template:
+    src: consul.hcl.j2
+    dest: /etc/consul.d/consul.hcl
+    owner: consul
+    group: consul
