@@ -1,0 +1,11 @@
+---
+vault_start_on_boot: yes
+vault_start_now: yes
+
+vault_version: 1.8.1
+
+# The token used to access consul from Vault
+vault_consul_token: ""
+
+vault_tls_cert: "/opt/vault/tls/tls.crt"
+vault_tls_key: "/opt/vault/tls/tls.key"
