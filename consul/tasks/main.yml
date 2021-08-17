@@ -4,6 +4,7 @@
     name: consul={{ consul_version }}
     update_cache: yes
     state: present
+  notify: restart-consul
 
 - name: Distribute Certificates
   ansible.builtin.copy:
@@ -15,6 +16,7 @@
     - "{{ consul_ca_file }}"
     - "{{ consul_cert_file }}"
     - "{{ consul_key_file }}"
+  notify: restart-consul
 
 - name: Template consul config
   ansible.builtin.template:
@@ -22,6 +24,7 @@
     dest: /etc/consul.d/consul.hcl
     owner: consul
     group: consul
+  notify: restart-consul
 
 - name: Template server config
   ansible.builtin.template:
@@ -30,3 +33,10 @@
     owner: consul
     group: consul
   when: consul_server
+  notify: restart-consul
+
+- name: Set to start on boot
+  ansible.builtin.systemd:
+    name: consul
+    enabled: "{{ consul_start_on_boot }}"
+    state: "{{ consul_start_now | ternary('started','stopped') }}"
