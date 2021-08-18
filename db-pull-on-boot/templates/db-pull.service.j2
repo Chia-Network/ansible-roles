@@ -1,0 +1,11 @@
+[Unit]
+Description=DB Pull Service
+
+[Service]
+type=oneshot
+ExecStart={{ chia_root }}/db-pull.sh
+User=ubuntu
+Group=ubuntu
+
+[Install]
+WantedBy=multi-user.target

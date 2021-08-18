@@ -1,0 +1,25 @@
+#!/bin/bash
+
+echo "Stopping chia services..."
+sudo systemctl stop chia
+
+count=1
+while : ; do
+processes=$(ps -aux | grep chia | grep -v grep | wc -l)
+echo "found $processes running chia processes. Waiting for all processes to stop..."
+
+# Exit conditions
+[[ $processes > 0 ]] || break
+[[ $count -lt 30 ]] || exit 2
+
+count=$(expr $count + 1)
+sleep 1
+done
+
+#Permission will be required to pull an object from the S3 bucket.
+
+echo "Downloading s3 database..."
+aws s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite" "{{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite"
+
+echo "Starting chia services..."
+sudo systemctl start chia
