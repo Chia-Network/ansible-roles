@@ -1,11 +1,10 @@
 ---
 - name: Copy over the db-pull.sh file
-    template:
-      src: db-pull.sh.j2
-      dest: {{ chia_root }}/db-pull.sh
+  template:
+    src: db-pull.sh.j2
+    dest: {{ chia_root }}/db-pull.sh
 
 - name: Install the DB unit file
-  become: yes
   template:
     src: "db-pull.service"
     dest: "/etc/systemd/system/db-pull.service"
