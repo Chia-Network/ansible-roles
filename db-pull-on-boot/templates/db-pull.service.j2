@@ -3,7 +3,7 @@ Description=DB Pull Service
 
 [Service]
 type=oneshot
-ExecStart=/home/ubuntu/db-push.sh
+ExecStart=dest: {{  chia_root }}/db-pull.sh
 User=ubuntu
 Group=ubuntu
 

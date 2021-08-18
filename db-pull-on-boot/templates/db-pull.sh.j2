@@ -19,7 +19,7 @@ done
 #Permission will be required to pull an object from the S3 bucket.
 
 echo "Downloading s3 database..."
-aws s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite" "{{ chia_root }}/{{ network }}/db/blockchain_v1_{{ network }}.sqlite"
+aws s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite" "{{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite"
 
 echo "Starting chia services..."
 sudo systemctl start chia
