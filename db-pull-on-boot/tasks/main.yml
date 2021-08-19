@@ -3,6 +3,9 @@
   template:
     src: "db-pull.sh.j2"
     dest: "{{ chia_root }}/db-pull.sh"
+    owner: ubuntu
+    group: ubuntu
+    mode: 0755
 
 - name: Install the DB unit file
   template:
