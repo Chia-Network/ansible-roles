@@ -1,4 +1,4 @@
 ---
 blockchain_backup_bucket: ""
 network : ""
-chia_root: ""
+chia_root: "/home/ubuntu/.chia"
