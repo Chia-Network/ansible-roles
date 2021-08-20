@@ -5,7 +5,7 @@ sudo systemctl stop chia
 
 count=1
 while : ; do
-processes=$(ps -aux | grep chia | grep -v grep | wc -l)
+processes=$(pgrep chia | grep -v grep | wc -l)
 echo "found $processes running chia processes. Waiting for all processes to stop..."
 
 # Exit conditions
@@ -20,6 +20,8 @@ done
 
 echo "Downloading s3 database..."
 aws s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite" "{{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite"
+
+sudo chown ubuntu:ubuntu "{{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite"
 
 echo "Starting chia services..."
 sudo systemctl start chia
