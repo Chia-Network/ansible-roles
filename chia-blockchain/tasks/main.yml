@@ -70,6 +70,8 @@
   template:
     src: config.yaml.j2
     dest: "{{ chia_root }}/config/config.yaml"
+    owner: "{{ user }}"
+    group: "{{ group }}"
   notify: restart-chia
 
 - name: Add Keys
