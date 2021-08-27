@@ -51,7 +51,7 @@
   become_user: "{{ user }}"
   shell: |
     sh install.sh
-    chia init
+    chia init --fix-ssl-permissions
   args:
     chdir: "/home/{{ user }}/chia-blockchain"
   environment:
