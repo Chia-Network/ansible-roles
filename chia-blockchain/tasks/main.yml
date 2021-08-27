@@ -26,6 +26,8 @@
     line: "export CHIA_ROOT={{ chia_root }}"
 
 - name: Copy latest blockchain DB from S3
+  become: yes
+  become_user: "{{ user }}"
   shell: |
     aws s3 cp s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite {{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite
   args:
@@ -33,6 +35,8 @@
   when: download_blockchain_db
 
 - name: Ensure correct ref is checked out
+  become: yes
+  become_user: "{{ user }}"
   ansible.builtin.git:
     repo: "{{ repo_url }}"
     dest: "/home/{{ user }}/chia-blockchain"
@@ -43,6 +47,8 @@
   notify: restart-chia
 
 - name: Chia Install and Init
+  become: yes
+  become_user: "{{ user }}"
   shell: |
     sh install.sh
     chia init
@@ -54,6 +60,8 @@
   when: git_output.changed
 
 - name: Install timelord
+  become: yes
+  become_user: "{{ user }}"
   shell: |
     . ./activate
     sh install-timelord.sh
@@ -75,6 +83,8 @@
   notify: restart-chia
 
 - name: Add Keys
+  become: yes
+  become_user: "{{ user }}"
   shell: |
     echo "{{ item }}" | chia keys add
   args:
