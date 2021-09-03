@@ -4,6 +4,8 @@
   ansible.builtin.apt:
     name:
       - git
+      - python3-dev
+      - build-essential
     state: present
 
 - name: Ensure chia directories exist
