@@ -1,0 +1,7 @@
+---
+- name: start-runner-service
+  systemd:
+    name: runner.service
+    daemon_reload: true
+    state: restarted
+    enabled: yes
