@@ -11,3 +11,8 @@ endpoint = "{{ loki_endpoint }}"
 labels.application = "chia-blockchain"
 labels.component = "{{ component }}"
 labels.network = "{{ network }}"
+{% if loki_basic_auth %}
+auth.strategy = "basic"
+auth.user = "{{ loki_basic_auth_username }}"
+auth.password = "{{ loki_basic_auth_password }}"
+{% endif %}
