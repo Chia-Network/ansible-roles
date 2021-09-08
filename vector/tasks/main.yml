@@ -14,8 +14,19 @@
     state: present
   notify: restart-vector
 
+- name: Template vector config
+  template:
+    src: vector.toml
+    dest: /etc/vector/vector.toml
+
+- name: Template systemd config
+  template:
+    src: vector.service
+    dest: /etc/systemd/system/vector.service
+
 - name: Set desired service/boot states
   ansible.builtin.systemd:
     name: vector
+    daemon_reload: true
     enabled: "{{ vector_start_on_boot }}"
     state: "{{ vector_start_now | ternary('started','stopped') }}"
