@@ -118,7 +118,7 @@
 
 - name: Add vector config
   become: yes
-  template:
+  ansible.builtin.template:
     src: chia-blockchain.vector.toml
     dest: /etc/vector/chia-blockchain.vector.toml
   when: add_vector_config
