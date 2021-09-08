@@ -8,3 +8,6 @@ read_from = "beginning"
 type = "loki"
 inputs = ["chia"]
 endpoint = "{{ loki_endpoint }}"
+labels.application = "chia-blockchain"
+labels.component = "{{ component }}"
+labels.network = "{{ network }}"
