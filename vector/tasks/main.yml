@@ -1,0 +1,21 @@
+---
+- name: Set up key and repo
+  ansible.builtin.shell: |
+    curl -1sLf \
+      'https://repositories.timber.io/public/vector/cfg/setup/bash.deb.sh' \
+    | sudo -E bash
+  args:
+    creates: /etc/apt/sources.list.d/timber-vector.list
+
+- name: Install vector
+  ansible.builtin.apt:
+    name: vector
+    update_cache: yes
+    state: present
+  notify: restart-vector
+
+- name: Set desired service/boot states
+  ansible.builtin.systemd:
+    name: vector
+    enabled: "{{ vector_start_on_boot }}"
+    state: "{{ vector_start_now | ternary('started','stopped') }}"
