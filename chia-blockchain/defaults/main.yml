@@ -77,6 +77,7 @@ process_count: 3
 send_uncompact_interval: 0
 
 # Vector/Loki Related
+add_vector_config: false
 loki_endpoint: http://localhost:3100
 loki_basic_auth: false
 loki_basic_auth_username: ""
