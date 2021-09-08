@@ -75,3 +75,7 @@ process_count: 3
 
 # 'send_uncompact_interval' seconds. Set to 0 if you don't use this feature. Recommended is 300
 send_uncompact_interval: 0
+
+# Vector/Loki Related
+add_vector_config: false
+loki_endpoint: http://localhost:3100
