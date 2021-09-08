@@ -1,0 +1,10 @@
+[sources.chia]
+type = "file"
+ignore_older_secs = 600
+include = ["{{ chia_root }}/log/debug.log"]
+read_from = "beginning"
+
+[sinks.loki]
+type = "loki"
+inputs = ["chia"]
+endpoint = "{{ loki_endpoint }}"

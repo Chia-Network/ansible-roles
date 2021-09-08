@@ -115,4 +115,10 @@
     daemon_reload: yes
     enabled: "{{ start_on_boot }}"
     state: "{{ start_now | ternary('started','stopped') }}"
-# Sleep?
+
+- name: Add vector config
+  become: yes
+  template:
+    src: chia-blockchain.vector.toml
+    dest: /etc/vector/chia-blockchain.vector.toml
+  when: add_vector_config
