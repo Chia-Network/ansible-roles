@@ -14,3 +14,14 @@
 
 # Change this to use a non-default directory for Vector data storage:
 # data_dir = "/var/lib/vector"
+
+# Source syslog and sink to blockhole so that we have a valid default config and vector can start
+[sources.syslog]
+type = "file"
+ignore_older_secs = 600
+include = ["/var/log/syslog"]
+read_from = "end"
+
+[sinks.syslog_blackhole]
+type = "blackhole"
+inputs = ["syslog"]
