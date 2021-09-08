@@ -1,6 +1,10 @@
 ---
 # chia-runner/tasks/main.yml
 - name: Clone runner code and unzip
+  stat:
+    path: /Library/LaunchAgents/actions.runner.Chia-Network.m1-01.plist
+  register: runner_file
+  when: not runner_file.stat.exists
   shell: |
     mkdir actions-runner && cd actions-runner
     curl -O -L https://github.com/actions/runner/releases/download/v"{{ runner_release_version }}"/actions-runner-osx-x64-"{{ runner_release_version }}".tar.gz
