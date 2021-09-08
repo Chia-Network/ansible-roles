@@ -1,0 +1,5 @@
+- name: restart-vector
+  service:
+    name: vector
+    state: restarted
+  when: vector_start_now
