@@ -121,5 +121,4 @@
   ansible.builtin.template:
     src: chia-blockchain.vector.toml
     dest: /etc/vector/chia-blockchain.vector.toml
-  when: add_vector_config
   notify: restart-vector
