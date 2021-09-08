@@ -24,9 +24,14 @@
     src: vector.service
     dest: /etc/systemd/system/vector.service
 
-- name: Set desired service/boot states
+- name: Set desired boot state
   ansible.builtin.systemd:
     name: vector
     daemon_reload: true
     enabled: "{{ vector_start_on_boot }}"
+
+- name: Set desired current state
+  ansible.builtin.systemd:
+    name: vector
     state: "{{ vector_start_now | ternary('started','stopped') }}"
+  ignore_errors: yes # In case we have a bad config and we need to finish the playbook to continue
