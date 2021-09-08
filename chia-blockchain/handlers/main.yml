@@ -9,4 +9,3 @@
   service:
     name: vector
     state: restarted
-  when: add_vector_config
