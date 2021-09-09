@@ -43,6 +43,8 @@
     line: "export CHIA_ROOT={{ chia_root }}"
 
 - name: Ensure correct ref is checked out
+  become: yes
+  become_user: "{{ user }}"
   ansible.builtin.git:
     repo: "{{ repo_url }}"
     dest: "/home/{{ user }}/chiadns"
@@ -56,6 +58,8 @@
     - restart-crawler
 
 - name: Chia Install and Init
+  become: yes
+  become_user: "{{ user }}"
   shell: |
     sh install.sh
     chia init
@@ -70,6 +74,8 @@
   template:
     src: config.yaml.j2
     dest: "{{ chia_root }}/config/config.yaml"
+    owner: "{{ user }}"
+    group: "{{ group }}"
   notify:
     - restart-dns-introducer
     - restart-crawler
