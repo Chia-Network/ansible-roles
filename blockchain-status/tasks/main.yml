@@ -1,18 +1,10 @@
 ---
 - name: Upload binary
   become: yes
-  ansible.posix.synchronize:
+  ansible.builtin.copy:
     src: "{{ local_bin_path }}"
     dest: "/usr/local/bin/{{ bin_name }}"
-    checksum: yes
-  notify: restart-blockchain-status
-
-- name: Ensure permissions are correct on the binary
-  become: yes
-  ansible.builtin.file:
-    state: file
     mode: '0755'
-    path: "/usr/local/bin/{{ bin_name }}"
   notify: restart-blockchain-status
 
 - name: Systemd Config
