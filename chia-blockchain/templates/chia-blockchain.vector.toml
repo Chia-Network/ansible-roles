@@ -4,6 +4,19 @@ ignore_older_secs = 600
 include = ["{{ chia_root }}/log/debug.log"]
 read_from = "beginning"
 
+# This parses the line that contains number of plots total, plots that were eligible, and number of proofs found
+[transforms.parse_proofs]
+type = "remap"
+inputs = ["chia"]
+source = """
+. |= parse_regex!(.message, r'^.*(?P<eligible_plots>[0-9]+) plots were eligible .* Found (?P<proofs>[0-9]+) proofs.*Total (?P<plots>[0-9]+) plots.*$')
+
+# Coerce parsed fields
+.eligible_plots = to_int!(.eligible_plots)
+.proofs = to_int!(.proofs)
+.plots = to_int!(.plots)
+"""
+
 [sinks.loki]
 type = "loki"
 inputs = ["chia"]
