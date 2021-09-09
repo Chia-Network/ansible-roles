@@ -27,6 +27,7 @@ introducer_peer:
   host: introducer.chia.net
   port: 8444
 
+application: chia-blockchain
 # Which chia blockchain component to start
 component: node
 
