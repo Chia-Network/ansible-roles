@@ -11,6 +11,13 @@ private_deploy_key: ""
 
 chia_root: "/home/ubuntu/.chia"
 
+application: chia-blockchain
+# Which chia blockchain component to start
+component: dns-introducer
+# Group Tag is used to add context to the installation, metrics, etc when the application, network, component, and ref
+# are otherwise identical
+group_tag: default
+
 # What network we're running on
 # This is templated directly into config.yaml as well, so needs to exactly match the network name
 network: "mainnet"
@@ -54,3 +61,10 @@ network_overrides:
       address_prefix: "xch"
     testnet7:
       address_prefix: "txch"
+
+# Vector/Loki Related
+add_vector_config: false
+loki_endpoint: http://localhost:3100
+loki_basic_auth: false
+loki_basic_auth_username: ""
+loki_basic_auth_password: ""

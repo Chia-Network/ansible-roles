@@ -3,8 +3,15 @@
   service:
     name: crawler
     state: restarted
+
 - name: restart-dns-introducer
   become: yes
   service:
     name: dns-introducer
     state: restarted
+
+- name: restart-vector
+  service:
+    name: vector
+    state: restarted
+  when: add_vector_config
