@@ -107,3 +107,11 @@
   with_items:
     - crawler
     - dns-introducer
+
+- name: Add vector config
+  become: yes
+  ansible.builtin.template:
+    src: dns-introducer.vector.toml
+    dest: /etc/vector/dns-introducer.vector.toml
+  when: add_vector_config
+  notify: restart-vector
