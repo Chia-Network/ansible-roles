@@ -1,11 +1,13 @@
 ---
-- name: Set up key and repo
-  ansible.builtin.shell: |
-    curl -1sLf \
-      'https://repositories.timber.io/public/vector/cfg/setup/bash.deb.sh' \
-    | sudo -E bash
-  args:
-    creates: /etc/apt/sources.list.d/timber-vector.list
+- name: Add vector key
+  ansible.builtin.apt_key:
+    url: https://repositories.timber.io/public/vector/gpg.3543DB2D0A2BC4B8.key
+    state: present
+
+- name: Add vector repository
+  ansible.builtin.template:
+    src: timber-vector.list
+    dest: /etc/apt/sources.list.d/timber-vector.list
 
 - name: Install vector
   ansible.builtin.apt:
