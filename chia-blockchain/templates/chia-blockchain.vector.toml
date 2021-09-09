@@ -13,6 +13,8 @@ healthcheck.enabled = true
 labels.application = "chia-blockchain"
 labels.component = "{{ component }}"
 labels.network = "{{ network }}"
+labels.group = "{{ group_tag }}"
+labels.ref = "{{ repo_ref }}"
 
 {% if loki_basic_auth %}
 auth.strategy = "basic"

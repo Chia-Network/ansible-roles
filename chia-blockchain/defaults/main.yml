@@ -30,6 +30,10 @@ introducer_peer:
 # Which chia blockchain component to start
 component: node
 
+# Group Tag is used to add context to the installation, metrics, etc when the application, network, component, and ref
+# are otherwise identical
+group_tag: default
+
 repo_url: "https://github.com/Chia-Network/chia-blockchain.git"
 repo_ref: "latest"
 
