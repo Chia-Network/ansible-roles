@@ -1,11 +1,14 @@
 ---
 # chia-runner/tasks/main.yml
 
-- name: Insert the proper path for gnu-tar in .zshenv and source the file.
+- name: Insert the proper path for gnu-tar in .zshenv.
   lineinfile:
     path: "~/.zshenv"
     line: export PATH="/opt/homebrew/opt/gnu-tar/libexec/gnubin:$PATH"
     insertbefore: EOF
+
+- name: Source the ~/.zshenv file
+  - shell: source ~/.zshenv
 
 - name: Make action-runner directory
   ansible.builtin.file:
