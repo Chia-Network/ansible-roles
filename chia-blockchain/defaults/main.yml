@@ -76,7 +76,12 @@ network_overrides:
 sanitizer_mode: False
 
 # Number of VDF client processes to keep alive in the local machine.
+timelord_launcher_host: localhost
 process_count: 3
+vdf_client_ips:
+  - localhost
+  - 127.0.0.1
+vdf_server_hostname: localhost
 
 # 'send_uncompact_interval' seconds. Set to 0 if you don't use this feature. Recommended is 300
 send_uncompact_interval: 0
