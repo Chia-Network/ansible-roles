@@ -1,4 +1,4 @@
----
+--- # This can be called if needed to restart the service.
 - name: restart-runner-service
   shell: |
     {{ path_to_service }}\scv.sh stop

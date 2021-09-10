@@ -1,19 +1,56 @@
 ---
 # chia-runner/tasks/main.yml
-- name: Clone runner code and unzip
+#This checks to see if the service was installed. It is installed by running
+# ./svc.sh install in the actions-runner directory.
+- name: Check for the auto-generated service file
   stat:
     path: /Library/LaunchAgents/actions.runner.Chia-Network.m1-01.plist
   register: runner_file
+#This checks to see if the configuration script was succesfully ran.
+# It is installed by running ./config.sh with various flags in the actions-runner directory.
+- name: Check for the svc.sh script file
+  stat:
+    path: /Users/hoffmang/actions-runner/svc.sh
+  register: service_script
+
+- name: Insert the proper path for gnu-tar in .zshenv and source the file.
+  lineinfile:
+    path: "~/.zshenv"
+    line: export PATH="/opt/homebrew/opt/gnu-tar/libexec/gnubin:$PATH"
+    insertbefore: EOF
+
+- name: Make action-runner directory
   when: not runner_file.stat.exists
-  shell: |
-    mkdir actions-runner && cd actions-runner
-    curl -O -L https://github.com/actions/runner/releases/download/v"{{ runner_release_version }}"/actions-runner-osx-x64-"{{ runner_release_version }}".tar.gz
-    tar xzf ./actions-runner-osx-x64-"{{ runner_release_version }}".tar.gz
-    ./config.sh --url https://github.com/Chia-Network --token ATAQBLQ36XEKM6ED6XQ7FNDBHE6ZM --runnergroup "M1 Runners" --labels macOS,self-hosted,X64,m1 --name m1-01 --work _work
-  become_user: chia-network
+  ansible.builtin.file:
+    path: "{{ path_to_service }}"
+    state: directory
+    mode: '0755'
+
+- name: Download runner tarball
+  get_url:
+    url: https://github.com/actions/runner/releases/download/v{{runner_release_version}}/actions-runner-osx-x64-{{runner_release_version}}.tar.gz
+    dest: "{{ path_to_service }}"
+    mode: '0755'
+
+- name: Unarchive runner tarball
+  when: not service_script.stat.exists
+  unarchive:
+    src: "{{ path_to_service }}/actions-runner-osx-x64-{{runner_release_version}}.tar.gz"
+    dest: "{{ path_to_service }}"
+    remote_src: yes
+    list_files: yes
+
+- name: Configure the runner for GitHub
+  when: not service_script.stat.exists
+  shell: ./config.sh --url https://github.com/Chia-Network --token {{registration_token}} --runnergroup "M1 Runners" --labels m1 --name m1-01 --unattended
+  args:
+    chdir: "{{ path_to_service }}"
 
 - name: Install the runner service
-  become: chia-network
-  shell: "{{ path_to_service }}/svc.sh install"
-
-
+  become_user: chia-network
+  shell: |
+    arch -x86_64 ./svc.sh install
+    arch -x86_64 ./svc.sh start
+    arch -x86_64 ./svc.sh status
+  args:
+    chdir: "{{ path_to_service }}"
