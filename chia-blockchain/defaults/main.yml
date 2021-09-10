@@ -17,6 +17,7 @@ download_blockchain_db: true
 network: "mainnet"
 full_node_port: 8444
 introducer_port: 8444
+target_outbound_peer_count: 8
 target_peer_count: 80
 log_level: "ERROR"
 
