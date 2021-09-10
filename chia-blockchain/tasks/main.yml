@@ -74,7 +74,7 @@
     CHIA_ROOT: "{{ chia_root }}"
   when: # List is AND
     - git_output.changed
-    - component == "timelord"
+    - component is match("timelord.*")
 
 - name: Chia Config
   template:
