@@ -15,6 +15,7 @@ labels.component = "{{ component }}"
 labels.network = "{{ network }}"
 labels.group = "{{ group_tag }}"
 labels.ref = "{{ repo_ref }}"
+labels.host = "{% raw %}{{ host }}{% endraw %}"
 
 {% if loki_basic_auth %}
 auth.strategy = "basic"
