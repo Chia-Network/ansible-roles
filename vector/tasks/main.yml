@@ -10,6 +10,7 @@
     dest: /etc/apt/sources.list.d/timber-vector.list
 
 - name: Install vector
+  become: yes
   ansible.builtin.apt:
     name: vector
     update_cache: yes
