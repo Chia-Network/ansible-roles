@@ -1,0 +1,44 @@
+---
+# chia-runner/tasks/main.yml
+
+- name: Insert the proper path for gnu-tar in .zshenv.
+  lineinfile:
+    path: "~/.zshenv"
+    line: export PATH="/opt/homebrew/opt/gnu-tar/libexec/gnubin:$PATH"
+    insertbefore: EOF
+
+- name: Make action-runner directory
+  ansible.builtin.file:
+    path: "{{ path_to_service }}"
+    state: directory
+    mode: '0755'
+
+- name: Download runner tarball
+  get_url:
+    url: https://github.com/actions/runner/releases/download/v{{runner_release_version}}/actions-runner-osx-x64-{{runner_release_version}}.tar.gz
+    dest: "{{ path_to_service }}"
+    mode: '0755'
+
+- name: Unarchive runner tarball
+  ansible.builtin.unarchive:
+    src: "{{ path_to_service }}/actions-runner-osx-x64-{{runner_release_version}}.tar.gz"
+    dest: "{{ path_to_service }}"
+    remote_src: yes
+    list_files: yes
+    creates: "{{ path_to_service }}/actions-runner/svc.sh"
+
+- name: Configure the runner for GitHub
+  shell: ./config.sh --url https://github.com/Chia-Network --token {{registration_token}} --runnergroup "M1 Runners" --labels m1 --name m1-01 --unattended
+  args:
+    chdir: "{{ path_to_service }}"
+    creates: "{{ path_to_service }}/actions-runner/svc.sh"
+
+- name: Install the runner service
+  become_user: chia-network
+  shell: |
+    arch -x86_64 ./svc.sh install
+    arch -x86_64 ./svc.sh start
+    arch -x86_64 ./svc.sh status
+  args:
+    chdir: "{{ path_to_service }}"
+    creates: "{{ path_to_service }}/actions-runner/svc.sh"
