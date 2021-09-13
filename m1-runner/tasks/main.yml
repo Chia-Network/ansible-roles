@@ -28,7 +28,7 @@
     creates: "{{ path_to_service }}/svc.sh"
 
 - name: Configure the runner for GitHub
-  shell: ./config.sh --url https://github.com/Chia-Network --token {{registration_token}} --runnergroup "M1 Runners" --labels m1 --name m1-01 --unattended
+  shell: ./config.sh --url https://github.com/Chia-Network --token {{registration_token}} --runnergroup "m1-test-runners" --labels m1-test --name m1-01 --unattended
   args:
     chdir: "{{ path_to_service }}"
     creates: "{{ path_to_service }}/svc.sh"
