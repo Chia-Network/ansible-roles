@@ -2,3 +2,5 @@
 dependencies:
   - role: awscli
   - role: logrotate
+  - role: vector
+    when: add_vector_config
