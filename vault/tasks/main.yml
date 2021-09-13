@@ -5,6 +5,9 @@
     update_cache: yes
     state: present
   notify: restart-vault
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
 - name: Template vault config
   ansible.builtin.template:

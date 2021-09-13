@@ -1,11 +1,4 @@
 ---
-- name: Install Deps
-  become: yes
-  ansible.builtin.apt:
-    name:
-      - git
-    state: present
-
 - name: Ensure chia directories exist
   # become, in case ownership is incorrect
   become: yes
