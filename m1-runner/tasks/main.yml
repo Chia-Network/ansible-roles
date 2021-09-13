@@ -7,9 +7,6 @@
     line: export PATH="/opt/homebrew/opt/gnu-tar/libexec/gnubin:$PATH"
     insertbefore: EOF
 
-#- name: Source the ~/.zshenv file
-#  - shell: source ~/.zshenv
-
 - name: Make action-runner directory
   ansible.builtin.file:
     path: "{{ path_to_service }}"
