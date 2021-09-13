@@ -5,16 +5,19 @@
     path: "/etc/hosts"
     regexp: '^127.0.0.1 localhost'
     line: "127.0.0.1 localhost {{ ansible_facts.hostname }}"
+
 - name: Copy updated config into place
   become: yes
   template:
     src: resolved.conf
     dest: /etc/systemd/resolved.conf
+
 - name: Copy resolv.conf into place
   become: yes
   template:
     src: resolv.conf
     dest: /etc/resolv.conf
+
 - name: Stop and disable resolved service
   become: yes
   ansible.builtin.systemd:
