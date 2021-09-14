@@ -1,5 +1,6 @@
 runner_release_version: ""
-path_to_service: ""
+path_to_runner_directory: ""
+path_to_service_file: ""
 token: ""
 user: ""
 runner_group: ""
