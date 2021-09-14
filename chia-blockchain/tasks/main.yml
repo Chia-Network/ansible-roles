@@ -126,3 +126,11 @@
     dest: /etc/vector/chia-blockchain.vector.toml
   when: add_vector_config
   notify: restart-vector
+
+- name: Add monit config
+  become: yes
+  ansible.builtin.template:
+    src: monit_config.j2
+    dest: /etc/monit/conf.d/chia_monit
+  when: add_monit_config
+  notify: restart-monit

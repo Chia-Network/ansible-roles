@@ -1,0 +1,19 @@
+---
+# Install monit from apt
+- name: Install monit
+  become: yes
+  ansible.builtin.apt:
+    name: monit
+    update_cache: yes
+    state: present
+  notify: restart-monit
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
+- name: Enable and start the service for monit
+  ansible.builtin.systemd:
+    name: monit
+    daemon_reload: true
+    enabled: "{{ monitor_start_on_boot }}"
+    state: "{{ monitor_start_now | ternary('started','stopped') }}"

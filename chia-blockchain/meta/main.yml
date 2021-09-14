@@ -4,3 +4,5 @@ dependencies:
   - role: logrotate
   - role: vector
     when: add_vector_config
+  - role: monit
+    when: add_monit_config
