@@ -1,3 +1,4 @@
 ---
-vector_start_on_boot: yes
-vector_start_now: yes
+monitor_start_on_boot: yes
+monitor_start_now: yes
+

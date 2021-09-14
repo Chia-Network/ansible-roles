@@ -10,3 +10,10 @@
     name: vector
     state: restarted
   when: add_vector_config
+
+- name: restart-monit
+  service:
+    name: monit
+    state: restarted
+  when: add_monit_config
+

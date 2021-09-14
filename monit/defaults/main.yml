@@ -1,0 +1,3 @@
+---
+monit_start_on_boot: yes
+monit_start_now: yes
