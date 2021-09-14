@@ -34,11 +34,18 @@
     creates: "{{ path_to_runner_directory }}/svc.sh"
 
 - name: Install the runner service
-  become_user: chia-network
   shell: |
     arch -x86_64 ./svc.sh install
-    arch -x86_64 ./svc.sh start
-    arch -x86_64 ./svc.sh status
   args:
     chdir: "{{ path_to_runner_directory }}"
     creates: "{{ path_to_service_file }}"
+
+- name:  Start the runner service
+  shell: |
+    arch -x86_64 ./svc.sh start
+    arch -x86_64 ./svc.sh status
+  register: output
+
+- name: Display the output in Ansible
+  debug: msg:"{{ output.stdout }}"
+
