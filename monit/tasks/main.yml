@@ -15,5 +15,5 @@
   ansible.builtin.systemd:
     name: monit
     daemon_reload: true
-    enabled: "{{ monitor_start_on_boot }}"
-    state: "{{ monitor_start_now | ternary('started','stopped') }}"
+    enabled: "{{ monit_start_on_boot }}"
+    state: "{{ monit_start_now | ternary('started','stopped') }}"
