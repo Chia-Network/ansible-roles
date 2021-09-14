@@ -47,5 +47,6 @@
   register: output
 
 - name: Display the output in Ansible
-  debug: msg:"{{ output.stdout }}"
+  debug:
+    msg: "{{ output.stdout }}"
 
