@@ -94,4 +94,4 @@ loki_basic_auth: false
 loki_basic_auth_username: ""
 loki_basic_auth_password: ""
 
-add_monit_config: false
+add_monit_config: true
