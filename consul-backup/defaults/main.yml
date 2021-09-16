@@ -1,0 +1,4 @@
+---
+user: ubuntu
+group: ubuntu
+consul_backup_bucket: "consul-backup-bucket-name"
