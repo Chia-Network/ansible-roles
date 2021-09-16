@@ -1,0 +1,38 @@
+#!/bin/bash
+
+THEDATE=$(date +%s)
+BACKUP_FILENAME="backup-${THEDATE}.snap"
+BACKUP_FILE="/tmp/$BACKUP_FILENAME"
+
+# Check for required variables
+[ -z "${TOKEN_FILE+x}" ] && echo "Please set TOKEN_FILE" && exit 1
+
+LOCK_FILE="/tmp/consul-backup.lock"
+
+cleanup() {
+    rm -f "$LOCK_FILE" || true
+    rm -f "$BACKUP_FILE" || true
+}
+
+if [ -e $LOCK_FILE ] ; then
+    echo "Lock file exists, not starting another backup"
+    exit 1
+fi
+
+trap cleanup EXIT
+
+touch $LOCK_FILE
+
+echo "Starting consul backup"
+n=0
+until [ "$n" -ge 5 ]
+do
+   consul snapshot save -token-file="$TOKEN_FILE" "$BACKUP_FILE" && break
+   n=$((n+1))
+   echo "Backup failed, retrying"
+done
+
+echo "Starting upload to s3..."
+aws s3 cp "$BACKUP_FILE" "s3://{{ consul_backup_bucket }}/$BACKUP_FILENAME"
+
+echo "Backup Complete!"
