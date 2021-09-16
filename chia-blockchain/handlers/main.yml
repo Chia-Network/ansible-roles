@@ -6,12 +6,14 @@
   when: start_now
 
 - name: restart-vector
+  become: yes
   service:
     name: vector
     state: restarted
   when: add_vector_config
 
 - name: restart-monit
+  become: yes
   service:
     name: monit
     state: restarted
