@@ -4,9 +4,6 @@ THEDATE=$(date +%s)
 BACKUP_FILENAME="backup-${THEDATE}.snap"
 BACKUP_FILE="/tmp/$BACKUP_FILENAME"
 
-# Check for required variables
-[ -z "${TOKEN_FILE+x}" ] && echo "Please set TOKEN_FILE" && exit 1
-
 LOCK_FILE="/tmp/consul-backup.lock"
 
 cleanup() {
@@ -27,7 +24,7 @@ echo "Starting consul backup"
 n=0
 until [ "$n" -ge 5 ]
 do
-   consul snapshot save -token-file="$TOKEN_FILE" "$BACKUP_FILE" && break
+   consul snapshot save -token-file="{{ consul_token_file }}" "$BACKUP_FILE" && break
    n=$((n+1))
    echo "Backup failed, retrying"
 done
