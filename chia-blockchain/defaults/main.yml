@@ -96,5 +96,3 @@ loki_basic_auth_password: ""
 
 # monit service related
 add_monit_config: true
-#This is the delay time for monit to start checking after a system start
-delay_time_secs: 240

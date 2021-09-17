@@ -11,6 +11,14 @@
   retries: 100
   until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
+- name: Add monitrc config file
+  become: yes
+  ansible.builtin.template:
+    src: chia_monitrc.j2
+    dest: /etc/monit/monitrc
+  when: add_monit_config
+  notify: restart-monit
+
 - name: Enable and start the service for monit
   ansible.builtin.systemd:
     name: monit
