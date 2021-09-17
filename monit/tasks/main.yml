@@ -16,7 +16,6 @@
   ansible.builtin.template:
     src: chia_monitrc.j2
     dest: /etc/monit/monitrc
-  when: add_monit_config
   notify: restart-monit
 
 - name: Enable and start the service for monit

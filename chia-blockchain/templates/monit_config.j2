@@ -1,5 +1,5 @@
 check host localhost with address 127.0.0.1
-    start program = "/bin/systemctl start chia" with timeout 300 seconds
+    start program = "/bin/systemctl start chia" with timeout 600 seconds
     stop program = "/bin/systemctl stop chia"
     if failed port {{ full_node_port }} then restart
     if 5 restarts within 5 cycles then timeout
