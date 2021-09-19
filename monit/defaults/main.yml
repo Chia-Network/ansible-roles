@@ -1,3 +1,6 @@
 ---
 monit_start_on_boot: yes
 monit_start_now: yes
+
+#This is the delay time for monit to start checking after a system start
+monit_start_delay_secs: 240
