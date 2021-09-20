@@ -82,6 +82,8 @@ full_node:
 
   # How often to initiate outbound connections to other full nodes.
   peer_connect_interval: 30
+  # How long to wait for a peer connection
+  peer_connect_timeout: {{ peer_connect_timeout }}
   # Accept peers until this number of connections
   target_peer_count: 80
   # Initiate outbound connections until this number is hit.
@@ -111,6 +113,10 @@ full_node:
   # analyze with chia/utils/profiler.py
   enable_profiler: False
 
+  # this is a debug and profiling facility that logs all SQLite commands to a
+  # separate log file (under logging/sql.log).
+  log_sqlite_cmds: False
+
   # List of trusted DNS seeders to bootstrap from.
   # If you modify this, please change the hardcode as well from FullNode.set_server()
   dns_servers:
@@ -122,7 +128,8 @@ full_node:
     host: *self_hostname
     port: 8446
   introducer_peer:
-    - introducer.chia.net
+    host: introducer.chia.net
+    port: 8444
   wallet_peer:
     host: *self_hostname
     port: 8449

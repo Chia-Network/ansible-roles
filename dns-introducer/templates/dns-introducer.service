@@ -2,12 +2,14 @@
 Description=Chia DNS Introducer Service
 
 [Service]
+Type=forking
 Environment=PATH=/home/{{ user }}/chiadns/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=CHIA_ROOT=/home/{{ user }}/.chia
-ExecStart=/home/{{ user }}/chiadns/venv/bin/python /home/{{ user }}/chiadns/chia/crawler/crawler_dns.py
+ExecStart=/home/{{ user }}/chiadns/venv/bin/chiadns start all
+ExecStop=/home/{{ user }}/chiadns/venv/bin/chiadns stop all
 User={{ user }}
 Group={{ group }}
-TimeoutStopSec=1
+TimeoutStopSec=10
 LimitNOFILE=1048576
 LimitNPROC=1048576
 
