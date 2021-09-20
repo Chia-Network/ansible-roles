@@ -1,9 +1,3 @@
-- name: restart-crawler
-  become: yes
-  service:
-    name: crawler
-    state: restarted
-
 - name: restart-dns-introducer
   become: yes
   service:

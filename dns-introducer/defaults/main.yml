@@ -23,6 +23,7 @@ group_tag: default
 network: "mainnet"
 full_node_port: 8444
 log_level: "ERROR"
+peer_connect_timeout: 2
 
 minimum_height: 240000
 bootstrap_peers:
