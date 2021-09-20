@@ -4,7 +4,7 @@ Description=Chia DNS Introducer Service
 [Service]
 Environment=PATH=/home/{{ user }}/chiadns/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=CHIA_ROOT=/home/{{ user }}/.chia
-ExecStart=/home/{{ user }}/chiadns/venv/bin/python /home/{{ user }}/chiadns/chia/crawler/dns.py
+ExecStart=/home/{{ user }}/chiadns/venv/bin/python /home/{{ user }}/chiadns/chia/crawler/crawler_dns.py
 User={{ user }}
 Group={{ group }}
 TimeoutStopSec=1
