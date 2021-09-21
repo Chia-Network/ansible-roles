@@ -7,13 +7,13 @@ BACKUP_FILE="/tmp/$BACKUP_FILENAME"
 LOCK_FILE="/tmp/consul-backup.lock"
 
 cleanup() {
-    rm -f "$LOCK_FILE" || true
-    rm -f "$BACKUP_FILE" || true
+	rm -f "$LOCK_FILE" || true
+	rm -f "$BACKUP_FILE" || true
 }
 
-if [ -e $LOCK_FILE ] ; then
-    echo "Lock file exists, not starting another backup"
-    exit 1
+if [ -e $LOCK_FILE ]; then
+	echo "Lock file exists, not starting another backup"
+	exit 1
 fi
 
 trap cleanup EXIT
@@ -22,11 +22,10 @@ touch $LOCK_FILE
 
 echo "Starting consul backup"
 n=0
-until [ "$n" -ge 5 ]
-do
-   consul snapshot save -token-file="{{ consul_token_file }}" "$BACKUP_FILE" && break
-   n=$((n+1))
-   echo "Backup failed, retrying"
+until [ "$n" -ge 5 ]; do
+	consul snapshot save -token-file="{{ consul_token_file }}" "$BACKUP_FILE" && break
+	n=$((n + 1))
+	echo "Backup failed, retrying"
 done
 
 echo "Starting upload to s3..."
