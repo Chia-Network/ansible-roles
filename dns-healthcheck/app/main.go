@@ -33,7 +33,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func readyLoop() {
 	hostname, set := os.LookupEnv("DNS_HOSTNAME")
-	if ! set {
+	if !set {
 		hostname = "dns-introducer.chia.net"
 	}
 

@@ -4,16 +4,16 @@ echo "Stopping chia services..."
 sudo systemctl stop chia
 
 count=1
-while : ; do
-processes=$(pgrep chia | grep -v grep | wc -l)
-echo "found $processes running chia processes. Waiting for all processes to stop..."
+while :; do
+	processes=$(pgrep chia | grep -v grep | wc -l)
+	echo "found $processes running chia processes. Waiting for all processes to stop..."
 
-# Exit conditions
-[[ $processes > 0 ]] || break
-[[ $count -lt 30 ]] || exit 2
+	# Exit conditions
+	[[ $processes > 0 ]] || break
+	[[ $count -lt 30 ]] || exit 2
 
-count=$(expr $count + 1)
-sleep 1
+	count=$(expr $count + 1)
+	sleep 1
 done
 
 #Permission will be required to pull an object from the S3 bucket.
