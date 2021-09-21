@@ -1,14 +1,47 @@
 ---
-  # chia-runner/tasks/main.yml
-  - name: Clone runner code and unzip
-    shell: mkdir actions-runner && cd actions-runner && curl -O -L https://github.com/actions/runner/releases/download/v"{{runner-release-version}}/actions-runner-linux-arm64-"{{runner-release-version}}.tar.gz && tar xzf ./actions-runner-linux-arm64-"{{runner-release-version}}.tar.gz
-    become: yes
-    become_user: ubuntu
+# chia-runner/tasks/main.yml
+- name: Make action-runner directory
+  ansible.builtin.file:
+    path: "{{ path_to_runner_directory }}"
+    state: directory
+    mode: '0755'
 
-  - name: Copy Service File TO AMI
-    copy:
-      src: files/runner-service
-      dest: /etc/systemd/system/github-runner.service
-      owner: root
-      group: root
-      mode: 0755
+- name: Download runner tarball
+  get_url:
+    url: https://github.com/actions/runner/releases/download/v{{runner_release_version}}/actions-runner-linux-arm64-{{runner_release_version}}.tar.gz
+    dest: "{{ path_to_runner_directory }}"
+    mode: '0755'
+
+- name: Unarchive runner tarball
+  ansible.builtin.unarchive:
+    src: "{{ path_to_runner_directory }}/actions-runner-linux-arm64-{{runner_release_version}}.tar.gz"
+    dest: "{{ path_to_runner_directory }}"
+    remote_src: yes
+    list_files: yes
+    creates: "{{ path_to_runner_directory }}/svc.sh"
+
+- name: Configure the runner for GitHub
+  shell: ./config.sh --url https://github.com/Chia-Network --token "{{ token }}" --runnergroup "{{runner_group}}" --labels "{{runner_tags}}" --name "{{runner_name}}" --unattended
+  args:
+    chdir: "{{ path_to_runner_directory }}"
+    creates: "{{ path_to_runner_directory }}/svc.sh"
+
+# The runner service becomes enabled in systemd after install
+- name: Install the runner service
+  shell: |
+    sudo ./svc.sh install
+  args:
+    chdir: "{{ path_to_runner_directory }}"
+    creates: "{{ path_to_service_file }}"
+
+- name:  Start the runner service
+  shell: |
+    sudo ./svc.sh start
+    sudo ./svc.sh status
+  args:
+    chdir: "{{ path_to_runner_directory }}"
+  register: output
+
+- name: Display the output in Ansible
+  debug:
+    msg: "{{ output.stdout }}"
