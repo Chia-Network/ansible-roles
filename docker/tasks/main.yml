@@ -1,0 +1,45 @@
+---
+- name: Update the apt package index and install packages to allow apt to use a repository over HTTPS
+  become: yes
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    update_cache: yes
+    cache_valid_time: 300
+
+- name: Get hashicorp key
+  become: yes
+  ansible.builtin.apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+    keyring: /usr/share/keyrings/docker-archive-keyring.gpg
+
+- name: Register distribution codename
+  shell: lsb_release -cs
+  register: lsb_release
+
+- name: Docker repository
+  become: yes
+  ansible.builtin.apt_repository:
+    repo:  deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ lsb_release.stdout }} stable
+  when: "ansible_architecture == 'x86_64'"
+
+- name: Docker repository
+  become: yes
+  ansible.builtin.apt_repository:
+    repo: deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ lsb_release.stdout }} stable
+  when: "ansible_architecture == 'arm64'"
+
+- name: Install Docker
+  become: yes
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    update_cache: yes
+    cache_valid_time: 300
