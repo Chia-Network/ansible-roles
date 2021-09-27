@@ -1,4 +1,10 @@
 ---
+- name: Stop Chia-Blockchain Service
+  ansible.builtin.service:
+    name: chia
+    state: started
+  ignore_errors: yes # This will still run if the error is not correct
+
 - name: Install Deps
   become: yes
   ansible.builtin.apt:
@@ -128,6 +134,11 @@
     dest: /etc/vector/chia-blockchain.vector.toml
   when: add_vector_config
   notify: restart-vector
+
+- name: Start Chia-Blockchain Service
+  ansible.builtin.service:
+    name: chia
+    state: started
 
 - name: Add custom monit config to conf.d
   become: yes
