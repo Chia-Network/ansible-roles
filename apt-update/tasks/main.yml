@@ -4,6 +4,7 @@
   ansible.builtin.apt:
     name: "*"
     update_cache: yes
+    cache_valid_time: 300
     state: latest
   register: apt_action
   retries: 100
