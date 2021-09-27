@@ -1,0 +1,6 @@
+---
+- name: Stop Chia-Blockchain Service
+  ansible.builtin.service:
+    name: chia
+    state: stopped
+  ignore_errors: yes # This will still run if the error is not correct
