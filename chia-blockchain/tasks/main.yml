@@ -2,7 +2,7 @@
 - name: Stop Monit Service
   ansible.builtin.service:
     name: monit
-    state: started
+    state: stopped
   when: add_monit_config
   ignore_errors: yes # This will still run if the error is not correct
 
