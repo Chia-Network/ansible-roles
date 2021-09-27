@@ -1,4 +1,11 @@
 ---
+- name: Stop Monit Service
+  ansible.builtin.service:
+    name: monit
+    state: stopped
+  when: add_monit_config
+  ignore_errors: yes # This will still run if the error is not correct
+
 - name: Install Deps
   become: yes
   ansible.builtin.apt:
@@ -136,3 +143,9 @@
     dest: /etc/monit/conf.d/chia_monit
   when: add_monit_config
   notify: restart-monit
+
+- name: Start Monit Service
+  ansible.builtin.service:
+    name: monit
+    state: started
+  when: add_monit_config
