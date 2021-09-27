@@ -1,7 +1,7 @@
 ---
-- name: Stop Chia-Blockchain Service
+- name: Stop Monit Service
   ansible.builtin.service:
-    name: chia
+    name: monit
     state: started
   ignore_errors: yes # This will still run if the error is not correct
 
@@ -143,7 +143,7 @@
   when: add_monit_config
   notify: restart-monit
 
-- name: Start Chia-Blockchain Service
+- name: Start Monit Service
   ansible.builtin.service:
-    name: chia
+    name: monit
     state: started
