@@ -7,4 +7,3 @@
 - name: Hashicorp repository
   ansible.builtin.apt_repository:
     repo: deb [arch=amd64] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main
-  update_cache: yes
