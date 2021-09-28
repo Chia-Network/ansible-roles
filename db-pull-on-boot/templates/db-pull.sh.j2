@@ -1,4 +1,24 @@
 #!/bin/bash
+LOCK_FILE="/tmp/blockchain-backup.lock"
+
+cleanup() {
+rm -f "$LOCK_FILE"
+rm -f /tmp/*.sqlite
+sudo systemctl start chia
+sudo systemctl start monit
+}
+
+if [ -e $LOCK_FILE ]; then
+echo "Lock file exists, not starting another backup"
+exit 1
+fi
+
+trap cleanup EXIT
+
+touch $LOCK_FILE
+
+echo "Stopping monit services..."
+sudo systemctl stop monit || true
 
 echo "Stopping chia services..."
 sudo systemctl stop chia
@@ -22,6 +42,3 @@ echo "Downloading s3 database..."
 aws s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite" "{{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite"
 
 sudo chown ubuntu:ubuntu "{{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite"
-
-echo "Starting chia services..."
-sudo systemctl start chia

@@ -1,4 +1,10 @@
 ---
+- name: Stop Monit service
+  systemd:
+    name: monit
+    state: stopped
+  when: "'monit.service' in services"
+
 - name: Copy over the db-pull.sh file
   template:
     src: "db-pull.sh.j2"
