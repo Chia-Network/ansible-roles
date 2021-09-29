@@ -1,5 +1,4 @@
 #!/bin/bash
-=======
 LOCK_FILE="/tmp/blockchain-backup.lock"
 
 cleanup() {
@@ -20,7 +19,6 @@ touch $LOCK_FILE
 
 echo "Stopping monit services..."
 sudo systemctl stop monit || true
->>>>>>> Stashed changes
 
 echo "Stopping chia services..."
 sudo systemctl stop chia
