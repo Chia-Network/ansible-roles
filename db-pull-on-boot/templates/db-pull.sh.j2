@@ -3,7 +3,6 @@ LOCK_FILE="/tmp/db-pull.lock"
 
 cleanup() {
 	rm -f "$LOCK_FILE"
-	rm -f /tmp/*.sqlite
 	sudo systemctl start chia
 	sudo systemctl start monit
 }
