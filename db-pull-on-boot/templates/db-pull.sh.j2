@@ -2,6 +2,7 @@
 LOCK_FILE="/tmp/db-pull.lock"
 
 cleanup() {
+
 	rm -f "$LOCK_FILE"
 	sudo systemctl start chia
 	sudo systemctl start monit
