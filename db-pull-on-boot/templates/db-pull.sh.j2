@@ -2,15 +2,15 @@
 LOCK_FILE="/tmp/blockchain-backup.lock"
 
 cleanup() {
-        rm -f "$LOCK_FILE"
-        rm -f /tmp/*.sqlite
-        sudo systemctl start chia
-        sudo systemctl start monit
+       rm -f "$LOCK_FILE"
+       rm -f /tmp/*.sqlite
+       sudo systemctl start chia
+       sudo systemctl start monit
 }
 
 if [ -e $LOCK_FILE ]; then
-        echo "Lock file exists, not starting another backup"
-        exit 1
+       echo "Lock file exists, not starting another backup"
+       exit 1
 fi
 
 trap cleanup EXIT
@@ -25,15 +25,15 @@ sudo systemctl stop chia
 
 count=1
 while :; do
-processes=$(pgrep chia | grep -v grep | wc -l)
-echo "found $processes running chia processes. Waiting for all processes to stop..."
+       processes=$(pgrep chia | grep -v grep | wc -l)
+       echo "found $processes running chia processes. Waiting for all processes to stop..."
 
-# Exit conditions
-[[ $processes > 0 ]] || break
-[[ $count -lt 30 ]] || exit 2
+       # Exit conditions
+       [[ $processes > 0 ]] || break
+       [[ $count -lt 30 ]] || exit 2
 
-count=$(expr $count + 1)
-sleep 1
+       count=$(expr $count + 1)
+       sleep 1
 done
 
 #Permission will be required to pull an object from the S3 bucket.
