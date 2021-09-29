@@ -8,7 +8,7 @@ cleanup() {
 }
 
 if [ -e $LOCK_FILE ]; then
-	echo "Lock file exists, pulling the database"
+	echo "Lock file exists, not pulling the database"
 	exit 1
 fi
 
