@@ -1,4 +1,23 @@
 #!/bin/bash
+LOCK_FILE="/tmp/db-pull.lock"
+
+cleanup() {
+	rm -f "$LOCK_FILE"
+	sudo systemctl start chia
+	sudo systemctl start monit
+}
+
+if [ -e $LOCK_FILE ]; then
+	echo "Lock file exists, not pulling the database"
+	exit 1
+fi
+
+trap cleanup EXIT
+
+touch $LOCK_FILE
+
+echo "Stopping monit services..."
+sudo systemctl stop monit || true
 
 echo "Stopping chia services..."
 sudo systemctl stop chia
