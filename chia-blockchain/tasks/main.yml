@@ -148,4 +148,4 @@
   ansible.builtin.service:
     name: monit
     state: started
-  when: add_monit_config
+  when: add_monit_config and monit_start_now
