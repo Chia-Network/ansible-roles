@@ -112,3 +112,4 @@ loki_basic_auth_password: ""
 
 # monit service related
 add_monit_config: true
+monit_start_now: false
