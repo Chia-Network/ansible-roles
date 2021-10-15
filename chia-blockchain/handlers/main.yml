@@ -10,12 +10,11 @@
   service:
     name: vector
     state: restarted
-  when: add_vector_config
+  when: add_vector_config and vector_start_now
 
 - name: restart-monit
   become: yes
   service:
     name: monit
     state: restarted
-  when: add_monit_config
-
+  when: add_monit_config and monit_start_now
