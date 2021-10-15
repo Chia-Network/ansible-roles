@@ -109,6 +109,8 @@ loki_endpoint: http://localhost:3100
 loki_basic_auth: false
 loki_basic_auth_username: ""
 loki_basic_auth_password: ""
+vector_start_now: false
+
 
 # monit service related
 add_monit_config: true
