@@ -28,7 +28,7 @@
     creates: "{{ path_to_runner_directory }}/svc.sh"
 
 - name: Configure the runner for GitHub
-  shell: ./config.sh --url https://github.com/Chia-Network --token "{{registration_token}}" --runnergroup "{{runner_group}}" --labels "{{runner_tags}}" --name "{{runner_name}}" --unattended
+  shell: ./config.sh --url https://github.com/Chia-Network --token "{{registration_token}}" --runnergroup "{{runner_group}}" --labels "{{runner_tags}}" --name "{{ ansible_hostname }}" --unattended
   args:
     chdir: "{{ path_to_runner_directory }}"
     creates: "{{ path_to_runner_directory }}/svc.sh"
@@ -49,4 +49,3 @@
 - name: Display the output in Ansible
   debug:
     msg: "{{ output.stdout }}"
-
