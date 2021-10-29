@@ -30,18 +30,20 @@
 # The runner service becomes enabled in systemd after install
 - name: Install the runner service
   shell: |
-    sudo ./svc.sh install
+    ./svc.sh install
   args:
     chdir: "{{ path_to_runner_directory }}"
-    creates: "{{ path_to_service_file }}"
+  ignore_errors: yes
+  become: yes
 
 - name:  Start the runner service
   shell: |
-    sudo ./svc.sh start
-    sudo ./svc.sh status
+    ./svc.sh start
+    ./svc.sh status
   args:
     chdir: "{{ path_to_runner_directory }}"
   register: output
+  become: yes
 
 - name: Display the output in Ansible
   debug:
