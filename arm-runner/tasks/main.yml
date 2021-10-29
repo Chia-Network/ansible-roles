@@ -33,7 +33,6 @@
     ./svc.sh install
   args:
     chdir: "{{ path_to_runner_directory }}"
-    creates: "{{ path_to_service_file }}"
   ignore_errors: yes
   become: yes
 
