@@ -48,6 +48,8 @@
   shell: |
     arch -x86_64 ./svc.sh start
     arch -x86_64 ./svc.sh status
+  args:
+    chdir: "{{ path_to_runner_directory }}"
   register: output
 
 - name: Display the output in Ansible
