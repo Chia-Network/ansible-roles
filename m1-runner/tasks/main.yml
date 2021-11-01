@@ -42,7 +42,7 @@
     arch -x86_64 ./svc.sh install
   args:
     chdir: "{{ path_to_runner_directory }}"
-    creates: "{{ path_to_service_file }}"
+    creates: "~/Library/LaunchAgents/actions.runner.Chia-Network.{{ ansible_hostname }}.plist"
 
 - name:  Start the runner service
   shell: |
