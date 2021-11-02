@@ -10,6 +10,6 @@
   ansible.builtin.cron:
     name: "Blockchain Backup"
     user: "{{ user }}"
-    minute: "30"
-    hour: "8,20"
+    minute: "{{ backup_cron_minute }}"
+    hour: "{{ backup_cron_hour }}"
     job: "/home/{{ user }}/backup.sh > /home/{{ user }}/backup.log 2>&1"
