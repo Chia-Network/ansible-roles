@@ -61,7 +61,7 @@
   debug:
     msg: "{{ output.stdout }}"
 
-- name: Move env.sh to actions-runner directory
+- name: Move .path to actions-runner directory
   template:
-    src: env.sh
+    src: .path
     dest: "{{ path_to_runner_directory }}"
