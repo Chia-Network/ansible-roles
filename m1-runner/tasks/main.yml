@@ -8,7 +8,12 @@
 - name: Insert the proper path for gnu-tar in .zshenv.
   lineinfile:
     path: "~/.zshenv"
-    line: export PATH="/opt/homebrew/opt/gnu-tar/libexec/gnubin:$PATH"
+    line: |
+      export PATH="/opt/homebrew/opt/gnu-tar/libexec/gnubin:$PATH"
+      export PATH=/opt/homebrew/bin:$PATH
+      export PATH=/opt/homebrew/sbin:$PATH
+      export PATH=/Users/chia/.cargo/bin:$PATH
+
     insertbefore: EOF
 
 - name: Make action-runner directory
@@ -55,3 +60,8 @@
 - name: Display the output in Ansible
   debug:
     msg: "{{ output.stdout }}"
+
+- name: Move env.sh to actions-runner directory
+  template:
+    src: env.sh
+    dest: "{{ path_to_runner_directory }}"
