@@ -6,6 +6,7 @@ cleanup() {
 	rm -f "$LOCK_FILE"
 	rm -f /tmp/*.sqlite
 	sudo systemctl start chia
+	sudo systemctl start monit
 }
 
 if [ -e $LOCK_FILE ]; then
@@ -18,6 +19,7 @@ trap cleanup EXIT
 touch $LOCK_FILE
 
 echo "Stopping chia services..."
+sudo systemctl stop monit
 sudo systemctl stop chia
 
 count=1
