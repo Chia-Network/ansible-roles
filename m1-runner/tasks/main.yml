@@ -40,7 +40,10 @@
   shell: arch -x86_64 ./config.sh --url https://github.com/Chia-Network --token "{{registration_token}}" --runnergroup "{{runner_group}}" --labels "{{runner_tags}}" --name "{{ ansible_hostname }}" --unattended
   args:
     chdir: "{{ path_to_runner_directory }}"
-    creates: "{{ path_to_runner_directory }}/svc.sh"
+  ignore_errors: yes
+    register: configure
+- debug:
+    msg: "{{ configure.stdout }}"
 
 - name: Install the runner service
   shell: |
@@ -48,6 +51,9 @@
   args:
     chdir: "{{ path_to_runner_directory }}"
     creates: "~/Library/LaunchAgents/actions.runner.Chia-Network.{{ ansible_hostname.split('.')[0] }}.plist"
+    register: install
+- debug:
+    msg: "{{ install.stdout }}"
 
 - name:  Start the runner service
   shell: |
@@ -56,9 +62,7 @@
   args:
     chdir: "{{ path_to_runner_directory }}"
   register: output
-
-- name: Display the output in Ansible
-  debug:
+- debug:
     msg: "{{ output.stdout }}"
 
 - name: Move .path to actions-runner directory
