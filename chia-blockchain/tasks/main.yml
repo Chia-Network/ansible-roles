@@ -38,6 +38,7 @@
     path: "/home/{{ user }}/.bashrc"
     regexp: '^export CHIA_ROOT='
     line: "export CHIA_ROOT={{ chia_root }}"
+  when: chia_root_to_env
 
 - name: Copy latest blockchain DB from S3
   become: yes
