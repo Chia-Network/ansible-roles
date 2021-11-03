@@ -4,7 +4,7 @@ Description=Chia Service
 [Service]
 Type=forking
 Environment=PATH=/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-Environment=CHIA_ROOT=/home/{{ user }}/.chia
+Environment=CHIA_ROOT={{ chia_root }}
 ExecStart=/home/{{ user }}/chia-blockchain/venv/bin/chia start {{ component }}
 User={{ user }}
 Group={{ group }}
