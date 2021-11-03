@@ -1,7 +1,8 @@
 ---
 # chia-runner/tasks/main.yml
 - name: Install curl from apt default repo
-  apt: curl
+  apt:
+    name: curl
     state: latest
 
 - name: Add repo containing podman to apt sources list
@@ -11,8 +12,9 @@
   shell: "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/Release.key" | sudo apt-key add -
 
 - name: Install podman
-  apt: podman
-  update_cache: yes
+  apt:
+    name: podman
+    update_cache: yes
 
 - name: Make action-runner directory
   ansible.builtin.file:
