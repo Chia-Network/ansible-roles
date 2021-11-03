@@ -6,6 +6,7 @@ user: ubuntu
 group: ubuntu
 
 chia_root: "/home/ubuntu/.chia"
+chia_root_to_env: true
 
 # The name of the bucket that blockchain backups can be found in
 blockchain_backup_bucket: "blockchain-backup-bucket-name"
