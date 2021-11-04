@@ -9,7 +9,6 @@
       - gnupg
       - lsb-release
     update_cache: yes
-    cache_valid_time: 300
 
 - name: Get docker key
   become: yes
@@ -29,6 +28,11 @@
   ansible.builtin.apt_repository:
     repo: deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu xenial stable
   when: "ansible_architecture == 'arm64'"
+
+- name: Update and upgrade apt packages
+  become: yes
+  apt:
+    update_cache: yes
 
 - name: Install Docker
   become: yes
