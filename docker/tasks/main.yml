@@ -17,17 +17,20 @@
     state: present
     keyring: /usr/share/keyrings/docker-archive-keyring.gpg
 
-- name: Docker repository
-  become: yes
-  ansible.builtin.apt_repository:
-    repo:  deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
-  when: "ansible_architecture == 'x86_64'"
+#- name: Docker repository
+#  become: yes
+#  ansible.builtin.apt_repository:
+#    repo:  deb [arch=x86_64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+#  when: "ansible_architecture == 'x86_64'"
 
 - name: Docker repository
   become: yes
   ansible.builtin.apt_repository:
-    repo: deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu xenial stable
-  when: "ansible_architecture == 'arm64'"
+    repo: deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+  register: docker
+- debug:
+    msg: "{{ docker.stdout }}"
+#  when: "ansible_architecture == 'arm64'"
 
 - name: Update apt packages
   become: yes
