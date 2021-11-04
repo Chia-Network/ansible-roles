@@ -24,7 +24,7 @@
   register: docker
 - debug:
     msg: "{{ docker.stdout }}"
-  when: ansible_architecture == "arm64"
+  when: ansible_architecture == "aarch64"
 
 - name: Get Docker Repo
   become: yes
