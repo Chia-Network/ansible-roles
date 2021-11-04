@@ -2,7 +2,7 @@
 # chia-runner/tasks/main.yml
 - name: Make action-runner directory
   ansible.builtin.file:
-    path: "{{ path_to_runner_directory }}"
+    path: /home/ubuntu/actions-runner
     state: directory
     mode: '0755'
   register: action
