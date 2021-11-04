@@ -22,19 +22,12 @@
   shell: |
     echo "deb [arch=arm64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
   when: "ansible_architecture == 'aarch64'"
-  register: docker
-
-
-
 
 - name: Get Docker Repo
   become: yes
   shell: |
     echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
   when: "ansible_architecture == 'x86_64'"
-  register: docker
-- debug:
-    msg: "{{ docker.stdout }}"
 
 #- name: Docker repository
 #  become: yes
