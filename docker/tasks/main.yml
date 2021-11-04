@@ -29,10 +29,9 @@
     repo: deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu xenial stable
   when: "ansible_architecture == 'arm64'"
 
-- name: Update and upgrade apt packages
+- name: Update apt packages
   become: yes
-  apt:
-    update_cache: yes
+  shell: apt-get update
 
 - name: Install Docker
   become: yes
