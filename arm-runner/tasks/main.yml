@@ -47,6 +47,7 @@
     sudo ./svc.sh status
   args:
     chdir: "{{ path_to_runner_directory }}"
+  ignore_errors: yes
   register: output
 - debug:
     msg: "{{ output.stdout }}"
