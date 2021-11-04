@@ -5,6 +5,9 @@
     path: "{{ path_to_runner_directory }}"
     state: directory
     mode: '0755'
+  register: action
+- debug:
+    msg: "{{ action.stdout }}"
 
 - name: Download runner tarball
   get_url:
