@@ -25,7 +25,6 @@
   shell: ./config.sh --url https://github.com/Chia-Network --token "{{registration_token}}" --runnergroup "{{runner_group}}" --labels "{{runner_tags}}" --name "{{ ansible_hostname }}" --unattended
   args:
     chdir: "{{ path_to_runner_directory }}"
-  ignore_errors: yes
   register: configure
 - debug:
     msg: "{{ configure.stdout }}"
@@ -36,7 +35,7 @@
     sudo ./svc.sh install
   args:
     chdir: "{{ path_to_runner_directory }}"
-  ignore_errors: yes
+    creates: "/etc/systemd/system/actions.runner.Chia-Network.{{ ansible_hostname }}.service"
   register: install
 - debug:
     msg: "{{ install.stdout }}"
@@ -47,7 +46,6 @@
     sudo ./svc.sh status
   args:
     chdir: "{{ path_to_runner_directory }}"
-  ignore_errors: yes
   register: output
 - debug:
     msg: "{{ output.stdout }}"
