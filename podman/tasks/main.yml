@@ -21,6 +21,7 @@
   become: yes
   ansible.builtin.apt_repository:
     repo:  "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_{{ ansible_distribution_version }} /"
+    update_cache: yes
 
 - name: Install Podman
   become: yes
