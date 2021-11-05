@@ -22,13 +22,15 @@
   become: yes
   ansible.builtin.apt_repository:
     repo:  deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+    update_cache: yes
   when: "ansible_architecture == 'x86_64'"
 
 - name: Docker repository
   become: yes
   ansible.builtin.apt_repository:
-    repo: deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
-  when: "ansible_architecture == 'arm64'"
+    repo: deb [arch=arm64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+    update_cache: yes
+  when: "ansible_architecture == 'aarch64'"
 
 - name: Install Docker
   become: yes
