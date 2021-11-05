@@ -1,0 +1,32 @@
+---
+- name: Update the apt package index and install packages to allow apt to use a repository over HTTPS
+  become: yes
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    update_cache: yes
+    cache_valid_time: 300
+
+- name: Get Podman Repo key
+  become: yes
+  ansible.builtin.apt_key:
+    url: https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_{{ ansible_distribution_version }}/Release.key
+    state: present
+
+- name: Podman repository
+  become: yes
+  ansible.builtin.apt_repository:
+    repo:  "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_{{ ansible_distribution_version }} /"
+    update_cache: yes
+
+- name: Install Podman
+  become: yes
+  ansible.builtin.apt:
+    name:
+      - podman
+    update_cache: yes
+    cache_valid_time: 300
