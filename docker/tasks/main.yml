@@ -17,29 +17,29 @@
     state: present
     keyring: /usr/share/keyrings/docker-archive-keyring.gpg
 
-- name: Get Docker Repo
-  become: yes
-  shell: |
-    echo "deb [arch=arm64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-  when: "ansible_architecture == 'aarch64'"
-
-- name: Get Docker Repo
-  become: yes
-  shell: |
-    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-  when: "ansible_architecture == 'x86_64'"
-
-#- name: Docker repository
+#- name: Get Docker Repo
 #  become: yes
-#  ansible.builtin.apt_repository:
-#    repo:  deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+#  shell: |
+#    echo "deb [arch=arm64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+#  when: "ansible_architecture == 'aarch64'"
+#
+#- name: Get Docker Repo
+#  become: yes
+#  shell: |
+#    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 #  when: "ansible_architecture == 'x86_64'"
 
-#- name: Docker repository
-#  become: yes
-#  ansible.builtin.apt_repository:
-#    repo: deb [arch=arm64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
-#  when: "ansible_architecture == 'arm64'"
+- name: Docker repository
+  become: yes
+  ansible.builtin.apt_repository:
+    repo:  deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+  when: "ansible_architecture == 'x86_64'"
+
+- name: Docker repository
+  become: yes
+  ansible.builtin.apt_repository:
+    repo: deb [arch=arm64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+  when: "ansible_architecture == 'aarch64'"
 
 - name: Update apt packages
   become: yes
