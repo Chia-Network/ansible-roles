@@ -41,7 +41,7 @@
   args:
     chdir: "{{ path_to_runner_directory }}"
   ignore_errors: yes
-    register: configure
+  register: configure
 - debug:
     msg: "{{ configure.stdout }}"
 
@@ -51,7 +51,7 @@
   args:
     chdir: "{{ path_to_runner_directory }}"
     creates: "~/Library/LaunchAgents/actions.runner.Chia-Network.{{ ansible_hostname.split('.')[0] }}.plist"
-    register: install
+  register: install
 - debug:
     msg: "{{ install.stdout }}"
 
