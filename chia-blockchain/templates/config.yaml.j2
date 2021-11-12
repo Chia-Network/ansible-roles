@@ -3,7 +3,7 @@ min_mainnet_k_size: 32
 # Send a ping to all peers after ping_interval seconds
 ping_interval: 120
 self_hostname: &self_hostname "localhost"
-daemon_port: 55400
+daemon_port: {{ chia_daemon_port }}
 inbound_rate_limit_percent: 100
 outbound_rate_limit_percent: 30
 
@@ -42,14 +42,14 @@ logging: &logging
 
 harvester:
   # The harvester server (if run) will run on this port
-  port: 8448
+  port: {{ chia_harvester_port }}
   farmer_peer:
     host: *self_hostname
-    port: 8447
+    port: {{ farmer_port }}
 
   # If True, starts an RPC server at the following port
   start_rpc_server: True
-  rpc_port: 8560
+  rpc_port: {{ chia_harvester_rpc_port }}
   num_threads: 30
   plots_refresh_parameter:
     interval_seconds: 120 # The interval in seconds to refresh the plot file manager
@@ -91,14 +91,14 @@ pool:
 
 farmer:
   # The farmer server (if run) will run on this port
-  port: 8447
+  port: {{ chia_farmer_port }}
   # The farmer will attempt to connect to this full node and harvester
   full_node_peer:
     host: *self_hostname
     port: {{ full_node_port }}
   harvester_peer:
     host: *self_hostname
-    port: 8448
+    port: {{ chia_harvester_port }}
 
   pool_public_keys: []
 
@@ -107,7 +107,7 @@ farmer:
 
   # If True, starts an RPC server at the following port
   start_rpc_server: True
-  rpc_port: 8559
+  rpc_port: {{ chia_farmer_rpc_port }}
 
   # To send a share to a pool, a proof of space must have required_iters less than this number
   pool_share_threshold: 1000
@@ -125,7 +125,7 @@ farmer:
 timelord_launcher:
   # The server where the VDF clients will connect to.
   host: {{ timelord_launcher_host }}
-  port: 8000
+  port: {{ chia_timelord_launcher_port }}
   # Number of VDF client processes to keep alive in the local machine.
   process_count: {{ process_count }}
   logging: *logging
@@ -133,7 +133,7 @@ timelord_launcher:
 
 timelord:
   # The timelord server (if run) will run on this port
-  port: 8446
+  port: {{ chia_timelord_port }}
   # Provides a list of VDF clients expected to connect to this timelord.
   # For each client, an IP is provided, together with the estimated iterations per second.
   vdf_clients:
@@ -149,7 +149,7 @@ timelord:
   # The ip and port where the TCP clients will connect.
   vdf_server:
     host: {{ vdf_server_hostname }}
-    port: 8000
+    port: {{ chia_timelord_launcher_port }}
   logging: *logging
   network_overrides: *network_overrides
   selected_network: *selected_network
@@ -188,7 +188,7 @@ full_node:
 
   # If True, starts an RPC server at the following port
   start_rpc_server: True
-  rpc_port: 8555
+  rpc_port: {{ chia_full_node_rpc_port }}
 
   # Use UPnP to attempt to allow other full nodes to reach your node behind a gateway
   enable_upnp: False
@@ -242,15 +242,15 @@ full_node:
     {{ dns_servers | to_nice_yaml(indent=2) | indent(4) }}
   farmer_peer:
     host: *self_hostname
-    port: 8447
+    port: {{ chia_farmer_port }}
   timelord_peer:
     host: *self_hostname
-    port: 8446
+    port: {{ chia_timelord_port }}
   introducer_peer:
     {{ introducer_peer | to_nice_yaml(indent=2) | indent(4) }}
   wallet_peer:
     host: *self_hostname
-    port: 8449
+    port: {{ chia_wallet_port }}
   logging: *logging
   network_overrides: *network_overrides
   selected_network: *selected_network
@@ -263,10 +263,10 @@ full_node:
 
 ui:
   # The ui node server (if run) will run on this port
-  port: 8222
+  port: {{ chia_ui_port }}
 
   # Which port to use to communicate with the full node
-  rpc_port: 8555
+  rpc_port: {{ chia_full_node_rpc_port }}
 
   # This SSH key is for the ui SSH server
   ssh_filename: config/ssh_host_key
@@ -277,7 +277,7 @@ ui:
   # this is where the electron UI will find its daemon
   # defaults to the one running locally with its private keys
   daemon_host: *self_hostname
-  daemon_port: 55400
+  daemon_port: {{ chia_daemon_port }}
   daemon_ssl:
     private_crt: config/ssl/daemon/private_daemon.crt
     private_key: config/ssl/daemon/private_daemon.key
@@ -298,8 +298,8 @@ introducer:
     public_key:  "config/ssl/full_node/public_full_node.key"
 
 wallet:
-  port: 8449
-  rpc_port: 9256
+  port: {{ chia_wallet_port }}
+  rpc_port: {{ chia_wallet_rpc_port }}
 
   # The minimum height that we care about for our transactions. Set to zero
   # If we are restoring from private key and don't know the height.
