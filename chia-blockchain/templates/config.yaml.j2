@@ -45,7 +45,7 @@ harvester:
   port: {{ chia_harvester_port }}
   farmer_peer:
     host: *self_hostname
-    port: {{ farmer_port }}
+    port: {{ chia_farmer_port }}
 
   # If True, starts an RPC server at the following port
   start_rpc_server: True
