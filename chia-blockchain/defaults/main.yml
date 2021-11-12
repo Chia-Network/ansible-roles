@@ -1,4 +1,5 @@
 ---
+chia_service_name: chia.service
 start_on_boot: yes
 start_now: yes
 
