@@ -1,5 +1,6 @@
 ---
 - name: Stop Monit Service
+  become: yes
   ansible.builtin.service:
     name: monit
     state: stopped
@@ -34,6 +35,8 @@
     - "/home/{{ user }}/chia-blockchain"
 
 - name: Ensure CHIA_ROOT is set in .bashrc
+  become: yes
+  become_user: "{{ user }}"
   ansible.builtin.lineinfile:
     path: "/home/{{ user }}/.bashrc"
     regexp: '^export CHIA_ROOT='
@@ -90,6 +93,7 @@
     - component is match("timelord.*")
 
 - name: Chia Config
+  become: yes
   template:
     src: config.yaml.j2
     dest: "{{ chia_root }}/config/config.yaml"
@@ -146,6 +150,7 @@
   notify: restart-monit
 
 - name: Start Monit Service
+  become: yes
   ansible.builtin.service:
     name: monit
     state: started
