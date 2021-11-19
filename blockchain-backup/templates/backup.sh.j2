@@ -40,7 +40,7 @@ HASH=$(shasum -a 256 {{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite | cut
 echo "Database hash is $HASH..."
 
 echo "Renaming old database on s3..."
-aws s3 mv "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite.previous"
+aws s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite.previous"
 
 echo "Starting upload to s3..."
 aws s3 cp {{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
@@ -59,13 +59,13 @@ else
 	echo "Local hash was $HASH..."
 	echo "S3 hash is     $NEWHASH..."
 	aws s3 rm "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
-	aws s3 mv "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite.previous" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
+	aws s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite.previous" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
 fi
 
 {% if network != "mainnet" %}
 {% if secondary_backup_bucket != "" %}
 echo "Uploading database to secondary backup bucket..."
-aws s3 mv "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite" "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite.previous"
+aws s3 cp "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite" "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite.previous"
 aws s3 cp {{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
 
 echo "Downloading secondary s3 database to validate hash..."
@@ -82,7 +82,7 @@ else
 	echo "Local hash was $HASH..."
 	echo "S3 hash is     $SECHASH..."
 	aws s3 rm "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
-	aws s3 mv "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite.previous" "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
+	aws s3 cp "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite.previous" "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite"
 fi
 
 {% endif %}
