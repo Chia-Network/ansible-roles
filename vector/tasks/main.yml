@@ -25,6 +25,11 @@
     src: vector.toml
     dest: /etc/vector/vector.toml
 
+- name: Ensure the example configs are not present
+  ansible.builtin.file:
+    path: /etc/vector/examples
+    state: absent
+
 - name: Template systemd config
   template:
     src: vector.service
