@@ -1,5 +1,7 @@
 ---
 chia_service_name: chia.service
+# Set to yes if using crawler or dns server
+chia_seeder: no
 start_on_boot: yes
 start_now: yes
 
