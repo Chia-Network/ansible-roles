@@ -116,6 +116,12 @@
   with_items: "{{ keys }}"
   notify: restart-chia # @TODO would be better to have this only restart if we could tell keys changed
 
+- name: Allow python in venv to bind 53
+  become: yes
+  shell: |
+    setcap CAP_NET_BIND_SERVICE=+eip $(readlink -f /home/{{ user }}/chiadns/venv/bin/python)
+  when: chia_seeder
+
 - name: Chia Systemd Config
   become: yes
   ansible.builtin.template:
