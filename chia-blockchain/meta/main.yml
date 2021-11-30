@@ -2,6 +2,8 @@
 dependencies:
   - role: awscli
   - role: logrotate
+  - role: disable-resolvd
+    when: chia_seeder
   - role: vector
     when: add_vector_config
   - role: monit
