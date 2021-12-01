@@ -1,5 +1,7 @@
 ---
 chia_service_name: chia.service
+# Set to yes if using crawler or dns server
+chia_seeder: no
 start_on_boot: yes
 start_now: yes
 
@@ -117,6 +119,15 @@ vdf_server_hostname: localhost
 
 # 'send_uncompact_interval' seconds. Set to 0 if you don't use this feature. Recommended is 300
 send_uncompact_interval: 0
+
+# Seeder Config
+minimum_height: 240000
+bootstrap_peers:
+  - node.chia.net
+domain_name: dns-introducer.chia.net.
+nameserver: chia.net.
+ttl: 300
+soa_rname: "hostmaster.chia.net."
 
 # Vector/Loki Related
 add_vector_config: false
