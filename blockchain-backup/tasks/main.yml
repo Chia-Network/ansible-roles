@@ -12,4 +12,4 @@
     user: "{{ user }}"
     minute: "{{ backup_cron_minute }}"
     hour: "{{ backup_cron_hour }}"
-    job: "/home/{{ user }}/backup.sh > /home/{{ user }}/backup.log 2>&1"
+    job: "/home/{{ user }}/backup.sh >> /home/{{ user }}/backup.log 2>&1"
