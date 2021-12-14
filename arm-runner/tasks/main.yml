@@ -49,3 +49,10 @@
   register: output
 - debug:
     msg: "{{ output.stdout }}"
+
+- name: Add ansible_user to the docker group
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+  become: yes
