@@ -1,7 +1,7 @@
 ---
 - name: get userify shim
   get_url:
-    url: https://shim.userify.com/installer.sh
+    url: https://static.userify.com/installer.sh
     dest: /tmp
     mode: 0777
   notify: start_userify
