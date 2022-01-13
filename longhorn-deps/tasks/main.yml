@@ -1,9 +1,10 @@
 ---
-- name: Install open-iscsi
+- name: Install dependencies
   become: yes
   ansible.builtin.apt:
     name:
       - open-iscsi
+      - nfs-common
     state: present
     update_cache: yes
     cache_valid_time: 300
