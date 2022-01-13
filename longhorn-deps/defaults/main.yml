@@ -1,0 +1,3 @@
+---
+iscsid_start_on_boot: yes
+iscsid_start_now: yes
