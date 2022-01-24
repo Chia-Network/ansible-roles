@@ -1,10 +1,12 @@
 ---
 - name: Add vector key
+  become: yes
   ansible.builtin.apt_key:
     url: https://repositories.timber.io/public/vector/gpg.3543DB2D0A2BC4B8.key
     state: present
 
 - name: Add vector repository
+  become: yes
   ansible.builtin.template:
     src: timber-vector.list
     dest: /etc/apt/sources.list.d/timber-vector.list
@@ -21,27 +23,32 @@
   until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
 - name: Template vector config
+  become: yes
   template:
     src: vector.toml
     dest: /etc/vector/vector.toml
 
 - name: Ensure the example configs are not present
+  become: yes
   ansible.builtin.file:
     path: /etc/vector/examples
     state: absent
 
 - name: Template systemd config
+  become: yes
   template:
     src: vector.service
     dest: /etc/systemd/system/vector.service
 
 - name: Set desired boot state
+  become: yes
   ansible.builtin.systemd:
     name: vector
     daemon_reload: true
     enabled: "{{ vector_start_on_boot }}"
 
 - name: Set desired current state
+  become: yes
   ansible.builtin.systemd:
     name: vector
     state: "{{ vector_start_now | ternary('started','stopped') }}"
