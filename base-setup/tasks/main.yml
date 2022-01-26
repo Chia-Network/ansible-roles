@@ -4,5 +4,5 @@
   lineinfile:
     path: "/etc/ssh/sshd_config"
     regexp: '^PasswordAuthentication'
-    line: "PasswordAuthentication yes"
+    line: "PasswordAuthentication no"
   notify: restart-sshd
