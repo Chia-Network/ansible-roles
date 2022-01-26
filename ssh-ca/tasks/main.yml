@@ -1,5 +1,6 @@
 ---
 - name: Copy CA to the trusted CA key file
+  become: yes
   get_url:
     url: "{{ ca_url }}"
     dest: /etc/ssh/trusted-user-ca-keys.pem
@@ -9,6 +10,7 @@
 
 # TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem
 - name: Ensure ssh config has the trusted CA
+  become: yes
   ansible.builtin.lineinfile:
     path: /etc/ssh/sshd_config
     regexp: '^TrustedUserCAKeys'
