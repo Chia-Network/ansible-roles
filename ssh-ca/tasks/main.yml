@@ -4,6 +4,7 @@
     url: "{{ ca_url }}"
     dest: /etc/ssh/trusted-user-ca-keys.pem
     mode: '0644'
+  when: ca_url != ""
   notify: restart-sshd
 
 # TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem
@@ -12,6 +13,7 @@
     path: /etc/ssh/sshd_config
     regexp: '^TrustedUserCAKeys'
     line: "TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem"
+  when: ca_url != ""
   notify: restart-sshd
 
 
