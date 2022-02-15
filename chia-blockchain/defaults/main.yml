@@ -12,6 +12,7 @@ chia_root_to_env: true
 # The name of the bucket that blockchain backups can be found in
 blockchain_backup_bucket: "blockchain-backup-bucket-name"
 download_blockchain_db: true
+db_version: v2
 
 # What network we're running on
 # This impacts the backup we retrieve from S3 as well as whether or not we configure for testnet

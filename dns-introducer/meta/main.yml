@@ -1,6 +1,0 @@
----
-dependencies:
-  - role: git
-  - role: disable-resolvd
-  - role: vector
-    when: add_vector_config
