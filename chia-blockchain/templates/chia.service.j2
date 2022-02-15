@@ -5,7 +5,7 @@ Description=Chia Service for {{ user }}
 Type=forking
 Environment=PATH=/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=CHIA_ROOT={{ chia_root }}
-ExecStart=/home/{{ user }}/chia-blockchain/venv/bin/chia{{ chia_seeder | ternary('_seeder','') }} start {{ component }}
+ExecStart=/home/{{ user }}/chia-blockchain/venv/bin/chia start {{ component }}
 User={{ user }}
 Group={{ group }}
 LimitNOFILE=1048576
