@@ -236,7 +236,7 @@ full_node:
   db_sync: "auto"
 
   # Run multiple nodes with different databases by changing the database_path
-  database_path: db/blockchain_v2_CHALLENGE.sqlite
+  database_path: db/blockchain_{{ db_version }}_CHALLENGE.sqlite
   # peer_db_path is deprecated and has been replaced by peers_file_path
   peer_db_path: db/peer_table_node.sqlite
   peers_file_path: db/peers.dat
@@ -390,7 +390,7 @@ wallet:
 
   testing: False
   # v2 used by the light wallet sync protocol
-  database_path: wallet/db/blockchain_wallet_v2_CHALLENGE_KEY.sqlite
+  database_path: wallet/db/blockchain_wallet_{{ db_version }}_CHALLENGE_KEY.sqlite
   # wallet_peers_path is deprecated and has been replaced by wallet_peers_file_path
   wallet_peers_path: wallet/db/wallet_peers.sqlite
   wallet_peers_file_path: wallet/db/wallet_peers.dat
