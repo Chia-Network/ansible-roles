@@ -3,7 +3,7 @@ dependencies:
   - role: awscli
   - role: logrotate
   - role: disable-resolvd
-    when: chia_seeder
+    when: component == "crawler" or component == "seeder" or component == "seeder-only"
   - role: vector
     when: add_vector_config
   - role: monit
