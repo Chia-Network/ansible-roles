@@ -47,9 +47,9 @@
   become: yes
   become_user: "{{ user }}"
   shell: |
-    aws s3 cp s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_v1_{{ network }}.sqlite {{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite
+    aws s3 cp s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite {{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite
   args:
-    creates: "{{ chia_root }}/db/blockchain_v1_{{ network }}.sqlite"
+    creates: "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite"
   when: download_blockchain_db
 
 - name: Ensure correct ref is checked out
