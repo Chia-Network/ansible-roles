@@ -21,6 +21,7 @@
     job: "/home/{{ user }}/backup.sh >> /home/{{ user }}/backup-logs/backup.log 2>&1"
 
 - name: Add logrotate script for backup log file
+  become: yes
   template:
     src: backup-script-logrotate.j2
     dest: "/etc/logrotate.d/backup-script-logrotate"
