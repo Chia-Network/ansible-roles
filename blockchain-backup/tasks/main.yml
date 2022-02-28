@@ -5,6 +5,12 @@
     dest: "/home/{{ user }}/backup.sh"
     mode: '0755'
 
+- name: Create log directory for backup script
+  file:
+    path: "/home/{{ user }}/backup-logs"
+    state: directory
+    mode: "0755"
+
 - name: Add cron to backup every 12 hours
   become: yes
   ansible.builtin.cron:
@@ -12,4 +18,10 @@
     user: "{{ user }}"
     minute: "{{ backup_cron_minute }}"
     hour: "{{ backup_cron_hour }}"
-    job: "/home/{{ user }}/backup.sh >> /home/{{ user }}/backup.log 2>&1"
+    job: "/home/{{ user }}/backup.sh >> /home/{{ user }}/backup-logs/backup.log 2>&1"
+
+- name: Add logrotate script for backup log file
+  template:
+    src: backup-script-logrotate.j2
+    dest: "/etc/logrotate/backup-script-logrotate"
+    mode: '0644'
