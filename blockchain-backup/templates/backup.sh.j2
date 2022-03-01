@@ -47,7 +47,7 @@ while :; do
 done
 
 echo "Compressing database..."
-gzip -c "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite" > "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
+gzip -c "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite" >"/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
 
 echo "Starting upload to s3 (uncompressed)..."
 aws --no-progress s3 cp "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite"

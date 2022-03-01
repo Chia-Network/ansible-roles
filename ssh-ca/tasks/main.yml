@@ -17,5 +17,3 @@
     line: "TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem"
   when: ca_url != ""
   notify: restart-sshd
-
-
