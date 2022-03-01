@@ -1,13 +1,22 @@
 #!/bin/bash
 
+NOW=$(date)
+echo "Starting backup at ${NOW}" 
+
 LOCK_FILE="/tmp/blockchain-backup.lock"
 
 cleanup() {
+	echo "Removing lock file..."
 	rm -f "$LOCK_FILE"
+    echo "Removing *.sqlite files..."
 	rm -f /tmp/*.sqlite
+	echo "Removing *.sqlite.gz files..."
 	rm -f /tmp/*.sqlite.gz
+	echo "Starting Chia..."
 	sudo systemctl start chia
+	echo "Starting Monit..."
 	sudo systemctl start monit
+	echo "Done!  Exiting..."
 }
 
 if [ -e $LOCK_FILE ]; then
@@ -19,8 +28,9 @@ trap cleanup EXIT
 
 touch $LOCK_FILE
 
-echo "Stopping chia services..."
+echo "Stopping monit services..."
 sudo systemctl stop monit
+echo "Stopping chia services..."
 sudo systemctl stop chia
 
 count=1
@@ -40,15 +50,15 @@ echo "Compressing database..."
 gzip -c "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite" > "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
 
 echo "Starting upload to s3 (uncompressed)..."
-aws s3 cp "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite"
+aws --no-progress s3 cp "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite"
 
 echo "Starting upload to s3 (compressed)..."
-aws s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
+aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
 
 {% if network != "mainnet" %}
 {% if secondary_backup_bucket != "" %}
 echo "Uploading compressed database to secondary backup bucket..."
-aws s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
+aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
 
 {% endif %}
 {% endif %}
