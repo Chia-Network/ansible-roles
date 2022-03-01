@@ -1,5 +1,13 @@
 ---
-# chia-runner/tasks/main.yml
+- name: Load architecture specific vars
+  include_vars: "{{ lookup('first_found', params) }}"
+  vars:
+    params:
+      files:
+        - '{{ansible_architecture}}.yml'
+      paths:
+        - 'vars'
+
 - name: Make action-runner directory
   ansible.builtin.file:
     path: "{{ path_to_runner_directory }}"
@@ -8,24 +16,26 @@
 
 - name: Download runner tarball
   get_url:
-    url: https://github.com/actions/runner/releases/download/v{{runner_release_version}}/actions-runner-linux-arm64-{{runner_release_version}}.tar.gz
+    url: https://github.com/actions/runner/releases/download/v{{runner_release_version}}/actions-runner-linux-{{download_arch}}-{{runner_release_version}}.tar.gz
     dest: "{{ path_to_runner_directory }}"
     mode: '0755'
 
 - name: Unarchive runner tarball
   ansible.builtin.unarchive:
-    src: "{{ path_to_runner_directory }}/actions-runner-linux-arm64-{{runner_release_version}}.tar.gz"
+    src: "{{ path_to_runner_directory }}/actions-runner-linux-{{download_arch}}-{{runner_release_version}}.tar.gz"
     dest: "{{ path_to_runner_directory }}"
     remote_src: yes
     list_files: yes
     creates: "{{ path_to_runner_directory }}/svc.sh"
 
 - name: Configure the runner for GitHub
-  become_user: ubuntu
+  become: yes
+  become_user: "{{ user }}"
   shell: ./config.sh --url https://github.com/Chia-Network --token "{{registration_token}}" --runnergroup "{{runner_group}}" --labels "{{runner_tags}}" --name "{{ ansible_hostname }}" --unattended
   args:
     chdir: "{{ path_to_runner_directory }}"
   register: configure
+
 - debug:
     msg: "{{ configure.stdout }}"
 
@@ -37,6 +47,7 @@
     chdir: "{{ path_to_runner_directory }}"
     creates: "/etc/systemd/system/actions.runner.Chia-Network.{{ ansible_hostname }}.service"
   register: install
+
 - debug:
     msg: "{{ install.stdout }}"
 
@@ -47,12 +58,13 @@
   args:
     chdir: "{{ path_to_runner_directory }}"
   register: output
+
 - debug:
     msg: "{{ output.stdout }}"
 
 - name: Add ansible_user to the docker group
+  become: yes
   user:
     name: "{{ ansible_user }}"
     groups: docker
     append: yes
-  become: yes
