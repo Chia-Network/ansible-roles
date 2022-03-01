@@ -55,7 +55,7 @@
 - debug:
     msg: "{{ install.stdout }}"
 
-- name:  Start the runner service
+- name: Start the runner service
   shell: |
     arch -x86_64 ./svc.sh start
     arch -x86_64 ./svc.sh status
