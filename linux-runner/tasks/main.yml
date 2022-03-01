@@ -55,7 +55,7 @@
 - debug:
     msg: "{{ install.stdout }}"
 
-- name:  Start the runner service
+- name: Start the runner service
   shell: |
     sudo ./svc.sh start
     sudo ./svc.sh status
