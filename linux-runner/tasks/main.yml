@@ -1,4 +1,7 @@
 ---
+- debug:
+    msg: "{{ ansible_architecture }}"
+
 - name: Load architecture specific vars
   include_vars: "{{ lookup('first_found', params) }}"
   vars:
