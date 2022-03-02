@@ -76,6 +76,9 @@
     PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     CHIA_ROOT: "{{ chia_root }}"
   when: git_output.changed
+  register: install_action
+  retries: 100
+  until: install_action is success or ('Unable to acquire the dpkg frontend lock' not in install_action.stderr)
 
 - name: Install timelord
   become: yes
