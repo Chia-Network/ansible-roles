@@ -1,4 +1,6 @@
 # Userify Shim Configuration
+# @generated This is used to ignore from super-linter, since we can't have spaces around the = signs
+# no spaces due to this being loaded in the shell with `source userify_config.py`
 
 company="ChiaNetwork"
 project="Default"
