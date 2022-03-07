@@ -28,6 +28,9 @@ trap cleanup EXIT
 
 touch $LOCK_FILE
 
+echo "Authenticating with b2 service"
+/usr/local/sbin/b2 authorize-account {{ b2_application_key_id }} {{ b2_application_key }}
+
 echo "Stopping monit services..."
 sudo systemctl stop monit
 echo "Stopping chia services..."
@@ -59,6 +62,9 @@ aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.g
 {% if secondary_backup_bucket != "" %}
 echo "Uploading compressed database to secondary backup bucket..."
 aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
+
+echo "Uploading compressed database to b2 bucket..."
+/usr/local/sbin/b2 upload-file --noProgress chia-public-databases "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
 
 {% endif %}
 {% endif %}

@@ -1,0 +1,9 @@
+---
+# Use self-contained b2 tool to interact with the Backblaze b2
+# object storage. See https://www.backblaze.com/b2/docs/quick_command_line.html
+# for more documentation.
+- name: Add b2 client
+  get_url:
+    url: https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/download/b2-linux
+    dest: /usr/local/sbin/b2
+    mode: '0755'
