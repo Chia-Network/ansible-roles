@@ -64,7 +64,7 @@ echo "Uploading compressed database to secondary backup bucket..."
 aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
 
 echo "Uploading compressed database to b2 bucket..."
-/usr/local/sbin/b2 upload-file --noProgress chia-b2-testing "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
+/usr/local/sbin/b2 upload-file --noProgress chia-public-databases "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
 
 {% endif %}
 {% endif %}
