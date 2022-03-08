@@ -122,10 +122,12 @@ harvester:
 
 pool:
   # Replace this with a real puzzle hash
-  # xch_target_address: txch102gkhhzs60grx7cfnpng5n6rjecr89r86l5s8xux2za8k820cxsq64ssdg
+  xch_target_address: "{{ pool_xch_target_address }}"
   logging: *logging
   network_overrides: *network_overrides
   selected_network: *selected_network
+  pool_list:
+    {{ pool_list | to_nice_yaml(indent=2) | indent(4) }}
 
 farmer:
   # The farmer server (if run) will run on this port
@@ -141,7 +143,7 @@ farmer:
   pool_public_keys: []
 
   # Replace this with a real puzzle hash
-  # xch_target_address: txch102gkhhzs60grx7cfnpng5n6rjecr89r86l5s8xux2za8k820cxsq64ssdg
+  xch_target_address: "{{ farmer_xch_target_address }}"
 
   # If True, starts an RPC server at the following port
   start_rpc_server: True

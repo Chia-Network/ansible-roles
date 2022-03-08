@@ -60,7 +60,15 @@ keys: []
 #  - "my words go here"
 #  - "my second words go here"
 
+# Harvester Settings
 plot_directories: []
+
+# Pool Settings
+pool_xch_target_address: ""
+pool_list: []
+
+# Farmer Settings
+farmer_xch_target_address: ""
 
 # This is the network overrides section of config.yaml
 # When this runs, we attempt to pull the network overrides from the ref specified, but
