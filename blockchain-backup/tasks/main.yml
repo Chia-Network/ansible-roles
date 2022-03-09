@@ -11,7 +11,7 @@
     state: directory
     mode: "0755"
 
-- name: "Add cron to do routine backups"
+- name: Add cron to do routine backups
   become: yes
   ansible.builtin.cron:
     name: "Blockchain Backup"
