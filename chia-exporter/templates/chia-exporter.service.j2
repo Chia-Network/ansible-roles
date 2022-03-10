@@ -1,0 +1,12 @@
+[Unit]
+Description=Chia Exporter Service for {{ user }}
+
+[Service]
+Type=simple
+Environment=CHIA_ROOT={{ chia_root }}
+ExecStart=/home/{{ user }}/bin/chia-exporter serve
+User={{ user }}
+Group={{ group }}
+
+[Install]
+WantedBy=multi-user.target
