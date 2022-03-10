@@ -1,0 +1,88 @@
+---
+- name: Load architecture specific vars
+  include_vars: "{{ lookup('first_found', params) }}"
+  vars:
+    params:
+      files:
+        - '{{ansible_architecture}}.yml'
+      paths:
+        - 'vars'
+
+- name: Install Deps
+  become: yes
+  ansible.builtin.apt:
+    name:
+      - unzip
+    state: present
+    update_cache: yes
+    cache_valid_time: 300
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
+- name: Ensure bin directory exists
+  become: yes
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ user }}"
+    group: "{{ group }}"
+    recurse: yes
+  with_items:
+    - "/home/{{ user }}/bin"
+
+- name: Determine the latest chia-exporter release file
+  uri:
+    url: https://api.github.com/repos/Chia-Network/chia-exporter/releases/latest
+    return_content: true
+    force_basic_auth: true
+    url_username: "{{ github_username }}"
+    url_password: "{{ github_password }}"
+  register: json_response
+
+- name: Get latest chia-exporter release
+  become: yes
+  get_url:
+    url: "{{ json_response.json | json_query(latest_url_query) | first }}"
+    dest: "/home/{{ user }}/bin/chia-exporter-{{ json_response.json.tag_name }}.zip"
+  vars:
+    - latest_url_query: "assets[?name=='chia-exporter-linux-{{ download_arch }}.zip'].browser_download_url"
+  notify: restart-chia-exporter
+  register: new_release
+
+- name: Unzip the new release
+  ansible.builtin.unarchive:
+    src: "/home/{{ user }}/bin/chia-exporter-{{ json_response.json.tag_name }}.zip"
+    dest: "/home/{{ user }}/bin"
+    remote_src: true
+  when: new_release.changed
+
+- name: Move the binary into the correct location
+  ansible.builtin.copy:
+    src: "/home/{{ user }}/bin/chia-exporter-linux-{{ download_arch }}/chia-exporter"
+    dest: "/home/{{ user }}/bin/chia-exporter"
+    remote_src: true
+    mode: 0755
+  when: new_release.changed
+
+- name: Ensure the extracted folder is not present
+  file:
+    path: "/home/{{ user }}/bin/chia-exporter-linux-{{ download_arch }}"
+    state: absent
+
+- name: Chia Exporter Systemd Config
+  become: yes
+  ansible.builtin.template:
+    src: "chia-exporter.service.j2"
+    dest: "/etc/systemd/system/{{ chia_exporter_service_name }}"
+    owner: root
+    group: root
+  notify: restart-chia-exporter
+
+- name: Ensure chia-exporter service is in desired boot and current state
+  become: yes
+  ansible.builtin.systemd:
+    name: "{{ chia_exporter_service_name }}"
+    daemon_reload: yes
+    enabled: "{{ chia_exporter_start_on_boot }}"
+    state: "{{ chia_exporter_start_now | ternary('started','stopped') }}"
