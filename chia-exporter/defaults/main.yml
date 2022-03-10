@@ -5,3 +5,13 @@ chia_exporter_start_now: yes
 
 user: ubuntu
 group: ubuntu
+
+chia_root: "/home/ubuntu/.chia"
+
+# You can use a username/PAT here or an oauth Key/Secret to get around the anonymous rate limits
+# Link: https://docs.github.com/en/rest/overview/resources-in-the-rest-api#oauth2-keysecret
+github_username: ""
+github_password: ""
+
+# Arch Specific Vars - These are set in vars/$arch.yml
+download_arch: ""
