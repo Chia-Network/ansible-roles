@@ -1,0 +1,6 @@
+- name: restart-chia-exporter
+  become: yes
+  service:
+    name: "{{ chia_exporter_service_name }}"
+    state: restarted
+  when: chia_exporter_start_now
