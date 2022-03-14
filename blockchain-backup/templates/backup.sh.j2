@@ -49,11 +49,17 @@ done
 echo "Compressing database..."
 gzip -c "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite" >"/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
 
-echo "Starting upload to s3 (uncompressed)..."
+echo "Starting database upload to s3 (uncompressed)..."
 aws --no-progress s3 cp "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite"
 
-echo "Starting upload to s3 (compressed)..."
+echo "Starting database upload to s3 (compressed)..."
 aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
+
+echo "Starting height-to-hash cache file upload to s3"
+aws --no-progress s3 cp "{{ chia_root }}/db/height-to-hash" "s3://{{ blockchain_backup_bucket }}/{{ network }}/height-to-hash"
+
+echo "Starting sub-epoch-summaries cache file upload to s3"
+aws --no-progress s3 cp "{{ chia_root }}/db/sub-epoch-summaries" "s3://{{ blockchain_backup_bucket }}/{{ network }}/sub-epoch-summaries"
 
 {% if network != "mainnet" %}
 {% if secondary_backup_bucket != "" %}
