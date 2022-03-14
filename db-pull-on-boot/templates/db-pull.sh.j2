@@ -24,7 +24,7 @@ sudo systemctl stop chia
 
 count=1
 while :; do
-	processes=$(pgrep chia | grep -v grep | wc -l)
+	processes=$(pgrep chia_ | wc -l)
 	echo "found $processes running chia processes. Waiting for all processes to stop..."
 
 	# Exit conditions
