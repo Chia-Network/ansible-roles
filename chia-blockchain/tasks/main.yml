@@ -43,11 +43,13 @@
     line: "export CHIA_ROOT={{ chia_root }}"
   when: chia_root_to_env
 
-- name: Copy latest blockchain DB from S3
+- name: Copy latest blockchain DB and cache files from S3
   become: yes
   become_user: "{{ user }}"
   shell: |
     aws --no-progress s3 cp s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite {{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite
+    aws --no-progress s3 cp s3://{{ blockchain_backup_bucket }}/{{ network }}/height-to-hash {{ chia_root }}/db/height-to-hash
+    aws --no-progress s3 cp s3://{{ blockchain_backup_bucket }}/{{ network }}/sub-epoch-summaries {{ chia_root }}/db/sub-epoch-summaries
   args:
     creates: "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite"
   when: download_blockchain_db
