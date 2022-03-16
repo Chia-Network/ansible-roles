@@ -4,6 +4,9 @@ Description=Chia Exporter Service for {{ user }}
 [Service]
 Type=simple
 Environment=CHIA_ROOT={{ chia_root }}
+{% if download_maxmind_db == true %}
+Environment=CHIA_EXPORTER_MAXMIND_DB_PATH=/home/{{ user }}/bin/{{ maxmind_db_name }}
+{% endif %}
 ExecStart=/home/{{ user }}/bin/chia-exporter serve
 User={{ user }}
 Group={{ group }}
