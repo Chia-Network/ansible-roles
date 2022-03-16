@@ -70,6 +70,15 @@
     path: "/home/{{ user }}/bin/chia-exporter-linux-{{ download_arch }}"
     state: absent
 
+- name: Copy maxmind DB from S3
+  become: yes
+  become_user: "{{ user }}"
+  shell: |
+    aws --no-progress s3 cp "s3://{{ maxmind_db_backup_bucket }}/{{ maxmind_db_name }}" "/home/{{ user }}/bin/{{ maxmind_db_name }}"
+  args:
+    creates: "/home/{{ user }}/bin/{{ maxmind_db_name }}"
+  when: download_maxmind_db
+
 - name: Chia Exporter Systemd Config
   become: yes
   ansible.builtin.template:

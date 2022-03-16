@@ -3,6 +3,10 @@ chia_exporter_service_name: chia-exporter.service
 chia_exporter_start_on_boot: yes
 chia_exporter_start_now: yes
 
+download_maxmind_db: false
+maxmind_db_backup_bucket: ""
+maxmind_db_name: "GeoLite2-Country.mmdb"
+
 user: ubuntu
 group: ubuntu
 
