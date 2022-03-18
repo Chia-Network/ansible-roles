@@ -4,6 +4,7 @@
   ansible.builtin.file:
     path: "~/.zshenv"
     mode: '0755'
+    state: touch
 
 - name: Insert the proper path for gnu-tar in .zshenv.
   lineinfile:
