@@ -17,9 +17,12 @@ trap cleanup EXIT
 touch $LOCK_FILE
 
 echo "Downloading s3 database..."
-aws s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite" "{{ chia_root }}/blockchain_{{ db_version }}_{{ network }}.sqlite"
-
+aws --no-progress s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite" "{{ chia_root }}/blockchain_{{ db_version }}_{{ network }}.sqlite"
+aws --no-progress s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/height-to-hash" "{{ chia_root }}/height-to-hash"
+aws --no-progress s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/sub-epoch-summaries" "{{ chia_root }}/sub-epoch-summaries"
 sudo chown ubuntu:ubuntu "{{ chia_root }}/blockchain_{{ db_version }}_{{ network }}.sqlite"
+sudo chown ubuntu:ubuntu "{{ chia_root }}/height-to-hash"
+sudo chown ubuntu:ubuntu "{{ chia_root }}/sub-epoch-summaries"
 
 echo "Stopping monit services..."
 sudo systemctl stop monit || true
@@ -43,7 +46,6 @@ done
 #Permission will be required to pull an object from the S3 bucket.
 
 echo "Moving the database....."
-mv "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite" "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite"
-
-echo "Starting chia services..."
-sudo systemctl start chia
+mv "{{ chia_root }}/blockchain_{{ db_version }}_{{ network }}.sqlite" "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite"
+mv "{{ chia_root }}/height-to-hash" "{{ chia_root }}/db/height-to-hash"
+mv "{{ chia_root }}/sub-epoch-summaries" "{{ chia_root }}/db/sub-epoch-summaries"
