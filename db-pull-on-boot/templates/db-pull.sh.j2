@@ -16,6 +16,11 @@ trap cleanup EXIT
 
 touch $LOCK_FILE
 
+echo "Downloading s3 database..."
+aws s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite" "{{ chia_root }}/blockchain_{{ db_version }}_{{ network }}.sqlite"
+
+sudo chown ubuntu:ubuntu "{{ chia_root }}/blockchain_{{ db_version }}_{{ network }}.sqlite"
+
 echo "Stopping monit services..."
 sudo systemctl stop monit || true
 
@@ -37,10 +42,8 @@ done
 
 #Permission will be required to pull an object from the S3 bucket.
 
-echo "Downloading s3 database..."
-aws s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite" "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite"
-
-sudo chown ubuntu:ubuntu "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite"
+echo "Moving the database....."
+mv "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite" "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite"
 
 echo "Starting chia services..."
 sudo systemctl start chia
