@@ -20,9 +20,9 @@ echo "Downloading s3 database..."
 aws --no-progress s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite" "{{ chia_root }}/blockchain_{{ db_version }}_{{ network }}.sqlite"
 aws --no-progress s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/height-to-hash" "{{ chia_root }}/height-to-hash"
 aws --no-progress s3 cp "s3://{{ blockchain_backup_bucket }}/{{ network }}/sub-epoch-summaries" "{{ chia_root }}/sub-epoch-summaries"
-sudo chown ubuntu:ubuntu "{{ chia_root }}/blockchain_{{ db_version }}_{{ network }}.sqlite"
-sudo chown ubuntu:ubuntu "{{ chia_root }}/height-to-hash"
-sudo chown ubuntu:ubuntu "{{ chia_root }}/sub-epoch-summaries"
+sudo chown "{{ user }}":"{{ group }}" "{{ chia_root }}/blockchain_{{ db_version }}_{{ network }}.sqlite"
+sudo chown "{{ user }}":"{{ group }}" "{{ chia_root }}/height-to-hash"
+sudo chown "{{ user }}":"{{ group }}" "{{ chia_root }}/sub-epoch-summaries"
 
 echo "Stopping monit services..."
 sudo systemctl stop monit || true
