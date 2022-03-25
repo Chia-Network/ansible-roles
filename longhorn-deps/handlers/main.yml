@@ -1,0 +1,5 @@
+- name: restart-multipath
+  become: yes
+  service:
+    name: multipathd.service
+    state: restarted

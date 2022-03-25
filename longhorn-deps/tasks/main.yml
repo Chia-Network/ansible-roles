@@ -19,3 +19,11 @@
     daemon_reload: yes
     enabled: "{{ iscsid_start_on_boot }}"
     state: "{{ iscsid_start_now | ternary('started','stopped') }}"
+
+# https://longhorn.io/kb/troubleshooting-volume-with-multipath/
+- name: multipath config
+  become: yes
+  template:
+    src: multipath.conf
+    dest: /etc/multipath.conf
+  notify: restart-multipath
