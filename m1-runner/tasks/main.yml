@@ -9,12 +9,29 @@
 - name: Insert the proper path for gnu-tar in .zshenv.
   lineinfile:
     path: "~/.zshenv"
-    line: |
-      export PATH="/opt/homebrew/opt/gnu-tar/libexec/gnubin:$PATH"
-      export PATH=/opt/homebrew/bin:$PATH
-      export PATH=/opt/homebrew/sbin:$PATH
-      export PATH=/Users/chia/.cargo/bin:$PATH
+    line: export PATH=/opt/homebrew/opt/gnu-tar/libexec/gnubin:$PATH
+    regexp: '^export.PATH=/opt/homebrew/opt/gnu-tar'
+    insertbefore: EOF
 
+- name: Insert the proper path for homebrew bin in .zshenv.
+  lineinfile:
+    path: "~/.zshenv"
+    line: export PATH=/opt/homebrew/bin:$PATH
+    regexp: '^export.PATH=/opt/homebrew/bin'
+    insertbefore: EOF
+
+- name: Insert the proper path for homebrew sbin in .zshenv.
+  lineinfile:
+    path: "~/.zshenv"
+    line: export PATH=/opt/homebrew/sbin:$PATH
+    regexp: '^export.PATH=/opt/homebrew/sbin'
+    insertbefore: EOF
+
+- name: Insert the proper path for cargo in .zshenv.
+  lineinfile:
+    path: "~/.zshenv"
+    line: export PATH=/Users/chia/.cargo/bin:$PATH
+    regexp: '^export.PATH=/Users/chia/.cargo'
     insertbefore: EOF
 
 - name: Make action-runner directory
