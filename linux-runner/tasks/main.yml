@@ -34,7 +34,7 @@
 - name: Configure the runner for GitHub
   become: yes
   become_user: "{{ user }}"
-  shell: ./config.sh --url https://github.com/Chia-Network --token "{{registration_token}}" --runnergroup "{{runner_group}}" --labels "{{runner_tags}}" --name "{{ ansible_hostname }}" --unattended
+  shell: ./config.sh --url https://github.com/Chia-Network --token "{{registration_token}}" --runnergroup "{{runner_group}}" --labels "{{runner_tags}}" --name "{{ inventory_hostname }}" --unattended
   args:
     chdir: "{{ path_to_runner_directory }}"
     creates: "{{ path_to_runner_directory }}/.runner"
@@ -49,7 +49,7 @@
     sudo ./svc.sh install
   args:
     chdir: "{{ path_to_runner_directory }}"
-    creates: "/etc/systemd/system/actions.runner.Chia-Network.{{ ansible_hostname }}.service"
+    creates: "/etc/systemd/system/actions.runner.Chia-Network.{{ inventory_hostname }}.service"
   register: install
 
 - debug:
