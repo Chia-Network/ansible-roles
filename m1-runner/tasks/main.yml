@@ -55,7 +55,7 @@
     creates: "{{ path_to_runner_directory }}/svc.sh"
 
 - name: Configure the runner for GitHub
-  shell: arch -x86_64 ./config.sh --url https://github.com/Chia-Network --token "{{registration_token}}" --runnergroup "{{runner_group}}" --labels "{{runner_tags}}" --name "{{ ansible_hostname }}" --unattended
+  shell: arch -x86_64 ./config.sh --url https://github.com/Chia-Network --token "{{registration_token}}" --runnergroup "{{runner_group}}" --labels "{{runner_tags}}" --name "{{ inventory_hostname }}" --unattended
   args:
     chdir: "{{ path_to_runner_directory }}"
     creates: "{{ path_to_runner_directory }}/.runner"
@@ -68,7 +68,7 @@
     arch -x86_64 ./svc.sh install
   args:
     chdir: "{{ path_to_runner_directory }}"
-    creates: "~/Library/LaunchAgents/actions.runner.Chia-Network.{{ ansible_hostname.split('.')[0] }}.plist"
+    creates: "~/Library/LaunchAgents/actions.runner.Chia-Network.{{ inventory_hostname }}.plist"
   register: install
 - debug:
     msg: "{{ install.stdout }}"
