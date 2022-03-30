@@ -1,0 +1,35 @@
+---
+#####
+#
+# Role to install SentinelOne agent.  Currently only for Debian/Ubuntu based
+# Linux versions.  Requires variables sentinelone_token and sentinelone_type
+# be set.  In most cases, the token should be pulled from Vault.  Set the
+# sentinelone_type variable to be either "desktop" or "server".
+#
+######
+
+- name: Copy SentinelOne .deb file
+  ansible.builtin.copy:
+    src: SentinelAgent_linux_v22_1_1_4.deb
+    dest: /tmp/SentinelAgent_linux_v22_1_1_4.deb
+  when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
+
+- name: Install SentinelOne package
+  ansible.builtin.apt:
+    deb: /tmp/SentinelAgent_linux_v22_1_1_4.deb
+    state: present
+  when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
+
+- name: Configure SentinelOne Token
+  ansible.builtin.command: "/opt/sentinelone/bin/sentinelctl management token set {{ sentinelone_token }}"
+  args:
+    creates: /tmp/sentinel-one-agent-registered
+
+- name: Configure SentinelOne node type
+  ansible.builtin.command: "/opt/sentinelone/bin/sentinelctl management type set {{ sentinelone_type }}"
+  args:
+    creates: /tmp/sentinel-one-agent-type-set
+
+- name: Start SentinelOne SentinelOne agent
+  ansible.builtin.command: "/opt/sentinelone/bin/sentinelctl control start"
+
