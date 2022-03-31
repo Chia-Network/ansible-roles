@@ -4,8 +4,9 @@
 #   tmp_aws_access_key
 #   tmp_aws_secret_key
 #   tmp_aws_session_token
+#   sentinelone_debian_installer
 - name: Download SentinelOne installer from private S3 bucket
-  ansible.builin.shell: "aws --no-progress s3 cp {{ sentinelone_debian_installer }} /tmp/SentinelAgent_linux_v22_1_1_4.deb"
+  ansible.builin.shell: "aws --no-progress s3 cp s3://{{ sentinelone_bucket }}/sentinelone/SentinelAgent_linux_v22_1_1_4.deb /tmp/SentinelAgent_linux_v22_1_1_4.deb"
   args:
     creates: /tmp/SentinelAgent_linux_v22_1_1_4.deb
   environment:
