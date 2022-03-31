@@ -1,0 +1,42 @@
+---
+# Use ephemeral AWS credentials provided in the CI/CD actions. Make sure the
+# following variables are set:
+#   tmp_aws_access_key
+#   tmp_aws_secret_key
+- name: Authenticate with AWS to download SentinelOne installer from S3
+  ansible.builtin.shell: |
+    aws configure set aws_access_key_id {{ tmp_aws_access_key }} --profile sentinelone
+    aws configure set aws_secret_access_key {{ tmp_aws_secret_key }} --profile sentinelone
+    aws configure set aws_session_token {{ tmp_aws_session_token }} --profile sentinelone
+  no_log: true
+
+- name: Download SentinelOne installer from private S3 bucket
+  ansible.builin.command: "aws --profile sentinelone s3 cp {{ sentinelone_debian_installer }} /tmp/SentinelAgent_linux_v22_1_1_4.deb"
+  args:
+    creates: /tmp/SentinelAgent_linux_v22_1_1_4.deb
+  when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
+
+- name: Remove AWS credentials file
+  ansible.builtin.file:
+    src: ~/.aws/credentials
+    state: absent
+
+- name: Install SentinelOne package
+  ansible.builtin.apt:
+    deb: /tmp/SentinelAgent_linux_v22_1_1_4.deb
+    state: present
+  when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
+
+- name: Configure SentinelOne Token
+  ansible.builtin.command: "/opt/sentinelone/bin/sentinelctl management token set {{ sentinelone_token }}"
+  args:
+    creates: /tmp/sentinel-one-agent-registered
+
+- name: Configure SentinelOne node type
+  ansible.builtin.command: "/opt/sentinelone/bin/sentinelctl management type set {{ sentinelone_type }}"
+  args:
+    creates: /tmp/sentinel-one-agent-type-set
+
+- name: Start SentinelOne SentinelOne agent
+  ansible.builtin.command: "/opt/sentinelone/bin/sentinelctl control start"
+
