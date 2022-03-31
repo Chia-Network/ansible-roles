@@ -14,11 +14,6 @@
     AWS_SESSION_TOKEN: "{{ tmp_aws_session_token }}"
   when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
 
-- name: Remove AWS credentials file
-  ansible.builtin.file:
-    src: ~/.aws/credentials
-    state: absent
-
 - name: Install SentinelOne package
   ansible.builtin.apt:
     deb: /tmp/SentinelAgent_linux_v22_1_1_4.deb
