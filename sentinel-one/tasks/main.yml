@@ -3,17 +3,15 @@
 # following variables are set:
 #   tmp_aws_access_key
 #   tmp_aws_secret_key
-- name: Authenticate with AWS to download SentinelOne installer from S3
-  ansible.builtin.shell: |
-    aws configure set aws_access_key_id {{ tmp_aws_access_key }} --profile sentinelone
-    aws configure set aws_secret_access_key {{ tmp_aws_secret_key }} --profile sentinelone
-    aws configure set aws_session_token {{ tmp_aws_session_token }} --profile sentinelone
-  no_log: true
-
+#   tmp_aws_session_token
 - name: Download SentinelOne installer from private S3 bucket
-  ansible.builin.command: "aws --profile sentinelone s3 cp {{ sentinelone_debian_installer }} /tmp/SentinelAgent_linux_v22_1_1_4.deb"
+  ansible.builin.shell: "aws --no-progress s3 cp {{ sentinelone_debian_installer }} /tmp/SentinelAgent_linux_v22_1_1_4.deb"
   args:
     creates: /tmp/SentinelAgent_linux_v22_1_1_4.deb
+  environment:
+    AWS_ACCESS_KEY_ID: "{{ tmp_aws_access_key }}"
+    AWS_SECRET_ACCESS_KEY: "{{ tmp_aws_secret_key }}"
+    AWS_SESSION_TOKEN: "{{ tmp_aws_session_token }}"
   when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
 
 - name: Remove AWS credentials file
