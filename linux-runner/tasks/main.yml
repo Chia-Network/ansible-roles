@@ -11,6 +11,13 @@
       paths:
         - 'vars'
 
+- name: Add ansible_user to the docker group
+  become: yes
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+
 - name: Make action-runner directory
   ansible.builtin.file:
     path: "{{ path_to_runner_directory }}"
@@ -65,10 +72,3 @@
 
 - debug:
     msg: "{{ output.stdout }}"
-
-- name: Add ansible_user to the docker group
-  become: yes
-  user:
-    name: "{{ ansible_user }}"
-    groups: docker
-    append: yes
