@@ -1,0 +1,9 @@
+---
+# These defaults are placeholders - set the actual values in
+# group_vars or host_vars.
+sentinelone_bucket: "sentinelone-installer-bucket-name"
+tmp_aws_access_key: "EXAMPLEKEY"
+tmp_aws_secret_key: "EXAMPLESECRET"
+tmp_aws_session_token: "EXAMPLETOKEN"
+sentinelone_token: "SECRET_SENTINEL_ONE_SERVICE_TOKEN"
+sentinelone_type: "server" # Enter "server" or "desktop"
