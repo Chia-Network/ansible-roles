@@ -6,7 +6,7 @@
 #   tmp_aws_session_token
 #   sentinelone_debian_installer
 - name: Download SentinelOne installer from private S3 bucket
-  ansible.builin.shell: "aws --no-progress s3 cp s3://{{ sentinelone_bucket }}/sentinelone/SentinelAgent_linux_v22_1_1_4.deb /tmp/SentinelAgent_linux_v22_1_1_4.deb"
+  ansible.builtin.shell: "aws --no-progress s3 cp s3://{{ sentinelone_bucket }}/sentinelone/SentinelAgent_linux_v22_1_1_4.deb /tmp/SentinelAgent_linux_v22_1_1_4.deb"
   args:
     creates: /tmp/SentinelAgent_linux_v22_1_1_4.deb
   environment:
@@ -35,7 +35,7 @@
     creates: /tmp/sentinel-one-agent-type-set
   become: yes
 
-- name: Start SentinelOne SentinelOne agent
+- name: Start SentinelOne agent
   ansible.builtin.command: "/opt/sentinelone/bin/sentinelctl control start"
   become: yes
 
