@@ -12,6 +12,7 @@ chia_root_to_env: true
 # The name of the bucket that blockchain backups can be found in
 blockchain_backup_bucket: "blockchain-backup-bucket-name"
 download_blockchain_db: true
+download_crawler_db: false
 db_version: v2
 wallet_db_version: v2
 

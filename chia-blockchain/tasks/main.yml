@@ -102,6 +102,14 @@
     creates: "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite"
   when: download_blockchain_db
 
+- name: Copy latest crawler DB from S3
+  become: yes
+  become_user: "{{ user }}"
+  shell: aws --no-progress s3 cp s3://{{ blockchain_backup_bucket }}/{{ network }}/crawler.db {{ chia_root }}/crawler.db
+  args:
+    creates: "{{ chia_root }}/crawler.db"
+  when: download_crawler_db
+
 - name: Install timelord
   become: yes
   become_user: "{{ user }}"
