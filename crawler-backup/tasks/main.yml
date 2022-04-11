@@ -1,11 +1,15 @@
 ---
 - name: Backup Config
+  become: yes
+  become_user: "{{ user }}"
   template:
     src: crawler-backup.sh.j2
     dest: "/home/{{ user }}/crawler-backup.sh"
     mode: '0755'
 
 - name: Create log directory for backup script
+  become: yes
+  become_user: "{{ user }}"
   file:
     path: "/home/{{ user }}/backup-logs"
     state: directory
