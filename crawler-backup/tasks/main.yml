@@ -1,0 +1,28 @@
+---
+- name: Backup Config
+  template:
+    src: crawler-backup.sh.j2
+    dest: "/home/{{ user }}/crawler-backup.sh"
+    mode: '0755'
+
+- name: Create log directory for backup script
+  file:
+    path: "/home/{{ user }}/backup-logs"
+    state: directory
+    mode: "0755"
+
+- name: Add cron to do routine backups
+  become: yes
+  ansible.builtin.cron:
+    name: "Crawler Backup"
+    user: "{{ user }}"
+    minute: "{{ backup_cron_minute }}"
+    hour: "{{ backup_cron_hour }}"
+    job: "/home/{{ user }}/crawler-backup.sh >> /home/{{ user }}/backup-logs/crawler-backup.log 2>&1"
+
+- name: Add logrotate script for backup log file
+  become: yes
+  template:
+    src: crawler-backup-script-logrotate.j2
+    dest: "/etc/logrotate.d/crawler-backup-script-logrotate"
+    mode: '0644'
