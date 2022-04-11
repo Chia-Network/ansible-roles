@@ -41,3 +41,10 @@
       - containerd.io
     update_cache: yes
     cache_valid_time: 300
+
+- name: Add cron for docker system prune
+  become: yes
+    name: "Docker system prune"
+    minute: "15"
+    hour: "2"
+    job: "docker system prune -af"
