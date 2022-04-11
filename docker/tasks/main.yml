@@ -44,6 +44,7 @@
 
 - name: Add cron for docker system prune
   become: yes
+  ansible.builtin.cron:
     name: "Docker system prune"
     minute: "15"
     hour: "2"
