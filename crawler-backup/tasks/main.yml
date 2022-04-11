@@ -5,7 +5,7 @@
     src: crawler-backup.sh.j2
     dest: "/home/{{ user }}/crawler-backup.sh"
     mode: '0755'
-    user: "{{ user }}"
+    owner: "{{ user }}"
     group: "{{ group }}"
 
 - name: Create log directory for backup script
@@ -14,7 +14,7 @@
     path: "/home/{{ user }}/backup-logs"
     state: directory
     mode: "0755"
-    user: "{{ user }}"
+    owner: "{{ user }}"
     group: "{{ group }}"
 
 - name: Add cron to do routine backups
