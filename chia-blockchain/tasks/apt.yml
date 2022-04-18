@@ -37,10 +37,10 @@
   become: yes
   ansible.builtin.apt:
     name:
-      - "{{ chia_apt_package }}{{ repo_ref == 'latest' | ternary('', '=' + repo_ref) }}"
+      - "{{ chia_apt_package }}{{ ( repo_ref == 'latest' ) | ternary('', '=' + repo_ref) }}"
     update_cache: yes
     cache_valid_time: 300
-    state: "{{ repo_ref == 'latest' | ternary('latest', 'present') }}"
+    state: "{{ ( repo_ref == 'latest' ) | ternary('latest', 'present') }}"
   register: chia_install
 
 - name: Chia Init

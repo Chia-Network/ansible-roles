@@ -29,11 +29,11 @@
   when: chia_root_to_env
 
 - name: Install from source
-  include: "source.yml"
+  include_tasks: "source.yml"
   when: chia_installation_method == "source"
 
 - name: Install from apt
-  include: "apt.yml"
+  include_tasks: "apt.yml"
   when: chia_installation_method == "apt"
 
 - name: Check if the stub DB was created, if we plan to overwrite it with the S3 DB
