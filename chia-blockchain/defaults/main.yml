@@ -1,4 +1,9 @@
 ---
+# `source` or `apt`
+chia_installation_method: source
+# Install CLI only by default
+chia_apt_package: chia-blockchain-cli
+
 chia_service_name: chia.service
 start_on_boot: yes
 start_now: yes
