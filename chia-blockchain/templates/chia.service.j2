@@ -3,9 +3,13 @@ Description=Chia Service for {{ user }}
 
 [Service]
 Type=forking
-Environment=PATH=/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=CHIA_ROOT={{ chia_root }}
+{% if chia_installation_method == "source" %}
+Environment=PATH=/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/home/{{ user }}/chia-blockchain/venv/bin/chia start {{ component }}
+{% else %}
+ExecStart=/usr/bin/chia start {{ component }}
+{% endif %}
 User={{ user }}
 Group={{ group }}
 LimitNOFILE=1048576

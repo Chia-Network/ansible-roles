@@ -7,20 +7,6 @@
   when: add_monit_config
   ignore_errors: yes # This will still run if the error is not correct
 
-- name: Install Deps
-  become: yes
-  ansible.builtin.apt:
-    name:
-      - git
-      - python3-dev
-      - build-essential
-    state: present
-    update_cache: yes
-    cache_valid_time: 300
-  register: apt_action
-  retries: 100
-  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
-
 - name: Ensure chia directories exist
   # become, in case ownership is incorrect
   become: yes
@@ -32,7 +18,6 @@
     recurse: yes
   with_items:
     - "{{ chia_root }}/db"
-    - "/home/{{ user }}/chia-blockchain"
 
 - name: Ensure CHIA_ROOT is set in .bashrc
   become: yes
@@ -43,33 +28,13 @@
     line: "export CHIA_ROOT={{ chia_root }}"
   when: chia_root_to_env
 
-- name: Ensure correct ref is checked out
-  become: yes
-  become_user: "{{ user }}"
-  ansible.builtin.git:
-    repo: "{{ repo_url }}"
-    dest: "/home/{{ user }}/chia-blockchain"
-    version: "{{ repo_ref }}"
-    update: yes
-    force: yes
-  register: git_output
-  notify: restart-chia
+- name: Install from source
+  include_tasks: "source.yml"
+  when: chia_installation_method == "source"
 
-- name: Chia Install and Init
-  become: yes
-  become_user: "{{ user }}"
-  shell: |
-    sh install.sh
-    chia init --fix-ssl-permissions
-  args:
-    chdir: "/home/{{ user }}/chia-blockchain"
-  environment:
-    PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    CHIA_ROOT: "{{ chia_root }}"
-  when: git_output.changed
-  register: install_action
-  retries: 100
-  until: install_action is success or ('Unable to acquire the dpkg frontend lock' not in install_action.stderr)
+- name: Install from apt
+  include_tasks: "apt.yml"
+  when: chia_installation_method == "apt"
 
 - name: Check if the stub DB was created, if we plan to overwrite it with the S3 DB
   become: yes
@@ -110,21 +75,6 @@
     creates: "{{ chia_root }}/crawler.db"
   when: download_crawler_db
 
-- name: Install timelord
-  become: yes
-  become_user: "{{ user }}"
-  shell: |
-    . ./activate
-    sh install-timelord.sh
-  args:
-    chdir: "/home/{{ user }}/chia-blockchain"
-  environment:
-    PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    CHIA_ROOT: "{{ chia_root }}"
-  when: # List is AND
-    - git_output.changed
-    - component is match("timelord.*")
-
 - name: Chia Config
   become: yes
   template:
@@ -139,8 +89,6 @@
   become_user: "{{ user }}"
   shell: |
     echo "{{ item }}" | chia keys add
-  args:
-    chdir: "/home/{{ user }}/chia-blockchain"
   environment:
     PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     CHIA_ROOT: "{{ chia_root }}"
