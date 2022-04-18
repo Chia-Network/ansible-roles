@@ -1,0 +1,67 @@
+- name: Ensure source directory exists
+  become: yes
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ user }}"
+    group: "{{ group }}"
+    recurse: yes
+  with_items:
+    - "/home/{{ user }}/chia-blockchain"
+
+- name: Install Deps
+  become: yes
+  ansible.builtin.apt:
+    name:
+      - git
+      - python3-dev
+      - build-essential
+    state: present
+    update_cache: yes
+    cache_valid_time: 300
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
+- name: Ensure correct ref is checked out
+  become: yes
+  become_user: "{{ user }}"
+  ansible.builtin.git:
+    repo: "{{ repo_url }}"
+    dest: "/home/{{ user }}/chia-blockchain"
+    version: "{{ repo_ref }}"
+    update: yes
+    force: yes
+  register: git_output
+  notify: restart-chia
+
+- name: Chia Install and Init
+  become: yes
+  become_user: "{{ user }}"
+  shell: |
+    sh install.sh
+    chia init --fix-ssl-permissions
+  args:
+    chdir: "/home/{{ user }}/chia-blockchain"
+  environment:
+    PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    CHIA_ROOT: "{{ chia_root }}"
+  when: git_output.changed
+  register: install_action
+  retries: 100
+  until: install_action is success or ('Unable to acquire the dpkg frontend lock' not in install_action.stderr)
+
+- name: Install timelord
+  become: yes
+  become_user: "{{ user }}"
+  shell: |
+    . ./activate
+    sh install-timelord.sh
+  args:
+    chdir: "/home/{{ user }}/chia-blockchain"
+  environment:
+    PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    CHIA_ROOT: "{{ chia_root }}"
+  when: # List is AND
+    - git_output.changed
+    - component is match("timelord.*")
