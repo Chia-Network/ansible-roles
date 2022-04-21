@@ -9,10 +9,6 @@
   ansible.builtin.shell: "aws --no-progress s3 cp s3://{{ sentinelone_bucket }}/sentinelone/SentinelAgent_linux_v22_1_1_4.deb /tmp/SentinelAgent_linux_v22_1_1_4.deb"
   args:
     creates: /tmp/SentinelAgent_linux_v22_1_1_4.deb
-  environment:
-    AWS_ACCESS_KEY_ID: "{{ tmp_aws_access_key }}"
-    AWS_SECRET_ACCESS_KEY: "{{ tmp_aws_secret_key }}"
-    AWS_SESSION_TOKEN: "{{ tmp_aws_session_token }}"
   become: yes
   when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
 
