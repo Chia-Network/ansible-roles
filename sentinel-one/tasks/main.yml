@@ -12,23 +12,29 @@
   become: yes
   when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
 
+- name: Transfer SentinelOne configuration file that will be used during installation only
+  ansible.builtin.template:
+    src: s1-config.cfg
+    dest: /tmp/s1-config.cfg
+    owner: root
+    group: root
+    mode: '0700'
+  become: yes
+
 - name: Install SentinelOne package
   ansible.builtin.apt:
     deb: /tmp/SentinelAgent_linux_v22_1_1_4.deb
     state: present
   become: yes
+  environment:
+    S1_AGENT_INSTALL_CONFIG_PATH: "/tmp/s1-config.cfg"
   when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
 
-- name: Configure SentinelOne Token
-  ansible.builtin.command: "/opt/sentinelone/bin/sentinelctl management token set {{ sentinelone_token }}"
-  args:
-    creates: /tmp/sentinel-one-agent-registered
-  become: yes
-
-- name: Configure SentinelOne node type
-  ansible.builtin.command: "/opt/sentinelone/bin/sentinelctl management type set {{ sentinelone_type }}"
-  args:
-    creates: /tmp/sentinel-one-agent-type-set
+# Don't leave the sensitive config file on the system after install
+- name: Remove SentinelOne installation configuration file
+  ansible.builtin.file:
+    path: /tmp/s1-config.cfg
+    state: absent
   become: yes
 
 - name: Start SentinelOne agent
