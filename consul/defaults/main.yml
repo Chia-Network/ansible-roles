@@ -2,7 +2,7 @@
 consul_start_on_boot: yes
 consul_start_now: yes
 
-consul_version: 1.10.1
+consul_version: 1.12.0
 consul_server: false
 consul_bootstrap_expect: 3
 
