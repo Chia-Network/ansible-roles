@@ -1,2 +1,2 @@
 ---
-download_arch: "arm64"
+runner_download_arch: "arm64"

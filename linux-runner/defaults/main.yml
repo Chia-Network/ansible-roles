@@ -1,11 +1,10 @@
 ---
 runner_release_version: "2.290.1"
-path_to_runner_directory: ""
-path_to_service_file: ""
-registration_token: ""
-user: ""
-runner_group: ""
+runner_directory_path: ""
+runner_registration_token: ""
+runner_user: ""
+runner_github_group: ""
 runner_tags: ""
 
 # Arch Specific Vars - These are set in vars/$arch.yml
-download_arch: ""
+runner_download_arch: ""
