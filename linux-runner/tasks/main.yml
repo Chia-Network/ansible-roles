@@ -20,31 +20,31 @@
 
 - name: Make action-runner directory
   ansible.builtin.file:
-    path: "{{ path_to_runner_directory }}"
+    path: "{{ runner_directory_path }}"
     state: directory
     mode: '0755'
 
 - name: Download runner tarball
   get_url:
-    url: https://github.com/actions/runner/releases/download/v{{runner_release_version}}/actions-runner-linux-{{download_arch}}-{{runner_release_version}}.tar.gz
-    dest: "{{ path_to_runner_directory }}"
+    url: https://github.com/actions/runner/releases/download/v{{ runner_release_version }}/actions-runner-linux-{{ runner_download_arch }}-{{ runner_release_version }}.tar.gz
+    dest: "{{ runner_directory_path }}"
     mode: '0755'
 
 - name: Unarchive runner tarball
   ansible.builtin.unarchive:
-    src: "{{ path_to_runner_directory }}/actions-runner-linux-{{download_arch}}-{{runner_release_version}}.tar.gz"
-    dest: "{{ path_to_runner_directory }}"
+    src: "{{ runner_directory_path }}/actions-runner-linux-{{ runner_download_arch }}-{{ runner_release_version }}.tar.gz"
+    dest: "{{ runner_directory_path }}"
     remote_src: yes
     list_files: yes
-    creates: "{{ path_to_runner_directory }}/svc.sh"
+    creates: "{{ runner_directory_path }}/svc.sh"
 
 - name: Configure the runner for GitHub
   become: yes
-  become_user: "{{ user }}"
-  shell: ./config.sh --url https://github.com/Chia-Network --token "{{registration_token}}" --runnergroup "{{runner_group}}" --labels "{{runner_tags}}" --name "{{ inventory_hostname }}" --unattended
+  become_user: "{{ runner_user }}"
+  shell: ./config.sh --url https://github.com/Chia-Network --token "{{ runner_registration_token }}" --runnergroup "{{ runner_github_group }}" --labels "{{ runner_tags }}" --name "{{ inventory_hostname }}" --unattended
   args:
-    chdir: "{{ path_to_runner_directory }}"
-    creates: "{{ path_to_runner_directory }}/.runner"
+    chdir: "{{ runner_directory_path }}"
+    creates: "{{ runner_directory_path }}/.runner"
   register: configure
 
 - debug:
@@ -55,7 +55,7 @@
   shell: |
     sudo ./svc.sh install
   args:
-    chdir: "{{ path_to_runner_directory }}"
+    chdir: "{{ runner_directory_path }}"
     creates: "/etc/systemd/system/actions.runner.Chia-Network.{{ inventory_hostname }}.service"
   register: install
 
@@ -67,7 +67,7 @@
     sudo ./svc.sh start
     sudo ./svc.sh status
   args:
-    chdir: "{{ path_to_runner_directory }}"
+    chdir: "{{ runner_directory_path }}"
   register: output
 
 - debug:
