@@ -1,6 +1,6 @@
 --- # This can be called if needed to restart the service.
 - name: restart-runner-service
   shell: |
-    {{ path_to_service }}\scv.sh stop
-    {{ path_to_service }}\scv.sh start
+    {{ path_to_service }}\svc.sh stop
+    {{ path_to_service }}\svc.sh start
   become: yes
