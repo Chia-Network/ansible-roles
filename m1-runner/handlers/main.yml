@@ -3,4 +3,3 @@
   shell: |
     {{ runner_directory_path }}/svc.sh stop
     {{ runner_directory_path }}/svc.sh start
-  become: yes
