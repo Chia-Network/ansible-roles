@@ -52,7 +52,7 @@
   when: git_output.changed
 
 - name: Configure the runner for GitHub
-  shell: ./config.sh --url https://github.com/Chia-Network --token "{{ runner_registration_token }}" --runnergroup "{{ runner_group }}" --labels "{{ runner_tags }}" --name "{{ inventory_hostname }}" --unattended
+  shell: ./config.sh --url https://github.com/Chia-Network --token "{{ runner_registration_token }}" --runnergroup "{{ runner_github_group }}" --labels "{{ runner_tags }}" --name "{{ inventory_hostname }}" --unattended
   args:
     chdir: "{{ runner_directory_path }}/_layout"
     creates: "{{ runner_directory_path }}/_layout/.runner"
