@@ -1,5 +1,5 @@
 ---
-runner_release_version: ""
+runner_release_version: "2.290.1"
 path_to_runner_directory: ""
 path_to_service_file: ""
 registration_token: ""
