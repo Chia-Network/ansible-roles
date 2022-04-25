@@ -1,8 +1,7 @@
 ---
-runner_release_version: "2.290.1"
+runner_repo_url: ""
+runner_repo_ref: ""
 runner_directory_path: ""
 runner_registration_token: ""
-runner_user: ""
-# The group on github, not on the system
 runner_github_group: ""
 runner_tags: ""

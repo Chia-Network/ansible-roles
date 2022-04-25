@@ -34,40 +34,37 @@
     regexp: '^export.PATH=/Users/chia/.cargo'
     insertbefore: EOF
 
-- name: Make action-runner directory
-  ansible.builtin.file:
-    path: "{{ runner_directory_path }}"
-    state: directory
-    mode: '0755'
-
-- name: Download runner tarball
-  get_url:
-    url: https://github.com/actions/runner/releases/download/v{{ runner_release_version }}/actions-runner-osx-x64-{{ runner_release_version }}.tar.gz
+- name: Check out the repo to compile
+  ansible.builtin.git:
+    repo: "{{ runner_repo_url }}"
     dest: "{{ runner_directory_path }}"
-    mode: '0755'
+    version: "{{ runner_repo_ref }}"
+    update: yes
+    force: yes
+  register: git_output
+  notify: restart-runner-service
 
-- name: Unarchive runner tarball
-  ansible.builtin.unarchive:
-    src: "{{ runner_directory_path }}/actions-runner-osx-x64-{{ runner_release_version }}.tar.gz"
-    dest: "{{ runner_directory_path }}"
-    remote_src: yes
-    list_files: yes
-    creates: "{{ runner_directory_path }}/svc.sh"
+- name: Compile runner
+  shell: |
+    ./dev.sh layout
+  args:
+    chdir: "{{ runner_directory_path }}/src"
+  when: git_output.changed
 
 - name: Configure the runner for GitHub
-  shell: arch -x86_64 ./config.sh --url https://github.com/Chia-Network --token "{{ runner_registration_token }}" --runnergroup "{{ runner_github_group }}" --labels "{{ runner_tags }}" --name "{{ inventory_hostname }}" --unattended
+  shell: ./config.sh --url https://github.com/Chia-Network --token "{{ runner_registration_token }}" --runnergroup "{{ runner_github_group }}" --labels "{{ runner_tags }}" --name "{{ inventory_hostname }}" --unattended
   args:
-    chdir: "{{ runner_directory_path }}"
-    creates: "{{ runner_directory_path }}/.runner"
+    chdir: "{{ runner_directory_path }}/_layout"
+    creates: "{{ runner_directory_path }}/_layout/.runner"
   register: configure
 - debug:
     msg: "{{ configure.stdout }}"
 
 - name: Install the runner service
   shell: |
-    arch -x86_64 ./svc.sh install
+    ./svc.sh install
   args:
-    chdir: "{{ runner_directory_path }}"
+    chdir: "{{ runner_directory_path }}/_layout"
     creates: "~/Library/LaunchAgents/actions.runner.Chia-Network.{{ inventory_hostname }}.plist"
   register: install
 - debug:
@@ -75,10 +72,10 @@
 
 - name: Start the runner service
   shell: |
-    arch -x86_64 ./svc.sh start
-    arch -x86_64 ./svc.sh status
+    ./svc.sh start
+    ./svc.sh status
   args:
-    chdir: "{{ runner_directory_path }}"
+    chdir: "{{ runner_directory_path }}/_layout"
   register: output
 - debug:
     msg: "{{ output.stdout }}"
@@ -86,4 +83,4 @@
 - name: Move .path to actions-runner directory
   template:
     src: .path
-    dest: "{{ runner_directory_path }}"
+    dest: "{{ runner_directory_path }}/_layout"
