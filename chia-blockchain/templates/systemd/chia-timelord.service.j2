@@ -1,0 +1,21 @@
+[Unit]
+Description=Chia Timelord Service for {{ user }}
+Requires={{ chia_service_base }}-daemon.service
+After={{ chia_service_base }}-daemon.service
+
+[Service]
+Type=simple
+Environment=CHIA_ROOT={{ chia_root }}
+{% if chia_installation_method == "source" %}
+Environment=PATH=/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/{{ user }}/chia-blockchain/venv/bin/chia_timelord
+{% else %}
+ExecStart=/opt/chia/start_timelord
+{% endif %}
+User={{ user }}
+Group={{ group }}
+LimitNOFILE=1048576
+LimitNPROC=1048576
+
+[Install]
+WantedBy=multi-user.target

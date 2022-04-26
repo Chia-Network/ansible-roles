@@ -1,0 +1,20 @@
+[Unit]
+Description=Chia Daemon Service for {{ user }}
+StopWhenUnneeded=true
+
+[Service]
+Type=simple
+Environment=CHIA_ROOT={{ chia_root }}
+{% if chia_installation_method == "source" %}
+Environment=PATH=/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/{{ user }}/chia-blockchain/venv/bin/python -m chia.daemon.server
+{% else %}
+ExecStart=/opt/chia/daemon
+{% endif %}
+User={{ user }}
+Group={{ group }}
+LimitNOFILE=1048576
+LimitNPROC=1048576
+
+[Install]
+WantedBy=multi-user.target
