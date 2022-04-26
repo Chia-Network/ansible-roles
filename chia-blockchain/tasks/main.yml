@@ -103,22 +103,25 @@
     setcap CAP_NET_BIND_SERVICE=+eip $(readlink -f /home/{{ user }}/chia-blockchain/venv/bin/python)
   when: component == "crawler" or component == "seeder" or component == "seeder-only"
 
-- name: Chia Systemd Config
+- name: Chia Systemd Config Files
   become: yes
   ansible.builtin.template:
-    src: "chia.service.j2"
-    dest: "/etc/systemd/system/{{ chia_service_name }}"
+    src: "systemd/chia-{{ item }}.service.j2"
+    dest: "/etc/systemd/system/{{ chia_service_base }}-{{ item }}.service"
     owner: root
     group: root
   notify: restart-chia
+  with_items: "{{ chia_all_services }}"
 
-- name: Ensure service is in desired boot and current state
+# Daemon is implied to be required, because of dependencies in the other services
+- name: Ensure services are in desired boot and current state
   become: yes
   ansible.builtin.systemd:
-    name: "{{ chia_service_name }}"
+    name: "{{ chia_service_base }}-{{ item }}.service"
     daemon_reload: yes
     enabled: "{{ start_on_boot }}"
     state: "{{ start_now | ternary('started','stopped') }}"
+  with_items: "{{ chia_enabled_services }}"
 
 - name: Add vector config
   become: yes

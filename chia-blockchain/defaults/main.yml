@@ -4,9 +4,34 @@ chia_installation_method: source
 # Install CLI only by default
 chia_apt_package: chia-blockchain-cli
 
-chia_service_name: chia.service
+# chia_service_base will be used to make systemd files unique, in case multiple instances of chia run on the same host
+# <chia_service_base>-daemon.service
+# <chia_service_base>-full-node.service
+# etc
+chia_service_base: chia
 start_on_boot: yes
 start_now: yes
+
+# This is the list of systemd services that will be installed by default
+# daemon is required, and chia will fail to run properly without it
+# by default, all possible services are installed, even if they are not all enabled
+chia_all_services:
+  - daemon
+  - crawler
+  - farmer
+  - full-node
+  - harvester
+  - introducer
+  - seeder
+  - timelord
+  - timelord-launcher # This is not present in the installers
+  - wallet
+
+# This is the list of services that should be enabled on boot and started now (if set to start now)
+# Daemon never needs to be listed here, as it is a dependency of the other services
+# Defaults to just starting a full node
+chia_enabled_services:
+  - full-node
 
 user: ubuntu
 group: ubuntu
