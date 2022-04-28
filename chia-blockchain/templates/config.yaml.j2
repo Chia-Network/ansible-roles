@@ -429,6 +429,8 @@ wallet:
 
 data_layer:
   port: 8561
+  # If changing to a remote wallet, also change the dhia-data-layer.service
+  # file to check the remote IP for the wallet service to be ready.
   wallet_peer:
     host: localhost
     port: 9256
@@ -444,7 +446,6 @@ data_layer:
   selected_network: *selected_network
   # If True, starts an RPC server at the following port
   start_rpc_server: True
-  # TODO: what considerations are there in choosing this?
   rpc_port: 8562
   fee: 1000000000
   logging: *logging

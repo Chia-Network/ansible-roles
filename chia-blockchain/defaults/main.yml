@@ -18,6 +18,7 @@ start_now: yes
 chia_all_services:
   - daemon
   - crawler
+  - data-layer
   - farmer
   - full-node
   - harvester
