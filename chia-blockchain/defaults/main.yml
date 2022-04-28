@@ -155,6 +155,9 @@ nameserver: chia.net.
 ttl: 300
 soa_rname: "hostmaster.chia.net."
 
+# Datalayer variables
+data_layer_run_server: false
+
 # Vector/Loki Related
 add_vector_config: false
 loki_endpoint: http://localhost:3100
