@@ -1,7 +1,7 @@
 - name: restart-chia
   become: yes
   service:
-    name: "{{ chia_service_base }}.service"
+    name: "{{ chia_service_base }}.target"
     state: restarted
   when: start_now
 
