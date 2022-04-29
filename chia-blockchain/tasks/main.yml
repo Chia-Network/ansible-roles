@@ -125,14 +125,24 @@
     group: root
   notify: restart-chia
 
-# Daemon is implied to be required, because of dependencies in the other services
-- name: Ensure services are in desired boot and current state
+- name: Ensure the chia target is in desired boot and current state
   become: yes
   ansible.builtin.systemd:
     name: "{{ chia_service_base }}.target"
     daemon_reload: yes
     enabled: "{{ start_on_boot }}"
     state: "{{ start_now | ternary('started','stopped') }}"
+
+- name: Ensure services that are not supposed to be enabled are stopped and disabled in systemd
+  become: yes
+  ansible.builtin.systemd:
+    name: "{{ chia_service_base }}-{{ item }}.service"
+    daemon_reload: yes
+    enabled: "false"
+    state: "stopped"
+  # get the difference of 2 lists (items in chia_all_services that don’t exist in chia_enabled_services)
+  # also specifically excludes daemon, since that will never be listed in enabled_services, but is in all_services, but it shouldn't be touched by this step
+  with_items: "{{ chia_all_services | difference(chia_enabled_services) | difference([\"daemon\"]) }}"
 
 - name: Add vector config
   become: yes
