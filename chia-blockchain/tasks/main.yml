@@ -116,8 +116,8 @@
 - name: Chia Systemd Target
   become: yes
   ansible.builtin.template:
-    src: "systemd/chia.target.j2"
-    dest: "/etc/systemd/system/{{ chia_service_base }}.target"
+    src: "systemd/chia.service.j2"
+    dest: "/etc/systemd/system/{{ chia_service_base }}.service"
     owner: root
     group: root
   notify: restart-chia
@@ -126,7 +126,7 @@
 - name: Ensure services are in desired boot and current state
   become: yes
   ansible.builtin.systemd:
-    name: "{{ chia_service_base }}.target"
+    name: "{{ chia_service_base }}.service"
     daemon_reload: yes
     enabled: "{{ start_on_boot }}"
     state: "{{ start_now | ternary('started','stopped') }}"
