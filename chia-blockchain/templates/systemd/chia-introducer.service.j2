@@ -1,14 +1,17 @@
 [Unit]
-Description=Chia Service for {{ user }}
+Description=Chia Introducer Service for {{ user }}
+Requires={{ chia_service_base }}-daemon.service
+After={{ chia_service_base }}-daemon.service
+PartOf={{ chia_service_base }}.target
 
 [Service]
-Type=forking
+Type=simple
 Environment=CHIA_ROOT={{ chia_root }}
 {% if chia_installation_method == "source" %}
 Environment=PATH=/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=/home/{{ user }}/chia-blockchain/venv/bin/chia start {{ component }}
+ExecStart=/home/{{ user }}/chia-blockchain/venv/bin/chia_introducer
 {% else %}
-ExecStart=/usr/bin/chia start {{ component }}
+ExecStart=/opt/chia/start_introducer
 {% endif %}
 User={{ user }}
 Group={{ group }}
