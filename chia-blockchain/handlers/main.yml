@@ -1,10 +1,9 @@
 - name: restart-chia
   become: yes
   service:
-    name: "{{ chia_service_base }}-{{ item }}.service"
+    name: "{{ chia_service_base }}.target"
     state: restarted
   when: start_now
-  with_items: "{{ chia_enabled_services }}"
 
 - name: restart-vector
   become: yes
