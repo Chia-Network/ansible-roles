@@ -104,7 +104,7 @@
   become: yes
   shell: |
     setcap CAP_NET_BIND_SERVICE=+eip $(readlink -f /home/{{ user }}/chia-blockchain/venv/bin/python)
-  when: component == "crawler" or component == "seeder" or component == "seeder-only"
+  when: "crawler" in chia_all_services or "seeder" in chia_all_services
 
 - name: Chia Systemd Config Files
   become: yes

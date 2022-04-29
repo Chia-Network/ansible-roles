@@ -64,4 +64,4 @@
     CHIA_ROOT: "{{ chia_root }}"
   when: # List is AND
     - git_output.changed
-    - component is match("timelord.*")
+    - "timelord" in chia_enabled_services or "timelord-launcher" in chia_enabled_services

@@ -78,7 +78,8 @@ introducer_peer:
   port: 8444
 
 application: chia-blockchain
-# Which chia blockchain component to start
+# Currently only used for a vector label
+# @TODO should likely update this in the future to generate this vector label (if actually used) with the enabled services
 component: node
 
 # Group Tag is used to add context to the installation, metrics, etc when the application, network, component, and ref
