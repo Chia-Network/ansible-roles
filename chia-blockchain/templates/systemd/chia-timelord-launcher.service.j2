@@ -2,6 +2,7 @@
 Description=Chia Timelord Service for {{ user }}
 Requires={{ chia_service_base }}-daemon.service
 After={{ chia_service_base }}-daemon.service
+PartOf={{ chia_service_base }}.target
 
 [Service]
 Type=simple

@@ -1,6 +1,7 @@
 [Unit]
 Description=Chia Daemon Service for {{ user }}
 StopWhenUnneeded=true
+PartOf={{ chia_service_base }}.target
 
 [Service]
 Type=simple
