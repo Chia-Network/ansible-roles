@@ -3,7 +3,7 @@ LOCK_FILE="/tmp/db-pull.lock"
 
 cleanup() {
 	rm -f "$LOCK_FILE"
-	sudo systemctl start chia
+	sudo systemctl start chia.target
 	sudo systemctl start monit
 }
 
@@ -28,7 +28,7 @@ echo "Stopping monit services..."
 sudo systemctl stop monit || true
 
 echo "Stopping chia services..."
-sudo systemctl stop chia
+sudo systemctl stop chia.target
 
 count=1
 while :; do

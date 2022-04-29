@@ -13,7 +13,7 @@ cleanup() {
 	echo "Removing *.sqlite.gz files..."
 	rm -f /tmp/*.sqlite.gz
 	echo "Starting Chia..."
-	sudo systemctl start chia
+	sudo systemctl start chia.target
 	echo "Starting Monit..."
 	sudo systemctl start monit
 	echo "Done!  Exiting..."
@@ -31,7 +31,7 @@ touch $LOCK_FILE
 echo "Stopping monit services..."
 sudo systemctl stop monit
 echo "Stopping chia services..."
-sudo systemctl stop chia
+sudo systemctl stop chia.target
 
 count=1
 while :; do
