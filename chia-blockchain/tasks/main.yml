@@ -1,4 +1,7 @@
 ---
+- name: Cleanup any old leftovers
+  include_tasks: "cleanup.yml"
+
 - name: Stop Monit Service
   become: yes
   ansible.builtin.service:

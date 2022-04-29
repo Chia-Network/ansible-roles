@@ -1,0 +1,10 @@
+# The tasks in this file are responsible for cleaning up leftovers that may be on the system from old versions of this role
+
+- name: Remove files that may have existed from previous versions of this role
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    # This assumes that the new chia_service_base was updated to retain the same base from chia_service_name
+    # chia.service was the default chia_service_name, chia is the default for chia_service_base
+    - /etc/systemd/system/{{ chia_service_base }}.service
