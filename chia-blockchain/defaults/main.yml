@@ -4,9 +4,35 @@ chia_installation_method: source
 # Install CLI only by default
 chia_apt_package: chia-blockchain-cli
 
-chia_service_name: chia.service
+# chia_service_base will be used to make systemd files unique, in case multiple instances of chia run on the same host
+# <chia_service_base>-daemon.service
+# <chia_service_base>-full-node.service
+# etc
+chia_service_base: chia
 start_on_boot: yes
 start_now: yes
+
+# This is the list of systemd services that will be installed by default
+# daemon is required, and chia will fail to run properly without it
+# by default, all possible services are installed, even if they are not all enabled
+chia_all_services:
+  - daemon
+  - crawler
+  - data-layer
+  - farmer
+  - full-node
+  - harvester
+  - introducer
+  - seeder
+  - timelord
+  - timelord-launcher # This is not present in the installers
+  - wallet
+
+# This is the list of services that should be enabled on boot and started now (if set to start now)
+# Daemon never needs to be listed here, as it is a dependency of the other services
+# Defaults to just starting a full node
+chia_enabled_services:
+  - full-node
 
 user: ubuntu
 group: ubuntu
@@ -52,7 +78,8 @@ introducer_peer:
   port: 8444
 
 application: chia-blockchain
-# Which chia blockchain component to start
+# Currently only used for a vector label
+# @TODO should likely update this in the future to generate this vector label (if actually used) with the enabled services
 component: node
 
 # Group Tag is used to add context to the installation, metrics, etc when the application, network, component, and ref
@@ -129,6 +156,9 @@ domain_name: dns-introducer.chia.net.
 nameserver: chia.net.
 ttl: 300
 soa_rname: "hostmaster.chia.net."
+
+# Datalayer variables
+chia_data_layer_run_server: false
 
 # Vector/Loki Related
 add_vector_config: false

@@ -1,0 +1,26 @@
+[Unit]
+Description=Chia Data Layer Service for {{ user }}
+Requires={{ chia_service_base }}-daemon.service
+After={{ chia_service_base }}-daemon.service
+PartOf={{ chia_service_base }}.target
+
+[Service]
+Type=simple
+# Check to see if wallet is responding before starting. Data layer will fail
+# if the wallet service does not respond.  Hard-coded to localhost.
+ExecStartPre=/bin/bash -c '(while ! nc -z -v -w1 localhost 9256 2>/dev/null; do echo "Waiting for the wallet to listen on port 9256..."; sleep 1; done); sleep 1'
+Environment=CHIA_ROOT={{ chia_root }}
+{% if chia_installation_method == "source" %}
+Environment=PATH=/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/{{ user }}/chia-blockchain/venv/bin/chia_data_layer
+{% else %}
+ExecStart=/opt/chia/start_data_layer
+{% endif %}
+User={{ user }}
+Group={{ group }}
+LimitNOFILE=1048576
+LimitNPROC=1048576
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target
