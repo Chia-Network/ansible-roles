@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 NOW=$(date)
 echo "Starting backup at ${NOW}"
 
@@ -24,8 +26,14 @@ trap cleanup EXIT
 
 touch $LOCK_FILE
 
+# 900 second timeout to wait for a lock release, because writing crawler data takes a long time usually
+timeout=900000
+
 echo "Starting backup..."
-sqlite3 {{ chia_root }}/db/crawler.db ".backup '/tmp/crawler.db.backup'"
+sqlite3 {{ chia_root }}/crawler.db <<EOF
+.timeout $timeout
+.backup '/tmp/crawler.db.backup'
+EOF
 
 echo "Starting database upload to s3..."
 aws --no-progress s3 cp "/tmp/crawler.db.backup" "s3://{{ blockchain_backup_bucket }}/{{ network }}/crawler.db"
