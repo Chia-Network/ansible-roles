@@ -19,7 +19,7 @@ cleanup() {
 
 trybackup() {
 	echo "Attempting backup..."
-	return sqlite3 {{ chia_root }}/crawler.db ".backup '/tmp/crawler.db.backup'"
+	sqlite3 {{ chia_root }}/crawler.db ".backup '/tmp/crawler.db.backup'"
 }
 
 if [ -e $LOCK_FILE ]; then
