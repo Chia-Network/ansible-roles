@@ -1,6 +1,7 @@
 # The tasks in this file are responsible for cleaning up leftovers that may be on the system from old versions of this role
 
 - name: Remove files that may have existed from previous versions of this role
+  become: yes
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
