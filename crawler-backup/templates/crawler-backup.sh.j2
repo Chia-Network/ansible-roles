@@ -17,6 +17,11 @@ cleanup() {
 	echo "Done!  Exiting..."
 }
 
+trybackup() {
+	echo "Attempting backup..."
+	return sqlite3 {{ chia_root }}/crawler.db ".backup '/tmp/crawler.db.backup'"
+}
+
 if [ -e $LOCK_FILE ]; then
 	echo "Lock file exists, not starting another backup"
 	exit 1
@@ -26,14 +31,20 @@ trap cleanup EXIT
 
 touch $LOCK_FILE
 
-# 900 second timeout to wait for a lock release, because writing crawler data takes a long time usually
-timeout=900000
-
 echo "Starting backup..."
-sqlite3 {{ chia_root }}/crawler.db <<EOF
-.timeout $timeout
-.backup '/tmp/crawler.db.backup'
-EOF
+COUNTER=0
+MAX_ATTEMPTS=100
+while ! trybackup; do
+	COUNTER=$((COUNTER+1))
+
+	if [[ $COUNTER -gt $MAX_ATTEMPTS ]]; then
+		echo "Failed too many times. Giving up..."
+		exit 1
+  fi
+
+  echo "Retrying in 10 seconds (Attempt $COUNTER)..."
+  sleep 10
+done
 
 echo "Starting database upload to s3..."
 aws --no-progress s3 cp "/tmp/crawler.db.backup" "s3://{{ blockchain_backup_bucket }}/{{ network }}/crawler.db"
