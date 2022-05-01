@@ -35,7 +35,7 @@ echo "Starting backup..."
 COUNTER=0
 MAX_ATTEMPTS=100
 while ! trybackup; do
-	COUNTER=$((COUNTER+1))
+	COUNTER=$((COUNTER + 1))
 
 	if [[ $COUNTER -gt $MAX_ATTEMPTS ]]; then
 		echo "Failed too many times. Giving up..."
