@@ -40,10 +40,10 @@ while ! trybackup; do
 	if [[ $COUNTER -gt $MAX_ATTEMPTS ]]; then
 		echo "Failed too many times. Giving up..."
 		exit 1
-  fi
+	fi
 
-  echo "Retrying in 10 seconds (Attempt $COUNTER)..."
-  sleep 10
+	echo "Retrying in 10 seconds (Attempt $COUNTER)..."
+	sleep 10
 done
 
 echo "Starting database upload to s3..."
