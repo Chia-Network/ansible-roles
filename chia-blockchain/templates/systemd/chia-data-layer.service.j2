@@ -6,9 +6,6 @@ PartOf={{ chia_service_base }}.target
 
 [Service]
 Type=simple
-# Check to see if wallet is responding before starting. Data layer will fail
-# if the wallet service does not respond.  Hard-coded to localhost.
-ExecStartPre=/bin/bash -c '(while ! nc -z -v -w1 localhost {{ chia_wallet_rpc_port }} 2>/dev/null; do echo "Waiting for the wallet to listen on port {{ chia_wallet_rpc_port }}..."; sleep 1; done); sleep 1'
 Environment=CHIA_ROOT={{ chia_root }}
 {% if chia_installation_method == "source" %}
 Environment=PATH=/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
