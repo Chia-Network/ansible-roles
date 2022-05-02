@@ -12,6 +12,7 @@ ExecStart=/home/{{ user }}/chia-blockchain/venv/bin/python -m chia.daemon.server
 {% else %}
 ExecStart=/opt/chia/daemon
 {% endif %}
+ExecStartPost=/bin/bash -c '(while ! nc -z -v -w1 localhost {{ chia_daemon_port }} 2>/dev/null; do echo "Waiting for the daemon to listen on port {{ chia_daemon_port }}..."; sleep 1; done); sleep 1'
 User={{ user }}
 Group={{ group }}
 LimitNOFILE=1048576

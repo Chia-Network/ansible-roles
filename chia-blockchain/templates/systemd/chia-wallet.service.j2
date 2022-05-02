@@ -13,6 +13,7 @@ ExecStart=/home/{{ user }}/chia-blockchain/venv/bin/chia_wallet
 {% else %}
 ExecStart=/opt/chia/start_wallet
 {% endif %}
+ExecStartPost=/bin/bash -c '(while ! nc -z -v -w1 localhost {{ chia_wallet_rpc_port }} 2>/dev/null; do echo "Waiting for the wallet to listen on port {{ chia_wallet_rpc_port }}..."; sleep 1; done); sleep 1'
 User={{ user }}
 Group={{ group }}
 LimitNOFILE=1048576
