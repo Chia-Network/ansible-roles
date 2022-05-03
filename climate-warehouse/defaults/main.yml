@@ -1,0 +1,12 @@
+---
+# Climate Warehouse variables
+climate_warehouse_port: 31310
+climate_warehouse_root: "/home/{{ user }}/climate-warehouse"
+
+# Branch to use for chia datalayer. Eventually should just
+# become "latest" once everything is in main.  THIS NEEDS
+# TO BE DEFINED IN HOST OR GROUP VARS
+repo_ref: datalayer-sim
+
+# Climate Warehouse release
+climate_warehouse_version: "0.0.28"

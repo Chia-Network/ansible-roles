@@ -1,0 +1,4 @@
+---
+dependencies:
+  - role: chia-blockchain
+  - role: monit

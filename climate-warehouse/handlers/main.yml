@@ -1,0 +1,13 @@
+- name: restart-climate-warehouse
+  become: yes
+  service:
+    name: climate-warehouse
+    state: restarted
+  when: start_now
+
+- name: restart-chia-data
+  become: yes
+  service:
+    name: chia-data
+    state: restarted
+  when: start_now

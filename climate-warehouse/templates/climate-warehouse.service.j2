@@ -1,0 +1,12 @@
+[Unit]
+Description=Climate Warehouse for {{ user }}
+Requires=chia-data.service
+After=chia-data.service
+
+[Service]
+ExecStart=/home/{{ user }}/linux-x64/climate-warehouse
+User={{ user }}
+Group={{ group }}
+
+[Install]
+WantedBy=multi-user.target

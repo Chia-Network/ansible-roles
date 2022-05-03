@@ -1,0 +1,5 @@
+check host localhost with address 127.0.0.1/v1/projects
+    start program = "/bin/systemctl start climate-warehouse" with timeout 600 seconds
+    stop program = "/bin/systemctl stop climate-warehouse"
+    if failed port {{ climate_warehouse_port }} then restart
+    if 5 restarts within 5 cycles then timeout
