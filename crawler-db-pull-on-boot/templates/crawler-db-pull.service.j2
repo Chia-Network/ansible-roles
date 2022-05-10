@@ -1,0 +1,11 @@
+[Unit]
+Description=Crawler DB Pull Service
+
+[Service]
+Type=oneshot
+ExecStart={{ chia_root }}/crawler-db-pull.sh
+User=ubuntu
+Group=ubuntu
+
+[Install]
+WantedBy=multi-user.target
