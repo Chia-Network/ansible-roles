@@ -1,0 +1,7 @@
+---
+blockchain_backup_bucket: ""
+network: ""
+chia_root: "/home/ubuntu/.chia"
+db_version: v2
+user: ubuntu
+group: ubuntu
