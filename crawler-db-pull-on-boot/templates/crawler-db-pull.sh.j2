@@ -1,0 +1,47 @@
+#!/bin/bash
+LOCK_FILE="/tmp/crawler-db-pull.lock"
+
+cleanup() {
+	rm -f "$LOCK_FILE"
+	sudo systemctl start chia.target
+	sudo systemctl start monit
+}
+
+if [ -e $LOCK_FILE ]; then
+	echo "Lock file exists, not pulling the database"
+	exit 1
+fi
+
+trap cleanup EXIT
+
+touch $LOCK_FILE
+
+echo "Stopping monit services..."
+sudo systemctl stop monit || true
+
+echo "Stopping chia services..."
+sudo systemctl stop chia.target
+
+count=1
+while :; do
+	processes=$(pgrep chia_ | wc -l)
+	echo "found $processes running chia processes. Waiting for all processes to stop..."
+
+	# Exit conditions
+	[[ $processes -gt 0 ]] || break
+	[[ $count -lt 30 ]] || exit 2
+
+	count=$(expr $count + 1)
+	sleep 1
+done
+
+echo "Downloading crawler s3 database..."
+aws --no-progress s3 cp s3://{{ blockchain_backup_bucket }}/{{ network }}/crawler.db {{ chia_root }}/crawler.db
+sudo chown "{{ user }}":"{{ group }}" "{{ chia_root }}/crawler.db"
+
+echo "Starting chia services..."
+sudo systemctl start chia.target
+
+echo "Starting monit services..."
+sudo systemctl start monit
+#Permission will be required to pull an object from the S3 bucket.
