@@ -1,0 +1,23 @@
+---
+- name: Copy over the crawler db-pull.sh file
+  template:
+    src: "crawler-db-pull.sh.j2"
+    dest: "{{ chia_root }}/crawler-db-pull.sh"
+    owner: ubuntu
+    group: ubuntu
+    mode: 0755
+
+- name: Install the DB unit file
+  template:
+    src: "crawler-db-pull.service.j2"
+    dest: "/etc/systemd/system/crawler-db-pull.service"
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Enable DB pull service
+  systemd:
+    name: crawler-db-pull.service
+    daemon_reload: true
+    state: stopped
+    enabled: yes
