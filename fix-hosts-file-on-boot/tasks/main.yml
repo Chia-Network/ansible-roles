@@ -2,9 +2,9 @@
 - name: Copy over the fix-hosts script
   template:
     src: "fix-hosts.sh.j2"
-    dest: "{{ chia_root }}/fix-hosts.sh"
-    owner: ubuntu
-    group: ubuntu
+    dest: "{{ dest_location }}/fix-hosts.sh"
+    owner: root
+    group: root
     mode: 0755
 
 - name: Install the unit file
