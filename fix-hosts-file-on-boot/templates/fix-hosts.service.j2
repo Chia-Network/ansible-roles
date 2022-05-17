@@ -1,0 +1,11 @@
+[Unit]
+Description=Fix Hosts service
+
+[Service]
+Type=oneshot
+ExecStart={{ dest_location }}/fix-hosts.sh
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
