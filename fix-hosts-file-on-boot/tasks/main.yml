@@ -1,0 +1,23 @@
+---
+- name: Copy over the fix-hosts script
+  template:
+    src: "fix-hosts.sh.j2"
+    dest: "{{ chia_root }}/fix-hosts.sh"
+    owner: ubuntu
+    group: ubuntu
+    mode: 0755
+
+- name: Install the unit file
+  template:
+    src: "fix-hosts.service.j2"
+    dest: "/etc/systemd/system/fix-hosts.service"
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Enable fix-hosts service
+  systemd:
+    name: fix-hosts.service
+    daemon_reload: true
+    state: stopped
+    enabled: yes
