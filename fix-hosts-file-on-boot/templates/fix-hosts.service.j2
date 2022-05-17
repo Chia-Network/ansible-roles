@@ -3,9 +3,9 @@ Description=Fix Hosts service
 
 [Service]
 Type=oneshot
-ExecStart={{ chia_root }}/fix-hosts.sh
-User=ubuntu
-Group=ubuntu
+ExecStart={{ dest_location }}/fix-hosts.sh
+User=root
+Group=root
 
 [Install]
 WantedBy=multi-user.target
