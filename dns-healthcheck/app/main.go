@@ -41,7 +41,7 @@ func readyLoop() {
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{
-				Timeout: time.Millisecond * time.Duration(10000),
+				Timeout: 30 * time.Second,
 			}
 			return d.DialContext(ctx, network, "127.0.0.1:53")
 		},
