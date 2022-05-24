@@ -1,6 +1,100 @@
 ---
-# chia-runner/tasks/main.yml
-- name: Clone runner code and unzip
-  shell: mkdir actions-runner && cd actions-runner && curl -O -L https://github.com/actions/runner/releases/download/v"{{runner-release-version}}/actions-runner-osx-x64-"{{runner-release-version}}.tar.gz && tar xzf ./actions-runner-osx-x64-"{{runner-release-version}}.tar.gz
-  become: yes
-  become_user: chia
+- debug:
+    msg: "{{ ansible_architecture }}"
+
+- name: Load architecture specific vars
+  include_vars: "{{ lookup('first_found', params) }}"
+  vars:
+    params:
+      files:
+        - '{{ansible_architecture}}.yml'
+      paths:
+        - 'vars'
+
+- name: Make .zshenv or verify that it exists
+  ansible.builtin.file:
+    path: "~/.zshenv"
+    mode: '0755'
+    state: touch
+
+- name: Insert the proper path for gnu-tar in .zshenv.
+  lineinfile:
+    path: "~/.zshenv"
+    line: export PATH={{ runner_additional_path }}:$PATH
+    regexp: '^export.PATH={{ runner_additional_path }}'
+    insertbefore: EOF
+
+- name: Insert the proper path for homebrew bin in .zshenv.
+  lineinfile:
+    path: "~/.zshenv"
+    line: export PATH={{ homebrew_bin_path }}:$PATH
+    regexp: '^export.PATH={{ homebrew_bin_path }}'
+    insertbefore: EOF
+
+- name: Insert the proper path for homebrew sbin in .zshenv.
+  lineinfile:
+    path: "~/.zshenv"
+    line: export PATH={{ homebrew_sbin_path }}:$PATH
+    regexp: '^export.PATH={{ homebrew_sbin_path }}'
+    insertbefore: EOF
+
+- name: Insert the proper path for cargo in .zshenv.
+  lineinfile:
+    path: "~/.zshenv"
+    line: export PATH=/Users/chia/.cargo/bin:$PATH
+    regexp: '^export.PATH=/Users/chia/.cargo'
+    insertbefore: EOF
+
+- name: Make action-runner directory
+  ansible.builtin.file:
+    path: "{{ runner_directory_path }}"
+    state: directory
+    mode: '0755'
+
+- name: Download runner tarball
+  get_url:
+    url: https://github.com/actions/runner/releases/download/v{{ runner_release_version }}/actions-runner-osx-{{ runner_download_arch }}-{{ runner_release_version }}.tar.gz
+    dest: "{{ runner_directory_path }}"
+    mode: '0755'
+
+- name: Unarchive runner tarball
+  ansible.builtin.unarchive:
+    src: "{{ runner_directory_path }}/actions-runner-osx-{{ runner_download_arch }}-{{ runner_release_version }}.tar.gz"
+    dest: "{{ runner_directory_path }}"
+    remote_src: yes
+    list_files: yes
+    creates: "{{ runner_directory_path }}/svc.sh"
+
+- name: Configure the runner for GitHub
+  shell: ./config.sh --url https://github.com/Chia-Network --token "{{ runner_registration_token }}" --runnergroup "{{ runner_github_group }}" --labels "{{ runner_tags }}" --name "{{ inventory_hostname }}" --unattended
+  args:
+    chdir: "{{ runner_directory_path }}"
+    creates: "{{ runner_directory_path }}/.runner"
+  register: configure
+- debug:
+    msg: "{{ configure.stdout }}"
+
+- name: Install the runner service
+  shell: |
+    ./svc.sh install
+  args:
+    chdir: "{{ runner_directory_path }}"
+    creates: "~/Library/LaunchAgents/actions.runner.Chia-Network.{{ inventory_hostname }}.plist"
+  register: install
+- debug:
+    msg: "{{ install.stdout }}"
+
+- name: Move .path to actions-runner directory
+  template:
+    src: .path
+    dest: "{{ runner_directory_path }}"
+
+- name: Start the runner service
+  shell: |
+    ./svc.sh start
+    ./svc.sh status
+  args:
+    chdir: "{{ runner_directory_path }}"
+  register: output
+- debug:
+    msg: "{{ output.stdout }}"
