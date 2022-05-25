@@ -1,2 +1,12 @@
 ---
-runner-release-version: "2.278.0"
+runner_release_version: "2.292.0"
+runner_directory_path: ""
+runner_registration_token: ""
+runner_github_group: ""
+runner_tags: ""
+
+# Arch Specific Vars - These are set in vars/$arch.yml
+runner_download_arch: ""
+runner_additional_path: ""
+homebrew_bin_path: ""
+homebrew_sbin_path: ""

@@ -1,0 +1,5 @@
+---
+runner_download_arch: "x64"
+runner_additional_path: "/usr/local/opt/gnu-tar/libexec/gnubin" # :$PATH
+homebrew_bin_path: "/usr/local/opt"
+homebrew_sbin_path: "/usr/local/sbin"

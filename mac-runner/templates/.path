@@ -1,0 +1,1 @@
+{{ runner_additional_path }}:{{ homebrew_bin_path }}:{{ homebrew_sbin_path }}:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
