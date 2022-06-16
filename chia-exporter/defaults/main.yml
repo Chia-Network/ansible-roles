@@ -20,4 +20,4 @@ github_username: ""
 github_password: ""
 
 # Arch Specific Vars - These are set in vars/$arch.yml
-download_arch: ""
+chia_exporter_download_arch: ""
