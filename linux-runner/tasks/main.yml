@@ -11,10 +11,10 @@
       paths:
         - 'vars'
 
-- name: Add ansible_user to the docker group
+- name: Add runner_user to the docker group
   become: yes
   user:
-    name: "{{ ansible_user }}"
+    name: "{{ runner_user }}"
     groups: docker
     append: yes
 
@@ -37,6 +37,14 @@
     remote_src: yes
     list_files: yes
     creates: "{{ runner_directory_path }}/svc.sh"
+
+- name: Ensure actions-runner directory has correct permissions
+  become: yes
+  ansible.builtin.file:
+    path: "{{ runner_directory_path }}"
+    state: directory
+    mode: '0755'
+    user: "{{ runner_user }}"
 
 - name: Configure the runner for GitHub
   become: yes
