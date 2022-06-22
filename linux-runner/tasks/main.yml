@@ -38,6 +38,13 @@
     list_files: yes
     creates: "{{ runner_directory_path }}/svc.sh"
 
+- name: Ensure actions-runner directory has correct permissions
+  become: yes
+  ansible.builtin.file:
+    path: "{{ runner_directory_path }}"
+    state: directory
+    mode: '0755'
+
 - name: Configure the runner for GitHub
   become: yes
   become_user: "{{ runner_user }}"
