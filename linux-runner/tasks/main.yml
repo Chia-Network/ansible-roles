@@ -44,7 +44,8 @@
     path: "{{ runner_directory_path }}"
     state: directory
     mode: '0755'
-    user: "{{ runner_user }}"
+    owner: "{{ runner_user }}"
+    group: "{{ runner_group }}"
 
 - name: Configure the runner for GitHub
   become: yes
