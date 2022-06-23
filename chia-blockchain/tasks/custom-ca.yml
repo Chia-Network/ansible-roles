@@ -28,7 +28,7 @@
     - content: "{{ chia_private_ca_crt }}"
       filename: "private_ca.crt"
     - content: "{{ chia_private_ca_crt }}"
-      filename: "private__ca.crt"
+      filename: "private_ca.crt"
   register: ca_content
   when:
     - chia_ca_crt != ""
