@@ -40,6 +40,12 @@ group: ubuntu
 chia_root: "/home/ubuntu/.chia"
 chia_root_to_env: true
 
+# Set the following vars if you need to run chia init with a specific CA
+chia_ca_crt: ""
+chia_ca_key: ""
+chia_private_ca_crt: ""
+chia_private_ca_key: ""
+
 # The name of the bucket that blockchain backups can be found in
 blockchain_backup_bucket: "blockchain-backup-bucket-name"
 download_blockchain_db: true
