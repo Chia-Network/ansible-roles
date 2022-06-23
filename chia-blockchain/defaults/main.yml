@@ -53,6 +53,14 @@ download_crawler_db: false
 db_version: v2
 wallet_db_version: v2
 
+# This gets templated into the top level config
+# It will be used to determine how the RPC services, etc bind to an interface
+# Typically this is also used to tell other services the hostname/IP of other services, but if binding the top level
+# to 0.0.0.0 (to make the RPCs public), we need a second variable for the service to service hostname (chia_service_hostname)
+chia_top_level_hostname: "localhost"
+# This is the hostname the services use to reach each other on (farmer -> node, etc)
+chia_service_hostname: "localhost"
+
 # What network we're running on
 # This impacts the backup we retrieve from S3 as well as whether or not we configure for testnet
 # This is templated directly into config.yaml as well, so needs to exactly match the network name
