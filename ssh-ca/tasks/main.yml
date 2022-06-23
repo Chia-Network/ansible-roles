@@ -1,11 +1,20 @@
 ---
-- name: Copy CA to the trusted CA key file
+- name: Copy CA from URL to the trusted CA key file
   become: yes
   get_url:
     url: "{{ ca_url }}"
     dest: /etc/ssh/trusted-user-ca-keys.pem
     mode: '0644'
   when: ca_url != ""
+  notify: restart-sshd
+
+- name: Copy CA Content to the trusted CA key file
+  become: yes
+  copy:
+    content: "{{ ca_content }}"
+    dest: /etc/ssh/trusted-user-ca-keys.pem
+    mode: '0644'
+  when: ca_content != ""
   notify: restart-sshd
 
 # TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem
@@ -15,5 +24,5 @@
     path: /etc/ssh/sshd_config
     regexp: '^TrustedUserCAKeys'
     line: "TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem"
-  when: ca_url != ""
+  when: ca_url != "" or ca_content != ""
   notify: restart-sshd
