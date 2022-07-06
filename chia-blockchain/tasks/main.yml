@@ -105,6 +105,7 @@
 - name: Add Keys
   become: yes
   become_user: "{{ user }}"
+  no_log: yes # Don't expose secrets in logs
   shell: |
     echo "{{ item }}" | chia keys add
   environment:
