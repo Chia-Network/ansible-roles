@@ -15,6 +15,7 @@
 
 - name: Write CA files
   become: yes
+  no_log: yes # Don't expose secrets in logs
   copy:
     content: "{{ item.content }}"
     dest: /home/{{ user }}/chia-ca/{{ item.filename }}
