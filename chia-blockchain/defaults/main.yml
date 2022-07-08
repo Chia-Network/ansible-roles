@@ -84,6 +84,10 @@ chia_wallet_port: 8449
 chia_wallet_rpc_port: 9256
 chia_ui_port: 8222
 
+# IPv4/IPv6 network addresses and CIDR blocks allowed to connect even when target_peer_count has been hit.
+# exempt_peer_networks: ["192.168.0.3", "192.168.1.0/24", "fe80::/10", "2606:4700:4700::64/128"]
+exempt_peer_networks: []
+
 dns_servers:
   - "dns-introducer.chia.net"
 
