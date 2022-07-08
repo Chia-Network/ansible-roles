@@ -277,7 +277,8 @@ full_node:
   target_outbound_peer_count: {{ target_outbound_peer_count }}
   # IPv4/IPv6 network addresses and CIDR blocks allowed to connect even when target_peer_count has been hit.
   # exempt_peer_networks: ["192.168.0.3", "192.168.1.0/24", "fe80::/10", "2606:4700:4700::64/128"]
-  exempt_peer_networks: []
+  exempt_peer_networks:
+    {{ exempt_peer_networks | to_nice_yaml(indent=2) | indent(4) }}
   # Accept at most # of inbound connections for different node types.
   max_inbound_wallet: 20
   max_inbound_farmer: 10
