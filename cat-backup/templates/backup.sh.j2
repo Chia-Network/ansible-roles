@@ -1,0 +1,50 @@
+#!/bin/bash
+
+NOW=$(date)
+echo "Starting backup at ${NOW}"
+
+LOCK_FILE="/tmp/crawler-backup.lock"
+
+cleanup() {
+	echo "Removing lock file..."
+	rm -f "$LOCK_FILE"
+
+	echo "Removing *.sqlite files..."
+	rm -f /tmp/*.db
+
+	echo "Done!  Exiting..."
+}
+
+trybackup() {
+	echo "Attempting backup..."
+	sqlite3 {{ db_root }}/cat.db ".backup '/tmp/cat.db'"
+}
+
+if [ -e $LOCK_FILE ]; then
+	echo "Lock file exists, not starting another backup"
+	exit 1
+fi
+
+trap cleanup EXIT
+
+touch $LOCK_FILE
+
+echo "Starting backup..."
+COUNTER=0
+MAX_ATTEMPTS=100
+while ! trybackup; do
+	COUNTER=$((COUNTER + 1))
+
+	if [[ $COUNTER -gt $MAX_ATTEMPTS ]]; then
+		echo "Failed too many times. Giving up..."
+		exit 1
+	fi
+
+	echo "Retrying in 10 seconds (Attempt $COUNTER)..."
+	sleep 10
+done
+
+echo "Starting database upload to s3..."
+aws --no-progress s3 cp "/tmp/cat.db" "s3://{{ blockchain_backup_bucket }}/{{ network }}/cat.db"
+
+echo "Backup Complete!"
