@@ -189,3 +189,5 @@ vector_start_now: true
 # monit service related
 add_monit_config: true
 monit_start_now: true
+# How many times the port check needs to fail before monit will restart the service
+chia_monit_failure_threshold: 3
