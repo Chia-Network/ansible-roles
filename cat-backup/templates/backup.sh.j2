@@ -48,7 +48,4 @@ echo "Starting database upload to s3..."
 aws --no-progress s3 cp "/tmp/cat.db" "s3://{{ blockchain_backup_bucket }}/{{ network }}/cat.db"
 
 
-{% endif %}
-{% endif %}
-
 echo "Backup Complete!"
