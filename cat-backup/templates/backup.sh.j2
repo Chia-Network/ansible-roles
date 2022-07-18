@@ -1,0 +1,13 @@
+#!/bin/bash
+
+NOW=$(date)
+echo "Starting backup at ${NOW}"
+
+echo "Starting database upload to s3..."
+aws --no-progress s3 cp "~/CAT-addresses/db/*.sqlite" "s3://{{ blockchain_backup_bucket }}/{{ network }}/cat-db.sqlite"
+
+
+{% endif %}
+{% endif %}
+
+echo "Backup Complete!"

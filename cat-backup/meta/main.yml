@@ -1,0 +1,5 @@
+---
+dependencies:
+  - role: awscli
+  - role: sqlite3
+  - role: b2
