@@ -11,15 +11,6 @@
     state: directory
     mode: "0755"
 
-- name: Add cron to do routine backups
-  become: yes
-  ansible.builtin.cron:
-    name: "cat-db-backup"
-    user: "{{ user }}"
-    minute: "{{ backup_cron_minute }}"
-    hour: "{{ backup_cron_hour }}"
-    job: "/home/{{ user }}/backup.sh >> /home/{{ user }}/backup-logs/backup.log 2>&1"
-
 - name: Add logrotate script for backup log file
   become: yes
   template:
