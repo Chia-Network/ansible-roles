@@ -84,10 +84,13 @@
 - debug:
     msg: "{{ install.stdout }}"
 
-- name: Move .path to actions-runner directory
+- name: Move .path and .env to actions-runner directory
   template:
-    src: .path
+    src: "{{ item }}"
     dest: "{{ runner_directory_path }}"
+  with_items:
+    - .path
+    - .env
 
 - name: Start the runner service
   shell: |
