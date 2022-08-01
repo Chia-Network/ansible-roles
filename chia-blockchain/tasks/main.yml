@@ -51,6 +51,9 @@
   include_tasks: "apt.yml"
   when: chia_installation_method == "apt"
 
+- name: Init with custom CA
+  include_tasks: "custom-ca.yml"
+
 - name: Check if the stub DB was created, if we plan to overwrite it with the S3 DB
   become: yes
   become_user: "{{ user }}"
@@ -102,6 +105,7 @@
 - name: Add Keys
   become: yes
   become_user: "{{ user }}"
+  no_log: yes # Don't expose secrets in logs
   shell: |
     echo "{{ item }}" | chia keys add
   environment:

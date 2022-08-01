@@ -40,12 +40,26 @@ group: ubuntu
 chia_root: "/home/ubuntu/.chia"
 chia_root_to_env: true
 
+# Set the following vars if you need to run chia init with a specific CA
+chia_ca_crt: ""
+chia_ca_key: ""
+chia_private_ca_crt: ""
+chia_private_ca_key: ""
+
 # The name of the bucket that blockchain backups can be found in
 blockchain_backup_bucket: "blockchain-backup-bucket-name"
 download_blockchain_db: true
 download_crawler_db: false
 db_version: v2
 wallet_db_version: v2
+
+# This gets templated into the top level config
+# It will be used to determine how the RPC services, etc bind to an interface
+# Typically this is also used to tell other services the hostname/IP of other services, but if binding the top level
+# to 0.0.0.0 (to make the RPCs public), we need a second variable for the service to service hostname (chia_service_hostname)
+chia_top_level_hostname: "localhost"
+# This is the hostname the services use to reach each other on (farmer -> node, etc)
+chia_service_hostname: "localhost"
 
 # What network we're running on
 # This impacts the backup we retrieve from S3 as well as whether or not we configure for testnet
@@ -69,6 +83,10 @@ chia_timelord_port: 8446
 chia_wallet_port: 8449
 chia_wallet_rpc_port: 9256
 chia_ui_port: 8222
+
+# IPv4/IPv6 network addresses and CIDR blocks allowed to connect even when target_peer_count has been hit.
+# exempt_peer_networks: ["192.168.0.3", "192.168.1.0/24", "fe80::/10", "2606:4700:4700::64/128"]
+exempt_peer_networks: []
 
 dns_servers:
   - "dns-introducer.chia.net"
@@ -171,3 +189,5 @@ vector_start_now: true
 # monit service related
 add_monit_config: true
 monit_start_now: true
+# How many times the port check needs to fail before monit will restart the service
+chia_monit_failure_threshold: 3

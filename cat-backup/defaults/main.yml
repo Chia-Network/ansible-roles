@@ -1,0 +1,13 @@
+---
+user: ubuntu
+group: ubuntu
+
+db_root: "/home/ubuntu/CAT-addresses/db"
+
+# What network we're running on
+# This impacts the backup we retrieve from S3 as well as whether or not we configure for testnet
+# This is templated directly into config.yaml as well, so needs to exactly match the network name
+network: "mainnet"
+
+# The name of the bucket that blockchain backups can be found in
+blockchain_backup_bucket: "blockchain-backup-bucket-name"
