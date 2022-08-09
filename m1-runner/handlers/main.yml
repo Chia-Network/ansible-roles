@@ -1,5 +1,0 @@
---- # This can be called if needed to restart the service.
-- name: restart-runner-service
-  shell: |
-    {{ runner_directory_path }}/svc.sh stop
-    {{ runner_directory_path }}/svc.sh start

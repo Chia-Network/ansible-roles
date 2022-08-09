@@ -1,5 +1,0 @@
----
-- name: restart-runner-service
-  shell: |
-    {{ runner_directory_path }}/_layout/svc.sh stop
-    {{ runner_directory_path }}/_layout/svc.sh start
