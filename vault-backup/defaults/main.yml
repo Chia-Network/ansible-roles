@@ -1,0 +1,5 @@
+---
+user: ubuntu
+group: ubuntu
+vault_backup_bucket: "vault-backup-bucket-name"
+vault_addr: "https://vault.example.com:8200"

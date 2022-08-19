@@ -3,8 +3,9 @@
 THEDATE=$(date +%s)
 BACKUP_FILENAME="backup-${THEDATE}.snap"
 BACKUP_FILE="/tmp/$BACKUP_FILENAME"
+export VAULT_ADDR="{{ vault_addr }}"
 
-LOCK_FILE="/tmp/consul-backup.lock"
+LOCK_FILE="/tmp/vault-backup.lock"
 
 cleanup() {
 	rm -f "$LOCK_FILE" || true
@@ -20,15 +21,15 @@ trap cleanup EXIT
 
 touch $LOCK_FILE
 
-echo "Starting consul backup"
+echo "Starting vault backup"
 n=0
 until [ "$n" -ge 5 ]; do
-	consul snapshot save -token-file="{{ consul_token_file }}" "$BACKUP_FILE" && break
+	vault operator raft snapshot save $BACKUP_FILE && break
 	n=$((n + 1))
 	echo "Backup failed, retrying"
 done
 
 echo "Starting upload to s3..."
-aws s3 cp "$BACKUP_FILE" "s3://{{ consul_backup_bucket }}/$BACKUP_FILENAME"
+aws s3 cp "$BACKUP_FILE" "s3://{{ vault_backup_bucket }}/$BACKUP_FILENAME"
 
 echo "Backup Complete!"
