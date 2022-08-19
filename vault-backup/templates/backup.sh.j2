@@ -4,6 +4,7 @@ THEDATE=$(date +%s)
 BACKUP_FILENAME="backup-${THEDATE}.snap"
 BACKUP_FILE="/tmp/$BACKUP_FILENAME"
 export VAULT_ADDR="{{ vault_api_addr }}"
+export VAULT_TOKEN="{{ vault_backup_token }}"
 
 LOCK_FILE="/tmp/vault-backup.lock"
 
