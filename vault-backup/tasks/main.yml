@@ -2,14 +2,14 @@
 - name: Backup Config
   template:
     src: backup.sh.j2
-    dest: "/home/{{ user }}/backup-consul.sh"
+    dest: "/home/{{ user }}/backup-vault.sh"
     mode: '0755'
 
 - name: Add cron to backup every 12 hours
   become: yes
   ansible.builtin.cron:
-    name: "Consul Backup"
+    name: "Vault Backup"
     user: "{{ user }}"
     minute: "30"
     hour: "8,20"
-    job: "/home/{{ user }}/backup-consul.sh > /home/{{ user }}/backup-consul.log 2>&1"
+    job: "/home/{{ user }}/backup-vault.sh > /home/{{ user }}/backup-vault.log 2>&1"
