@@ -13,7 +13,6 @@
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
-    recurse: yes
   with_items:
     - "/home/{{ user }}/bin/chia-exporter"
 
