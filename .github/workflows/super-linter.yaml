@@ -28,3 +28,5 @@ jobs:
           IGNORE_GENERATED_FILES: true # Ignore files with @generated in them
           VALIDATE_BASH: false # shellcheck gets very confused with .sh.j2 files right now
           VALIDATE_BASH_EXEC: false # Don't care if .sh files are executable
+          VALIDATE_ENV: false # Breaks when ansible vars are used
+          VALIDATE_TERRAGRUNT: false

@@ -2,10 +2,12 @@
 vault_start_on_boot: yes
 vault_start_now: yes
 
-vault_version: 1.10.1
+vault_version: 1.11.2-1
 
-# The token used to access consul from Vault
-vault_consul_token: ""
+vault_api_addr: "https://vault.example.com:8200"
+vault_cluster_addr: "http://10.11.12.13:8201"
+vault_data_path: "/opt/vault/data"
+vault_node_id: "vault00"
 
 vault_tls_cert: "/opt/vault/tls/tls.crt"
 vault_tls_key: "/opt/vault/tls/tls.key"
