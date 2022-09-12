@@ -1,16 +1,8 @@
-- name: Chia amd64 repository
+- name: Chia Repository
   become: yes
   ansible.builtin.apt_repository:
-    repo: deb [arch=amd64 signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/debian/ stable main
+    repo: deb [arch={{ chia_repo_arch }} signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/debian/ stable main
     update_cache: yes
-  when: "ansible_architecture == 'x86_64'"
-
-- name: Chia arm64 repository
-  become: yes
-  ansible.builtin.apt_repository:
-    repo: deb [arch=arm64 signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/debian/ stable main
-    update_cache: yes
-  when: "ansible_architecture == 'aarch64'"
 
 - name: Install Chia
   become: yes

@@ -1,4 +1,13 @@
 ---
+- name: Load architecture specific vars
+  include_vars: "{{ lookup('first_found', params) }}"
+  vars:
+    params:
+      files:
+        - '{{ansible_architecture}}.yml'
+      paths:
+        - 'vars'
+
 - name: Cleanup any old leftovers
   include_tasks: "cleanup.yml"
 
