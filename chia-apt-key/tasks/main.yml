@@ -1,0 +1,21 @@
+---
+- name: Install Deps
+  become: yes
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: yes
+    cache_valid_time: 300
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
+- name: Get chia key
+  become: yes
+  ansible.builtin.apt_key:
+    url: https://repo.chia.net/FD39E6D3.pubkey.asc
+    state: present
+    keyring: /usr/share/keyrings/chia.gpg
