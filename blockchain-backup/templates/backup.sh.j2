@@ -1,26 +1,30 @@
 #!/bin/bash
 
-NOW=$(date)
-echo "Starting backup at ${NOW}"
+log() {
+	msg=$1
+	echo "$(date) ${msg}"
+}
+
+log "Starting backup"
 
 LOCK_FILE="/tmp/blockchain-backup.lock"
 
 cleanup() {
-	echo "Removing lock file..."
+	log "Removing lock file..."
 	rm -f "$LOCK_FILE"
-	echo "Removing *.sqlite files..."
+	log "Removing *.sqlite files..."
 	rm -f /tmp/*.sqlite
-	echo "Removing *.sqlite.gz files..."
+	log "Removing *.sqlite.gz files..."
 	rm -f /tmp/*.sqlite.gz
-	echo "Starting Chia..."
+	log "Starting Chia..."
 	sudo systemctl start chia.target
-	echo "Starting Monit..."
+	log "Starting Monit..."
 	sudo systemctl start monit
-	echo "Done!  Exiting..."
+	log "Done! Exiting..."
 }
 
 if [ -e $LOCK_FILE ]; then
-	echo "Lock file exists, not starting another backup"
+	log "Lock file exists, not starting another backup"
 	exit 1
 fi
 
@@ -28,51 +32,51 @@ trap cleanup EXIT
 
 touch $LOCK_FILE
 
-echo "Stopping monit services..."
+log "Stopping monit services..."
 sudo systemctl stop monit
-echo "Stopping chia services..."
+log "Stopping chia services..."
 sudo systemctl stop chia.target
 
 count=1
 while :; do
 	processes=$(ps -aux | grep chia | grep -v grep | grep -v chia-exporter | wc -l)
-	echo "found $processes running chia processes. Waiting for all processes to stop..."
+	log "found $processes running chia processes. Waiting for all processes to stop..."
 
 	# Exit conditions
 	[[ $processes > 0 ]] || break
 	[[ $count -lt 30 ]] || exit 2
 
 	count=$(expr $count + 1)
-	sleep 1
+	sleep 5
 done
 
-echo "Compressing database..."
+log "Compressing database..."
 gzip -c "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite" >"/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
 
-echo "Starting database upload to s3 (uncompressed)..."
+log "Starting database upload to s3 (uncompressed)..."
 aws --no-progress s3 cp "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite"
 
-echo "Starting database upload to s3 (compressed)..."
+log "Starting database upload to s3 (compressed)..."
 aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
 
-echo "Starting height-to-hash cache file upload to s3"
+log "Starting height-to-hash cache file upload to s3"
 aws --no-progress s3 cp "{{ chia_root }}/db/height-to-hash" "s3://{{ blockchain_backup_bucket }}/{{ network }}/height-to-hash"
 
-echo "Starting sub-epoch-summaries cache file upload to s3"
+log "Starting sub-epoch-summaries cache file upload to s3"
 aws --no-progress s3 cp "{{ chia_root }}/db/sub-epoch-summaries" "s3://{{ blockchain_backup_bucket }}/{{ network }}/sub-epoch-summaries"
 
 {% if network != "mainnet" %}
 {% if secondary_backup_bucket != "" %}
-echo "Uploading compressed database to secondary backup bucket..."
+log "Uploading compressed database to secondary backup bucket..."
 aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
 
-echo "Authenticating with b2 service"
+log "Authenticating with b2 service"
 /usr/local/sbin/b2 authorize-account {{ b2_application_key_id }} {{ b2_application_key }}
 
-echo "Uploading compressed database to b2 bucket..."
+log "Uploading compressed database to b2 bucket..."
 /usr/local/sbin/b2 upload-file --noProgress chia-public-databases "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
 
 {% endif %}
 {% endif %}
 
-echo "Backup Complete!"
+log "Backup Complete!"
