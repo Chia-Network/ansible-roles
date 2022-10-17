@@ -60,3 +60,18 @@
     daemon_reload: yes
     enabled: "{{ chia_exporter_start_on_boot }}"
     state: "{{ chia_exporter_start_now | ternary('started','stopped') }}"
+
+- name: Add custom monit config to conf.d
+  become: yes
+  ansible.builtin.template:
+    src: monit_config.j2
+    dest: /etc/monit/conf.d/chia_exporter_monit
+  when: chia_exporter_add_monit_config
+  notify: restart-monit
+
+- name: Start Monit Service
+  become: yes
+  ansible.builtin.service:
+    name: monit
+    state: started
+  when: chia_exporter_add_monit_config and monit_start_now

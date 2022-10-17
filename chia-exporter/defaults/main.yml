@@ -14,3 +14,9 @@ group: ubuntu
 # This variable name + default needs to be kept in sync with the chia-blockchain role so that these roles are
 # compatible when used in the same playbook / on the same host
 chia_root: "/home/ubuntu/.chia"
+
+# monit service related
+chia_exporter_add_monit_config: false
+monit_start_now: true
+# How many times the port check needs to fail before monit will restart the service
+chia_exporter_monit_failure_threshold: 3
