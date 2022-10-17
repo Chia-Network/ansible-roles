@@ -4,3 +4,10 @@
     name: "{{ chia_exporter_service_name }}"
     state: restarted
   when: chia_exporter_start_now
+
+- name: restart-monit
+  become: yes
+  service:
+    name: monit
+    state: restarted
+  when: chia_exporter_add_monit_config and monit_start_now
