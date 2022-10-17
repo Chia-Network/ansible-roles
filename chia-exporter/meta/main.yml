@@ -1,3 +1,5 @@
 ---
 dependencies:
   - role: chia-apt-key
+  - role: monit
+    when: chia_exporter_add_monit_config
