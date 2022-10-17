@@ -30,3 +30,4 @@ jobs:
           VALIDATE_BASH_EXEC: false # Don't care if .sh files are executable
           VALIDATE_ENV: false # Breaks when ansible vars are used
           VALIDATE_TERRAGRUNT: false
+          VALIDATE_GO: false
