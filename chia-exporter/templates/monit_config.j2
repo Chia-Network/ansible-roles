@@ -1,4 +1,4 @@
-check host localhost with address 127.0.0.1
+check host chia_exporter with address 127.0.0.1
     start program = "/bin/systemctl start {{ chia_exporter_service_name }}" with timeout 600 seconds
     stop program = "/bin/systemctl stop {{ chia_exporter_service_name }}"
     if failed port 9914 for {{ chia_exporter_monit_failure_threshold }} cycles then restart
