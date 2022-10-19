@@ -116,7 +116,7 @@
   become_user: "{{ user }}"
   no_log: yes # Don't expose secrets in logs
   shell: |
-    echo "{{ item }}" | chia keys add
+    echo "{{ item }}" | chia keys add -l ""
   environment:
     PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     CHIA_ROOT: "{{ chia_root }}"
