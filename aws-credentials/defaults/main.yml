@@ -1,6 +1,6 @@
 ---
 aws_user: ubuntu
 aws_group: ubuntu
-profile_type: [default]
+profile_type: default
 aws_key_id: ""
 aws_key: ""
