@@ -3,13 +3,13 @@
   file:
     path: /home/{{ user }}/.aws/
     state: directory
-    owner: "{{ user }}"
-    group: "{{ group }}"
+    owner: "{{ aws_user }}"
+    group: "{{ aws_group }}"
     mode: 0777
 - name: Copy the aws ID and key into a file
   copy:
     content: |
-      "{{ account_type }}"
+      [{{ aws_profile }}]
       aws_access_key_id = "{{ aws_key_id }}"
       aws_secret_access_key = "{{ aws_key }}"
     dest: /home/{{ user }}/.aws/credentials
