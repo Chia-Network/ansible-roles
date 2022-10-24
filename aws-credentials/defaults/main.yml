@@ -1,6 +1,8 @@
 ---
 aws_user: ubuntu
 aws_group: ubuntu
-profile_type: default
+aws_profile: default
 aws_key_id: ""
 aws_key: ""
+dir_mode: 0700
+file_mode: 0644
