@@ -9,7 +9,7 @@
 - name: Copy the aws ID and key into a file
   copy:
     content: |
-      "[{{ aws_profile }}]"
+      [{{ aws_profile }}]
       aws_access_key_id = "{{ aws_key_id }}"
       aws_secret_access_key = "{{ aws_key }}"
     dest: /home/{{ user }}/.aws/credentials
