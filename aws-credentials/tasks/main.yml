@@ -1,16 +1,16 @@
 ---
 - name: Create a dir
   file:
-    path: /home/ubuntu/.aws/
+    path: /home/{{ user }}/.aws/
     state: directory
-    owner: ubuntu
-    group: ubuntu
+    owner: "{{ user }}"
+    group: "{{ group }}"
     mode: 0777
 - name: Copy the aws ID and key into a file
   copy:
     content: |
-      [restricted_account]
-      aws_access_key_id = "{{ lookup('env', 'CANARY_API_KEY_ID') }}"
-      aws_secret_access_key = "{{ lookup('env', 'CANARY_API_SECRET_KEY') }}"
-    dest: /home/ubuntu/.aws/credentials
+      "{{ account_type }}"
+      aws_access_key_id = "{{ aws_key_id }}"
+      aws_secret_access_key = "{{ aws_key }}"
+    dest: /home/{{ user }}/.aws/credentials
     mode: 0644

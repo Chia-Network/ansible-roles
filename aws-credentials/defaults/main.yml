@@ -1,0 +1,6 @@
+---
+user: ubuntu
+group: ubuntu
+account_type: [default]
+aws_key_id: ""
+aws_key: ""
