@@ -5,7 +5,7 @@
     state: directory
     owner: "{{ aws_user }}"
     group: "{{ aws_group }}"
-    mode: "{{ dir_mode }}"
+    mode: "{{ aws_cred_dir_mode }}"
 - name: Copy the aws ID and key into a file
   copy:
     content: |
@@ -13,4 +13,4 @@
       aws_access_key_id = "{{ aws_key_id }}"
       aws_secret_access_key = "{{ aws_key }}"
     dest: /home/{{ user }}/.aws/credentials
-    mode: "{{ file_mode }}"
+    mode: "{{ aws_cred_file_mode }}"
