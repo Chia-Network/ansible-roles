@@ -1,0 +1,8 @@
+---
+aws_user: ubuntu
+aws_group: ubuntu
+aws_profile: default
+aws_key_id: ""
+aws_key: ""
+aws_cred_dir_mode: 0700
+aws_cred_file_mode: 0644
