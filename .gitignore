@@ -1,1 +1,4 @@
 super-linter.log
+playbook.yml
+hosts
+/vars/

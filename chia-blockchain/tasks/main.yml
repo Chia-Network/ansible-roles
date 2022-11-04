@@ -109,6 +109,17 @@
     dest: "{{ chia_root }}/config/config.yaml"
     owner: "{{ user }}"
     group: "{{ group }}"
+
+# Since the actual chia config is reformatted when python edits it, save a hidden copy of the
+# config as templated so we can tell if the config ACTUALLY changed, and only base restarts on
+# this other config file
+- name: Reference Config
+  become: yes
+  template:
+    src: config.yaml.j2
+    dest: "{{ chia_root }}/config/.config.yaml"
+    owner: "{{ user }}"
+    group: "{{ group }}"
   notify: restart-chia
 
 - name: Add Keys
