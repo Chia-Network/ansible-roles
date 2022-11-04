@@ -438,17 +438,20 @@ data_layer:
     port: {{ chia_wallet_rpc_port }}
 
   database_path: "data_layer/db/data_layer_CHALLENGE.sqlite"
+  # The location where the server files will be stored.
+  server_files_location: "data_layer/db/server_files_location_CHALLENGE"
+  # The timeout for the client to download a file from a server
+  client_timeout: 15
   # Data for running a data layer server.
   host_ip: 0.0.0.0
   host_port: {{ chia_data_layer_host_port }}
-  # Switch this to True if we want to run the server.
-  run_server: {{ chia_data_layer_run_server }}
   # Data for running a data layer client.
-  fetch_data_interval: 60
+  manage_data_interval: 60
   selected_network: *selected_network
   # If True, starts an RPC server at the following port
   start_rpc_server: True
   rpc_port: {{ chia_data_layer_rpc_port }}
+  rpc_server_max_request_body_size: 26214400
   fee: 1000000000
   logging: *logging
 
