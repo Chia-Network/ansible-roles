@@ -1,0 +1,23 @@
+[Unit]
+Description=Chia Data Layer HTTP Service for {{ user }}
+Requires={{ chia_service_base }}-daemon.service
+After={{ chia_service_base }}-daemon.service
+PartOf={{ chia_service_base }}.target
+
+[Service]
+Type=simple
+Environment=CHIA_ROOT={{ chia_root }}
+{% if chia_installation_method == "source" %}
+Environment=PATH=/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/{{ user }}/chia-blockchain/venv/bin/chia_data_layer_http
+{% else %}
+ExecStart=/opt/chia/start_data_layer_http
+{% endif %}
+User={{ user }}
+Group={{ group }}
+LimitNOFILE=1048576
+LimitNPROC=1048576
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

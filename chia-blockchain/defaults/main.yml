@@ -19,6 +19,7 @@ chia_all_services:
   - daemon
   - crawler
   - data-layer
+  - data-layer-http
   - farmer
   - full-node
   - harvester
