@@ -1,0 +1,20 @@
+---
+# Installs universal python 3.8 for mac arm
+- name: Download python 3.8
+  ansible.builtin.get_url:
+    url: https://www.python.org/ftp/python/3.8.10/python-3.8.10-macos11.pkg
+    dest: /tmp/Python38.pkg
+    mode: '0644'
+  register: download38
+
+- name: Install Python 3.8 Package
+  become: yes
+  shell:
+    installer -pkg /tmp/Python38.pkg -target /
+  when: download38.changed
+
+- name: Install Certificates
+  become: yes
+  shell:
+    sh "/Applications/Python 3.8/Install Certificates.command"
+  when: download38.changed
