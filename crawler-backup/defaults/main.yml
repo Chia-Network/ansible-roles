@@ -11,7 +11,7 @@ network: "mainnet"
 
 # What region we're backing up to/from
 # Some regions crawl better than others, so this just helps metrics stay more consistent when restoring backups
-region: ""
+region: "default"
 
 # The name of the bucket that blockchain backups can be found in
 blockchain_backup_bucket: "blockchain-backup-bucket-name"

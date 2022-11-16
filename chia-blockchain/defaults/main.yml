@@ -51,7 +51,7 @@ chia_private_ca_key: ""
 blockchain_backup_bucket: "blockchain-backup-bucket-name"
 download_blockchain_db: true
 download_crawler_db: false
-region: "" # Only used for the crawler DB backup right now
+region: "default" # Only used for the crawler DB backup right now
 db_version: v2
 wallet_db_version: v2
 
