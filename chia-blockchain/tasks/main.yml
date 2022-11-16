@@ -97,7 +97,7 @@
 - name: Copy latest crawler DB from S3
   become: yes
   become_user: "{{ user }}"
-  shell: aws --no-progress s3 cp s3://{{ blockchain_backup_bucket }}/{{ network }}/{{ region }}-crawler.db {{ chia_root }}/crawler.db
+  shell: aws --no-progress s3 cp s3://{{ blockchain_backup_bucket }}/{{ network }}/{{ crawler_segment }}-crawler.db {{ chia_root }}/crawler.db
   args:
     creates: "{{ chia_root }}/crawler.db"
   when: download_crawler_db
