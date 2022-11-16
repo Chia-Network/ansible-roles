@@ -47,6 +47,6 @@ while ! trybackup; do
 done
 
 echo "Starting database upload to s3..."
-aws --no-progress s3 cp "/tmp/crawler.db.backup" "s3://{{ blockchain_backup_bucket }}/{{ network }}/crawler.db"
+aws --no-progress s3 cp "/tmp/crawler.db.backup" "s3://{{ blockchain_backup_bucket }}/{{ network }}/{{ region }}-crawler.db"
 
 echo "Backup Complete!"

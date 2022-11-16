@@ -9,6 +9,10 @@ chia_root: "/home/ubuntu/.chia"
 # This is templated directly into config.yaml as well, so needs to exactly match the network name
 network: "mainnet"
 
+# What region we're backing up to/from
+# Some regions crawl better than others, so this just helps metrics stay more consistent when restoring backups
+region: ""
+
 # The name of the bucket that blockchain backups can be found in
 blockchain_backup_bucket: "blockchain-backup-bucket-name"
 
