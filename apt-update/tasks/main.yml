@@ -1,4 +1,11 @@
 ---
+# Some packages being updated via automation cause issues, hold these back
+- name: Hold packages
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  with_items: "{{ apt-update-hold-items }}"
+
 - name: Ensure apt packages are all up to date
   become: yes
   ansible.builtin.apt:
@@ -9,3 +16,9 @@
   register: apt_action
   retries: 100
   until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
+- name: Unhold packages
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: install
+  with_items: "{{ apt-update-hold-items }}"
