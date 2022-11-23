@@ -36,7 +36,7 @@ while :; do
 done
 
 echo "Downloading crawler s3 database..."
-aws --no-progress s3 cp s3://{{ blockchain_backup_bucket }}/{{ network }}/crawler.db {{ chia_root }}/crawler.db
+aws --no-progress s3 cp s3://{{ blockchain_backup_bucket }}/{{ network }}/{{ crawler_segment }}-crawler.db {{ chia_root }}/crawler.db
 sudo chown "{{ user }}":"{{ group }}" "{{ chia_root }}/crawler.db"
 
 echo "Starting chia services..."
