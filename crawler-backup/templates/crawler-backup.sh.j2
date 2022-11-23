@@ -23,10 +23,10 @@ trybackup() {
 }
 
 cleanpeers() {
-  CUTOFF=$(date +%s -d "{{ crawler_peer_retention_days }} days ago")
-  sqlite3 /tmp/crawler.db.backup "delete from peer_records where best_timestamp < ${CUTOFF}"
-  sqlite3 /tmp/crawler.db.backup "delete from peer_reliability where not exists (select peer_records.peer_id from peer_records where peer_records.peer_id = peer_reliability.peer_id)"
-  sqlite3 /tmp/crawler.db.backup "VACUUM"
+	CUTOFF=$(date +%s -d "{{ crawler_peer_retention_days }} days ago")
+	sqlite3 /tmp/crawler.db.backup "delete from peer_records where best_timestamp < ${CUTOFF}"
+	sqlite3 /tmp/crawler.db.backup "delete from peer_reliability where not exists (select peer_records.peer_id from peer_records where peer_records.peer_id = peer_reliability.peer_id)"
+	sqlite3 /tmp/crawler.db.backup "VACUUM"
 }
 
 if [ -e $LOCK_FILE ]; then
