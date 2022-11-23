@@ -16,5 +16,5 @@ crawler_segment: "default"
 # The name of the bucket that blockchain backups can be found in
 blockchain_backup_bucket: "blockchain-backup-bucket-name"
 
-backup_cron_minute: "30"
-backup_cron_hour: "8,20"
+backup_cron_minute: "5"
+backup_cron_hour: "*"
