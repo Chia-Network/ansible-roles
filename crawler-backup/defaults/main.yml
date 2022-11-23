@@ -18,3 +18,6 @@ blockchain_backup_bucket: "blockchain-backup-bucket-name"
 
 backup_cron_minute: "5"
 backup_cron_hour: "*"
+
+# Peer records that haven't been updated in this amount of time will be dropped from the DB when updating
+crawler_peer_retention_days: 30

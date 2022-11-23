@@ -22,6 +22,13 @@ trybackup() {
 	sqlite3 {{ chia_root }}/crawler.db ".backup '/tmp/crawler.db.backup'"
 }
 
+cleanpeers() {
+  CUTOFF=$(date +%s -d "{{ crawler_peer_retention_days }} days ago")
+  sqlite3 /tmp/crawler.db.backup "delete from peer_records where best_timestamp < ${CUTOFF}"
+  sqlite3 /tmp/crawler.db.backup "delete from peer_reliability where not exists (select peer_records.peer_id from peer_records where peer_records.peer_id = peer_reliability.peer_id)"
+  sqlite3 /tmp/crawler.db.backup "VACUUM"
+}
+
 if [ -e $LOCK_FILE ]; then
 	echo "Lock file exists, not starting another backup"
 	exit 1
@@ -45,6 +52,8 @@ while ! trybackup; do
 	echo "Retrying in 10 seconds (Attempt $COUNTER)..."
 	sleep 10
 done
+
+cleanpeers
 
 echo "Starting database upload to s3..."
 aws --no-progress s3 cp "/tmp/crawler.db.backup" "s3://{{ blockchain_backup_bucket }}/{{ network }}/{{ crawler_segment }}-crawler.db"
