@@ -3,7 +3,7 @@ Description=DNS Introducer Healthcheck
 
 [Service]
 Environment=DNS_HOSTNAME={{ dns_hostname }}
-ExecStart=/usr/local/bin/healthcheck
+ExecStart=/usr/local/bin/dns-introducer-healthcheck
 User=root
 Group=root
 

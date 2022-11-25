@@ -1,1 +1,7 @@
+---
+dns_healthcheck_version: latest
+dns_healthcheck_service_name: dns-healthcheck.service
+dns_healthcheck_start_on_boot: yes
+dns_healthcheck_start_now: yes
+
 dns_hostname: "dns-introducer.chia.net"
