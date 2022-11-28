@@ -193,3 +193,9 @@ add_monit_config: true
 monit_start_now: true
 # How many times the port check needs to fail before monit will restart the service
 chia_monit_failure_threshold: 3
+
+# Connect to certain peers on a given interval
+chia_periodic_connect_interval:
+  minute: "*/5"
+  hour: "*"
+chia_periodic_connect_peers: []
