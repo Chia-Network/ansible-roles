@@ -1,0 +1,13 @@
+---
+- name: Get climate warehouse binary
+  ansible.builtin.get_url:
+    url: https://github.com/Chia-Network/climate-warehouse/releases/download/{{ climate_warehouse_api_version }}/linux-x64-{{ climate_warehouse_api_version }}.zip
+    dest: /tmp/linux-x64-{{ climate_warehouse_api_version }}.zip
+  tags: climate_warehouse
+
+- name: Unzip Climate Warehouse package
+  ansible.builtin.unarchive:
+    src: /tmp/linux-x64-{{ climate_warehouse_api_version }}.zip
+    dest: /tmp
+    remote_src: true
+  tags: climate_warehouse

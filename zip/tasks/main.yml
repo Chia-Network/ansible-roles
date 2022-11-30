@@ -1,0 +1,7 @@
+---
+- name: install zip and unzip
+  ansible.builtin.apt:
+    pkg:
+      - zip
+      - unzip
+    state: present
