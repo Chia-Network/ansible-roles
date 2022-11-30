@@ -1,0 +1,71 @@
+---
+- name: Install certbot
+  become: true
+  community.general.snap:
+    name: certbot
+    classic: true
+    options:
+      - trust-plugin-with-root=ok
+
+- name: Install certbot DNS Plugin
+  become: true
+  community.general.snap:
+    name: certbot-dns-cloudflare
+    classic: true
+  when: certbot_validation_strategy == "cloudflare"
+
+- name: Symlink certbot into place.
+  become: true
+  ansible.builtin.file:
+    src: /snap/bin/certbot
+    dest: /usr/bin/certbot
+    state: link
+
+- name: Template cloudflare credentials ini for certbot
+  become: true
+  ansible.builtin.template:
+    src: cloudflare.ini.j2
+    dest: /root/cloudflare.ini
+    owner: root
+    group: root
+    mode: '0600'
+  when: certbot_validation_strategy == "cloudflare"
+
+- name: Issue certbot certificate using DNS validation
+  become: true
+  ansible.builtin.command: certbot certonly --test-cert --dns-cloudflare --dns-cloudflare-credentials /root/cloudflare.ini --noninteractive --agree-tos --email {{ certbot_email }} -d "{{ certbot_domains | join(',') }}" --dns-cloudflare-propagation-seconds {{ certbot_dns_validation_seconds }}
+  args:
+    creates: /etc/letsencrypt/live/{{ certbot_domains | first }}/privkey.pem
+  when: certbot_validation_strategy == "cloudflare"
+
+- name: Issue certbot certificate using webroot validation
+  become: true
+  ansible.builtin.command: certbot certonly --test-cert --webroot --webroot-path {{ certbot_webroot_path }} --noninteractive --agree-tos --email {{ certbot_email }} -d "{{ certbot_domains | join(',') }}"
+  args:
+    creates: /etc/letsencrypt/live/{{ certbot_domains | first }}/privkey.pem
+  when: certbot_validation_strategy == "webroot"
+
+- name: Add cron job for certbot renewal
+  become: true
+  ansible.builtin.cron:
+    name: Certbot automatic renewal.
+    job: "certbot renew --quiet --no-self-upgrade"
+    minute: "30"
+    hour: "5"
+    user: "root"
+
+- name: Add cron job to reload nginx configs, in case new certs are available
+  become: true
+  ansible.builtin.cron:
+    name: Reload nginx for new certs
+    job: "systemctl reload nginx"
+    minute: "45"
+    hour: "5"
+    user: "root"
+
+- name: Ensure we have the latest nginx options from certbot
+  become: true
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf
+    dest: /etc/letsencrypt/options-ssl-nginx.conf
+    mode: '0440'
