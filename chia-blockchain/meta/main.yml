@@ -10,3 +10,5 @@ dependencies:
     when: add_monit_config
   - role: chia-apt-key
     when: chia_installation_method == "apt"
+  - role: git
+    when: chia_installation_method == "source"
