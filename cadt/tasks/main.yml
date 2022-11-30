@@ -1,0 +1,72 @@
+---
+# CADT = Climate Action Data Trust
+- name: Get CADT binary
+  ansible.builtin.get_url:
+    url: https://github.com/Chia-Network/climate-warehouse/releases/download/{{ cadt_api_version }}/linux-x64-{{ cadt_api_version }}.zip
+    dest: /home/{{ user }}/linux-x64-{{ cadt_api_version }}.zip
+    owner: "{{ user }}"
+    group: "{{ user }}"
+  tags: cadt
+
+- name: Create CADT directory
+  ansible.builtin.file:
+    path: /home/{{ user }}/cadt
+    state: directory
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: '0755'
+  tags: cadt
+
+- name: Unzip CADT package
+  ansible.builtin.unarchive:
+    src: /home/{{ user }}/linux-x64-{{ cadt_api_version }}.zip
+    dest: /home/{{ user }}/cadt
+    remote_src: true
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: '0755'
+  notify: restart-cadt
+  tags: cadt
+
+- name: Add CADT Systemd config
+  become: true
+  ansible.builtin.template:
+    src: "cadt.service.j2"
+    dest: "/etc/systemd/system/cadt.service"
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - restart-cadt
+    - systemd-reload
+  tags: cadt
+
+- name: Add CADT config file
+  ansible.builtin.template:
+    src: "config.yaml.j2"
+    dest: "{{ cadt_root }}/v1/config.yaml"
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: '0644'
+  notify:
+    - restart-cadt
+  tags: cadt
+
+- name: Ensure CADT is in desired boot and current state
+  become: true
+  ansible.builtin.systemd:
+    name: "cadt.service"
+    daemon_reload: true
+    enabled: true
+    state: started
+  tags: cadt
+
+- name: Add custom monit config to conf.d for CADT
+  become: true
+  ansible.builtin.template:
+    src: monit_config.j2
+    dest: /etc/monit/conf.d/cadt_monit
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart-monit

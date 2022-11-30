@@ -1,0 +1,6 @@
+---
+- name: restart-cadt
+  become: yes
+  service:
+    name: cadt.service
+    state: restarted

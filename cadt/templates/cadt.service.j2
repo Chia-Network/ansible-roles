@@ -1,0 +1,14 @@
+[Unit]
+Description=CADT for {{ user }}
+Requires=chia-data-layer.service
+After=chia-data-layer.service
+Requires=chia-wallet.service
+After=chia-wallet.service
+
+[Service]
+ExecStart=/home/{{ user }}/cadt/linux-x64/climate-warehouse
+User={{ user }}
+Group={{ group }}
+
+[Install]
+WantedBy=multi-user.target
