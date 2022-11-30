@@ -1,0 +1,14 @@
+---
+# Supports webroot and cloudflare
+certbot_validation_strategy: "cloudflare"
+
+# Token to use when validation strategy is `cloudflare`
+certbot_cloudflare_token: ""
+certbot_dns_validation_seconds: 60
+
+# Settings for when validation strategy is "webroot"
+certbot_webroot_path: "/var/www/letsencrypt/"
+
+# List[string] of hostnames to issue the cert for
+certbot_domains: []
+certbot_email: ""
