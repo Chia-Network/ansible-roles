@@ -6,6 +6,7 @@ Requires=chia-wallet.service
 After=chia-wallet.service
 
 [Service]
+Environment=CHIA_ROOT={{ chia_root }}
 ExecStart=/home/{{ user }}/cadt/linux-x64/climate-warehouse
 User={{ user }}
 Group={{ group }}
