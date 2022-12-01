@@ -1,0 +1,5 @@
+---
+dependencies:
+  - role: chia-blockchain
+  - role: monit
+  - role: zip

@@ -1,0 +1,18 @@
+MIRROR_DB:
+  DB_USERNAME: {{ cadt_db_username }}
+  DB_PASSWORD: {{ cadt_db_password }}
+  DB_NAME: {{ cadt_db_name }}
+  DB_HOST: {{ cadt_db_host }}
+APP:
+  CW_PORT: {{ cadt_port }}
+  DATALAYER_URL: https://localhost:{{ chia_data_layer_rpc_port }}
+  WALLET_URL: https://localhost:{{ chia_wallet_rpc_port }}
+  USE_SIMULATOR: false
+  READ_ONLY: false
+  API_KEY: null
+  CHIA_NETWORK: {{ network }}
+  IS_GOVERNANCE_BODY: {{ cadt_is_governance_body }}
+  DEFAULT_FEE: 300000000
+  DEFAULT_COIN_AMOUNT: 300000000
+GOVERNANCE:
+  GOVERNANCE_BODY_ID: {{ cadt_governance_body_id }}
