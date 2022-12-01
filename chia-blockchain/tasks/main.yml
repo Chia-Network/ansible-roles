@@ -203,3 +203,16 @@
     name: monit
     state: started
   when: add_monit_config and monit_start_now
+
+- name: Setup periodic peer connect cron
+  become: yes
+  become_user: "{{ user }}"
+  ansible.builtin.cron:
+    name: "Ensure connected to {{ item }}"
+    user: "{{ user }}"
+    minute: "{{ chia_periodic_connect_interval.minute }}"
+    hour: "{{ chia_periodic_connect_interval.hour }}"
+    job: "PATH=/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin CHIA_ROOT={{ chia_root }} chia peer full_node -a {{ item }}:{{ full_node_port }} >> /dev/null 2>&1"
+  with_items: "{{ chia_periodic_connect_peers }}"
+  when:
+    - chia_periodic_connect_peers | length

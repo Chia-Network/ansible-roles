@@ -1,18 +1,36 @@
 ---
-# AWS can't do UDP healthchecks, so this app checks for the DNS server to be ready for the healthcheck
-- name: healthcheck binary
+- name: Load architecture specific vars
+  include_vars: "{{ lookup('first_found', params) }}"
+  vars:
+    params:
+      files:
+        - '{{ansible_architecture}}.yml'
+      paths:
+        - 'vars'
+
+- name: DNS Healthcheck Repository
   become: yes
-  ansible.builtin.copy:
-    src: "./app/healthcheck"
-    dest: /usr/local/bin/healthcheck
-    mode: '0755'
+  ansible.builtin.apt_repository:
+    repo: deb [arch={{ dns_healthcheck_repo_arch }} signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/dns-introducer-healthcheck/debian/ stable main
+    update_cache: yes
+
+- name: Install DNS Introducer Healthcheck
+  become: yes
+  ansible.builtin.apt:
+    name:
+      - "dns-introducer-healthcheck{{ ( dns_healthcheck_version == 'latest' ) | ternary('', '=' + dns_healthcheck_version) }}"
+    update_cache: yes
+    cache_valid_time: 300
+    state: "{{ ( dns_healthcheck_version == 'latest' ) | ternary('latest', 'present') }}"
   notify: restart-dns-healthcheck
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
 - name: Healthcheck Systemd Config
   become: yes
   ansible.builtin.template:
     src: "dns-healthcheck.service"
-    dest: "/etc/systemd/system/dns-healthcheck.service"
+    dest: "/etc/systemd/system/{{ dns_healthcheck_service_name }}"
     owner: root
     group: root
   notify: restart-dns-healthcheck
@@ -22,5 +40,5 @@
   ansible.builtin.systemd:
     name: dns-healthcheck
     daemon_reload: yes
-    enabled: yes
-    state: started
+    enabled: "{{ dns_healthcheck_start_on_boot }}"
+    state: "{{ dns_healthcheck_start_now | ternary('started','stopped') }}"

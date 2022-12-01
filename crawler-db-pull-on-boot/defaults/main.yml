@@ -5,3 +5,6 @@ chia_root: "/home/ubuntu/.chia"
 db_version: v2
 user: ubuntu
 group: ubuntu
+# What region we're backing up to/from
+# Some regions crawl better than others, so this just helps metrics stay more consistent when restoring backups
+crawler_segment: "default"
