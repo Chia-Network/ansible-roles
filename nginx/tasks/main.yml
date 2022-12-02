@@ -11,16 +11,26 @@
   retries: 100
   until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
+- name: Remove existing default Nginx site configuration(s)
+  become: true
+  ansible.builtin.file:
+    path: "/etc/nginx/sites-enabled/{{ item }}"
+    state: absent
+  with_items:
+    - default
+    - default.conf
+  notify: Reload-nginx
+
 - name: Copy default config
   become: true
   ansible.builtin.template:
     src: "{{ item }}"
-    dest: "/etc/nginx/sites-enabled/{{ item }}"
+    dest: "/etc/nginx/conf.d/{{ item }}"
     owner: root
     group: root
     mode: '0644'
   with_items:
-    - "default.conf"
+    - "custom-default.conf"
   notify: Reload-nginx
 
 - name: Copy snippets

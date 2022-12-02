@@ -2,7 +2,7 @@
 - name: Create directory for CADT UI files
   become: true
   ansible.builtin.file:
-    path: /var/www
+    path: /var/www/{{ cadt_ui_host }}
     state: directory
     mode: '0755'
     owner: "{{ user }}"
@@ -14,10 +14,21 @@
   become: true
   ansible.builtin.unarchive:
     src: https://github.com/Chia-Network/climate-warehouse-ui/releases/download/{{ cadt_ui_version }}/web-build.tar.gz
-    dest: /var/www
+    dest: /var/www/{{ cadt_ui_host }}
     owner: "{{ user }}"
     group: "{{ user }}"
     remote_src: true
   when: cadt_ui_hosting == "local"
   tags: cadt-ui
 
+- name: Template Nginx config for CADT
+  become: true
+  ansible.builtin.template:
+    src: cadt.local.conf.j2
+    dest: /etc/nginx/conf.d/cadt.conf
+    owner: root
+    group: root
+    mode: '0644'
+  when: cadt_ui_hosting == "local"
+  tags: cadt-ui
+  notify: Reload-nginx
