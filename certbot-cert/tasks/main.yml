@@ -38,7 +38,7 @@
     creates: /etc/letsencrypt/live/{{ certbot_domains | first }}/privkey.pem
   when: certbot_validation_strategy == "cloudflare"
 
-- name: Ensure webroot directory exists
+- name: Ensure certbot webroot directory exists
   become: true
   ansible.builtin.file:
     path: "{{ certbot_webroot_path }}"

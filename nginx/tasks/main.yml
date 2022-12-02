@@ -35,6 +35,13 @@
     - "lets-encrypt-webroot.conf"
   notify: Reload-nginx
 
+- name: Ensure certbot webroot directory exists
+  become: true
+  ansible.builtin.file:
+    path: "{{ certbot_webroot_path }}"
+    state: directory
+    mode: '0755'
+
 - name: Ensure service is in desired boot and current state
   become: true
   ansible.builtin.systemd:
