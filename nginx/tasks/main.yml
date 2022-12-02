@@ -25,23 +25,12 @@
   become: true
   ansible.builtin.template:
     src: "{{ item }}"
-    dest: "/etc/nginx/sites-available/{{ item }}"
+    dest: "/etc/nginx/conf.d/{{ item }}"
     owner: root
     group: root
     mode: '0644'
   with_items:
     - "custom-default.conf"
-  notify: Reload-nginx
-
-- name: Symlink default config to make active
-  become: true
-  ansible.builtin.file:
-    src: "/etc/nginx/sites-available/custom-default.conf"
-    dest: "/etc/nginx/sites-enabled/custom-default.conf"
-    state: link
-    owner: root
-    group: root
-    mode: '0644'
   notify: Reload-nginx
 
 - name: Copy snippets

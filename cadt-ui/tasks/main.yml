@@ -25,22 +25,10 @@
   become: true
   ansible.builtin.template:
     src: cadt.local.conf.j2
-    dest: /etc/nginx/sites-available/cadt.conf
+    dest: /etc/nginx/conf.d/cadt.conf
     owner: root
     group: root
     mode: '0644'
   when: cadt_ui_hosting == "local"
-  tags: cadt-ui
-  notify: Reload-nginx
-
-- name: Symlink CADT config to make active
-  become: true
-  ansible.builtin.file:
-    src: "/etc/nginx/sites-available/cadt.conf"
-    dest: "/etc/nginx/sites-enabled/cadt.conf"
-    state: link
-    owner: root
-    group: root
-    mode: '0644'
   tags: cadt-ui
   notify: Reload-nginx
