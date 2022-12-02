@@ -1,0 +1,10 @@
+---
+cadt_ui_version: "1.0.14"
+
+# Where to host the UI - options are "local" or "s3"
+cadt_ui_hosting: local
+
+# Use the same user and group variables as the chia-blockchain and cadt roles
+user: ubuntu
+group: ubuntu
+
