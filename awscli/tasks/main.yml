@@ -1,11 +1,11 @@
 ---
 - name: Install AWSCLI
-  become: yes
+  become: true
   ansible.builtin.apt:
     name:
       - awscli
     state: present
-    update_cache: yes
+    update_cache: true
     cache_valid_time: 300
   register: apt_action
   retries: 100
