@@ -1,5 +1,5 @@
 - name: restart-blockchain-status
-  become: yes
-  service:
+  become: true
+  ansible.builtin.service:
     name: "{{ bin_name }}"
     state: restarted

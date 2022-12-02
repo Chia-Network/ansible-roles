@@ -1,6 +1,6 @@
 ---
 - name: Upload binary
-  become: yes
+  become: true
   ansible.builtin.copy:
     src: "{{ local_bin_path }}"
     dest: "/usr/local/bin/{{ bin_name }}"
@@ -8,24 +8,26 @@
   notify: restart-blockchain-status
 
 - name: Systemd Config
-  become: yes
+  become: true
   ansible.builtin.template:
     src: "systemd-template.service"
     dest: "/etc/systemd/system/{{ bin_name }}.service"
     owner: root
     group: root
+    mode: "0644"
   notify: restart-blockchain-status
 
 - name: Blockchain status config
-  template:
+  ansible.builtin.template:
     src: "blockchain-status.yaml.j2"
     dest: "/home/{{ user }}/.blockchain-status.yaml"
+    mode: "0644"
   notify: restart-blockchain-status
 
 - name: Ensure service starts on boot and is started now (if set)
-  become: yes
+  become: true
   ansible.builtin.systemd:
     name: "{{ bin_name }}"
-    daemon_reload: yes
+    daemon_reload: true
     enabled: "{{ start_on_boot }}"
-    state: "{{ start_now | ternary('started','stopped') }}"
+    state: "{{ start_now | ternary('started', 'stopped') }}"
