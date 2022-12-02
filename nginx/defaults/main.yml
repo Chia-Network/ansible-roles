@@ -1,3 +1,7 @@
 ---
 start_on_boot: yes
 start_now: yes
+
+# Settings for when validation strategy is "webroot"
+# Matches the default in certbot-cert role
+certbot_webroot_path: "/var/www/letsencrypt/"

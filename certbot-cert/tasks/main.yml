@@ -33,14 +33,22 @@
 
 - name: Issue certbot certificate using DNS validation
   become: true
-  ansible.builtin.command: certbot certonly --test-cert --dns-cloudflare --dns-cloudflare-credentials /root/cloudflare.ini --noninteractive --agree-tos --email {{ certbot_email }} -d "{{ certbot_domains | join(',') }}" --dns-cloudflare-propagation-seconds {{ certbot_dns_validation_seconds }}
+  ansible.builtin.command: certbot certonly --dns-cloudflare --dns-cloudflare-credentials /root/cloudflare.ini --noninteractive --agree-tos --email {{ certbot_email }} -d "{{ certbot_domains | join(',') }}" --dns-cloudflare-propagation-seconds {{ certbot_dns_validation_seconds }}
   args:
     creates: /etc/letsencrypt/live/{{ certbot_domains | first }}/privkey.pem
   when: certbot_validation_strategy == "cloudflare"
 
+- name: Ensure webroot directory exists
+  become: true
+  ansible.builtin.file:
+    path: "{{ certbot_webroot_path }}"
+    state: directory
+    mode: '0755'
+  when: certbot_validation_strategy == "webroot"
+
 - name: Issue certbot certificate using webroot validation
   become: true
-  ansible.builtin.command: certbot certonly --test-cert --webroot --webroot-path {{ certbot_webroot_path }} --noninteractive --agree-tos --email {{ certbot_email }} -d "{{ certbot_domains | join(',') }}"
+  ansible.builtin.command: certbot certonly --webroot --webroot-path {{ certbot_webroot_path }} --noninteractive --agree-tos --email {{ certbot_email }} -d "{{ certbot_domains | join(',') }}"
   args:
     creates: /etc/letsencrypt/live/{{ certbot_domains | first }}/privkey.pem
   when: certbot_validation_strategy == "webroot"

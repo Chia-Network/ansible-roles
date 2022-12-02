@@ -4,3 +4,10 @@
     name: nginx
     state: restarted
   when: start_now
+
+- name: reload-nginx
+  become: yes
+  service:
+    name: nginx
+    state: reloaded
+  when: start_now

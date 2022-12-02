@@ -7,6 +7,7 @@ certbot_cloudflare_token: ""
 certbot_dns_validation_seconds: 60
 
 # Settings for when validation strategy is "webroot"
+# Matches the default in nginx role
 certbot_webroot_path: "/var/www/letsencrypt/"
 
 # List[string] of hostnames to issue the cert for
