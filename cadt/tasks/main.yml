@@ -1,13 +1,4 @@
 ---
-# CADT = Climate Action Data Trust
-# - name: Get CADT binary
-#   ansible.builtin.get_url:
-#     url:
-#     dest: /home/{{ user }}/linux-x64-{{ cadt_api_version }}.zip
-#     owner: "{{ user }}"
-#     group: "{{ user }}"
-#   tags: cadt
-
 - name: Create CADT directory
   ansible.builtin.file:
     path: /home/{{ user }}/cadt
