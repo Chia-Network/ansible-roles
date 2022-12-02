@@ -12,4 +12,6 @@ certbot_webroot_path: "/var/www/letsencrypt/"
 
 # List[string] of hostnames to issue the cert for
 certbot_domains: []
+
+# Email MUST be set
 certbot_email: ""

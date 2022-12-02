@@ -8,3 +8,8 @@ cadt_ui_hosting: local
 user: ubuntu
 group: ubuntu
 
+# No https:// or path - just domain
+cadt_ui_host: www.example.com
+
+# True or false
+cadt_ui_use_nginx: true
