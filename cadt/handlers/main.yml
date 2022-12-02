@@ -1,0 +1,11 @@
+---
+- name: restart-cadt
+  become: yes
+  service:
+    name: cadt.service
+    state: restarted
+
+- name: systemd-reload
+  become: yes
+  ansible.builtin.systemd:
+    daemon_reload: yes

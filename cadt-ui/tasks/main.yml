@@ -1,0 +1,23 @@
+---
+- name: Create directory for CADT UI files
+  become: true
+  ansible.builtin.file:
+    path: /var/www
+    state: directory
+    mode: '0755'
+    owner: "{{ user }}"
+    group: "{{ group }}"
+  when: cadt_ui_hosting == "local"
+  tags: cadt-ui
+
+- name: Copy and uncompress CADT files
+  become: true
+  ansible.builtin.unarchive:
+    src: https://github.com/Chia-Network/climate-warehouse-ui/releases/download/{{ cadt_ui_version }}/web-build.tar.gz
+    dest: /var/www
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    remote_src: true
+  when: cadt_ui_hosting == "local"
+  tags: cadt-ui
+
