@@ -1,19 +1,19 @@
 ---
 - name: Backup Config
-  template:
+  ansible.builtin.template:
     src: backup.sh.j2
     dest: "/home/{{ user }}/backup.sh"
     mode: '0755'
 
 - name: Create log directory for backup script
-  file:
+  ansible.builtin.file:
     path: "/home/{{ user }}/backup-logs"
     state: directory
     mode: "0755"
 
 - name: Add logrotate script for backup log file
-  become: yes
-  template:
+  become: true
+  ansible.builtin.template:
     src: backup-script-logrotate.j2
     dest: "/etc/logrotate.d/backup-script-logrotate"
     mode: '0644'

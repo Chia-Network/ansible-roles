@@ -1,4 +1,6 @@
 skip_list:
-  - yaml[line-length]
   - meta-no-info
+  - name[casing]
+  - package-latest
   - role-name
+  - yaml[line-length]

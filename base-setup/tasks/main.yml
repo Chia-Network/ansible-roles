@@ -1,15 +1,15 @@
 ---
 - name: Disable password login for SSH
-  become: yes
-  lineinfile:
+  become: true
+  ansible.builtin.lineinfile:
     path: "/etc/ssh/sshd_config"
     regexp: '^PasswordAuthentication'
     line: "PasswordAuthentication no"
   notify: restart-sshd
 
 - name: Disable root login for SSH
-  become: yes
-  lineinfile:
+  become: true
+  ansible.builtin.lineinfile:
     path: "/etc/ssh/sshd_config"
     regexp: '^PermitRootLogin'
     line: "PermitRootLogin no"
