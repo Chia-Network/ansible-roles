@@ -1,13 +1,13 @@
-- name: restart-nginx
-  become: yes
-  service:
+- name: Restart-nginx
+  become: true
+  ansible.builtin.service:
     name: nginx
     state: restarted
   when: start_now
 
-- name: reload-nginx
-  become: yes
-  service:
+- name: Reload-nginx
+  become: true
+  ansible.builtin.service:
     name: nginx
     state: reloaded
   when: start_now

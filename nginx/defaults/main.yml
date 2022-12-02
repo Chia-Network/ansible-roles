@@ -1,6 +1,6 @@
 ---
-start_on_boot: yes
-start_now: yes
+start_on_boot: true
+start_now: true
 
 # Settings for when validation strategy is "webroot"
 # Matches the default in certbot-cert role
