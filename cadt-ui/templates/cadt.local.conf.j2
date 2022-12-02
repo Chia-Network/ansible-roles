@@ -1,4 +1,5 @@
 server {
+    listen 80;
     listen [::]:80;
 
     server_name {{ certbot_domains | join( " " ) }};
@@ -14,6 +15,7 @@ server {
 
 server {
     listen 443 ssl http2;
+    listen [::]:443 ssl http2;
 
     root /var/www/{{ cadt_ui_host }}/build;
 
