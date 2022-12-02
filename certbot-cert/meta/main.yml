@@ -1,0 +1,4 @@
+---
+dependencies:
+  - role: nginx
+    when: certbot_validation_strategy == "webroot"
