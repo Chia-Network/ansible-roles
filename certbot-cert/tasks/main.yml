@@ -70,10 +70,3 @@
     minute: "45"
     hour: "5"
     user: "root"
-
-- name: Ensure we have the latest nginx options from certbot
-  become: true
-  ansible.builtin.get_url:
-    url: https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf
-    dest: /etc/letsencrypt/options-ssl-nginx.conf
-    mode: '0440'

@@ -52,6 +52,14 @@
     state: directory
     mode: '0755'
 
+- name: Ensure we have the latest nginx options from certbot
+  become: true
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf
+    dest: /etc/letsencrypt/options-ssl-nginx.conf
+    mode: '0440'
+  notify: Reload-nginx
+
 - name: Ensure service is in desired boot and current state
   become: true
   ansible.builtin.systemd:
