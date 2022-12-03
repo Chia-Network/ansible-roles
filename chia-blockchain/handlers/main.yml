@@ -1,20 +1,20 @@
 - name: restart-chia
-  become: yes
-  service:
+  become: true
+  ansible.builtin.service:
     name: "{{ chia_service_base }}.target"
     state: restarted
   when: start_now
 
 - name: restart-vector
-  become: yes
-  service:
+  become: true
+  ansible.builtin.service:
     name: vector
     state: restarted
   when: add_vector_config and vector_start_now
 
 - name: restart-monit
-  become: yes
-  service:
+  become: true
+  ansible.builtin.service:
     name: monit
     state: restarted
   when: add_monit_config and monit_start_now
