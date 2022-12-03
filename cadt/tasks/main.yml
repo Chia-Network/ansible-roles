@@ -32,17 +32,6 @@
     - systemd-reload
   tags: cadt
 
-- name: Add CADT config file
-  ansible.builtin.template:
-    src: "config.yaml.j2"
-    dest: "{{ cadt_root }}/v1/config.yaml"
-    owner: "{{ user }}"
-    group: "{{ user }}"
-    mode: '0644'
-  notify:
-    - restart-cadt
-  tags: cadt
-
 - name: Ensure CADT is in desired boot and current state
   become: true
   ansible.builtin.systemd:
@@ -50,6 +39,17 @@
     daemon_reload: true
     enabled: true
     state: started
+  tags: cadt
+
+- name: Add CADT config file
+  ansible.builtin.template:
+    src: "config.yaml.j2"
+    dest: "{{ chia_root }}climate-warehouse/v1/config.yaml"
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: '0644'
+  notify:
+    - restart-cadt
   tags: cadt
 
 - name: Add custom monit config to conf.d for CADT

@@ -1,5 +1,5 @@
 ---
-cadt_api_version: "1.2.14"
+cadt_api_version: "1.2.16"
 
 user: ubuntu
 
@@ -14,8 +14,6 @@ cadt_port: 31310
 cadt_is_governance_body: false
 cadt_read_only: false
 cadt_governance_body_id: 6c1e4032738fe4e7a61fe6fbb26c72f4186574bc07952728c920a3a705f49c59
-
-cadt_root: "/home/ubuntu/.chia/climate-warehouse"
 
 # Chia Datalayer RPC port
 chia_data_layer_rpc_port: 8562
