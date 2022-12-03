@@ -25,9 +25,14 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/{{ certbot_domains | first }}/privkey.pem;
 
     # SSL configurations from letsencrypt
-    include /etc/letsencrypt/options-ssl-nginx.conf;
+    include /etc/nginx/snippets/options-ssl-nginx.conf;
 
     resolver                  1.1.1.1;
+
+    {% if basic_authentication -- "true" %}
+    auth_basic              "Access Restricted"
+    auth_basic_user_file    /etc/nginx/.htpasswd
+    {% endif %}
 
     index index.html;
 
