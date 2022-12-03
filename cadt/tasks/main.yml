@@ -44,7 +44,7 @@
 - name: Add CADT config file
   ansible.builtin.template:
     src: "config.yaml.j2"
-    dest: "{{ chia_root }}climate-warehouse/v1/config.yaml"
+    dest: "{{ chia_root }}/climate-warehouse/v1/config.yaml"
     owner: "{{ user }}"
     group: "{{ user }}"
     mode: '0644'
