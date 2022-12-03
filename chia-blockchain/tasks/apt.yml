@@ -1,26 +1,26 @@
 - name: Chia Repository
-  become: yes
+  become: true
   ansible.builtin.apt_repository:
     repo: deb [arch={{ chia_repo_arch }} signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/debian/ stable main
-    update_cache: yes
+    update_cache: true
 
 - name: Install Chia
-  become: yes
+  become: true
   ansible.builtin.apt:
     name:
-      - "{{ chia_apt_package }}{{ ( repo_ref == 'latest' ) | ternary('', '=' + repo_ref) }}"
-    update_cache: yes
+      - "{{ chia_apt_package }}{{ (repo_ref == 'latest') | ternary('', '=' + repo_ref) }}"
+    update_cache: true
     cache_valid_time: 300
-    state: "{{ ( repo_ref == 'latest' ) | ternary('latest', 'present') }}"
+    state: "{{ (repo_ref == 'latest') | ternary('latest', 'present') }}"
   register: chia_install
   notify: restart-chia
   retries: 100
   until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
 - name: Chia Init
-  become: yes
+  become: true
   become_user: "{{ user }}"
-  shell: |
+  ansible.builtin.shell: |
     chia init --fix-ssl-permissions
   environment:
     CHIA_ROOT: "{{ chia_root }}"

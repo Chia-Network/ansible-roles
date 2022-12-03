@@ -1,13 +1,13 @@
 ---
 - name: Create a dir
-  ansible.builtinfile:
+  ansible.builtin.file:
     path: /home/{{ user }}/.aws/
     state: directory
     owner: "{{ aws_user }}"
     group: "{{ aws_group }}"
     mode: "{{ aws_cred_dir_mode }}"
 - name: Copy the aws ID and key into a file
-  ansible.builtincopy:
+  ansible.builtin.copy:
     content: |
       [{{ aws_profile }}]
       aws_access_key_id = "{{ aws_key_id }}"

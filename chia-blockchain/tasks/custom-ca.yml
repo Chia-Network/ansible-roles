@@ -1,12 +1,12 @@
 ---
 - name: Create directory for CA files
-  become: yes
+  become: true
   ansible.builtin.file:
     path: "/home/{{ user }}/chia-ca"
     state: directory
     owner: "{{ user }}"
     group: "{{ group }}"
-    recurse: yes
+    recurse: true
   when:
     - chia_ca_crt != ""
     - chia_ca_key != ""
@@ -14,22 +14,27 @@
     - chia_private_ca_key != ""
 
 - name: Write CA files
-  become: yes
-  no_log: yes # Don't expose secrets in logs
-  copy:
+  become: true
+  no_log: true # Don't expose secrets in logs
+  ansible.builtin.copy:
     content: "{{ item.content }}"
     dest: /home/{{ user }}/chia-ca/{{ item.filename }}
     owner: "{{ user }}"
     group: "{{ group }}"
+    mode: "{{ item.mode }}"
   with_items:
     - content: "{{ chia_ca_crt }}"
       filename: "chia_ca.crt"
+      mode: "0644"
     - content: "{{ chia_ca_key }}"
       filename: "chia_ca.key"
+      mode: "0600"
     - content: "{{ chia_private_ca_crt }}"
       filename: "private_ca.crt"
+      mode: "0644"
     - content: "{{ chia_private_ca_key }}"
       filename: "private_ca.key"
+      mode: "0600"
   register: ca_content
   when:
     - chia_ca_crt != ""
@@ -38,9 +43,9 @@
     - chia_private_ca_key != ""
 
 - name: Run init with custom CA
-  become: yes
+  become: true
   become_user: "{{ user }}"
-  shell: |
+  ansible.builtin.shell: |
     chia init -c /home/{{ user }}/chia-ca
   environment:
     PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"

@@ -1,44 +1,44 @@
 - name: Ensure source directory exists
-  become: yes
+  become: true
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     owner: "{{ user }}"
     group: "{{ group }}"
-    recurse: yes
+    recurse: true
   with_items:
     - "/home/{{ user }}/chia-blockchain"
 
 - name: Install Deps
-  become: yes
+  become: true
   ansible.builtin.apt:
     name:
       - git
       - python3-dev
       - build-essential
     state: present
-    update_cache: yes
+    update_cache: true
     cache_valid_time: 300
   register: apt_action
   retries: 100
   until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
 - name: Ensure correct ref is checked out
-  become: yes
+  become: true
   become_user: "{{ user }}"
   ansible.builtin.git:
     repo: "{{ repo_url }}"
     dest: "/home/{{ user }}/chia-blockchain"
     version: "{{ repo_ref }}"
-    update: yes
-    force: yes
+    update: true
+    force: true
   register: git_output
   notify: restart-chia
 
 - name: Chia Install and Init
-  become: yes
+  become: true
   become_user: "{{ user }}"
-  shell: |
+  ansible.builtin.shell: |
     sh install.sh
     chia init --fix-ssl-permissions
   args:
@@ -52,9 +52,9 @@
   until: install_action is success or ('Unable to acquire the dpkg frontend lock' not in install_action.stderr)
 
 - name: Install timelord
-  become: yes
+  become: true
   become_user: "{{ user }}"
-  shell: |
+  ansible.builtin.shell: |
     . ./activate
     sh install-timelord.sh
   args:
