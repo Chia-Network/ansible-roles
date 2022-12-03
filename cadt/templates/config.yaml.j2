@@ -8,7 +8,7 @@ APP:
   DATALAYER_URL: https://localhost:{{ chia_data_layer_rpc_port }}
   WALLET_URL: https://localhost:{{ chia_wallet_rpc_port }}
   USE_SIMULATOR: false
-  READ_ONLY: false
+  READ_ONLY: {{ cadt_read_only }}
   API_KEY: null
   CHIA_NETWORK: {{ network }}
   IS_GOVERNANCE_BODY: {{ cadt_is_governance_body }}
