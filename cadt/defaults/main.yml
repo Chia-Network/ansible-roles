@@ -13,7 +13,7 @@ cadt_db_host: null
 cadt_port: 31310
 cadt_is_governance_body: false
 cadt_read_only: false
-cadt_governance_body_id: 6c1e4032738fe4e7a61fe6fbb26c72f4186574bc07952728c920a3a705f49c59
+cadt_governance_body_id: 23f6498e015ebcd7190c97df30c032de8deb5c8934fc1caa928bc310e2b8a57e
 
 # Chia Datalayer RPC port
 chia_data_layer_rpc_port: 8562
