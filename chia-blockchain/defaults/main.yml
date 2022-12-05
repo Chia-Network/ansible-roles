@@ -9,8 +9,8 @@ chia_apt_package: chia-blockchain-cli
 # <chia_service_base>-full-node.service
 # etc
 chia_service_base: chia
-start_on_boot: yes
-start_now: yes
+start_on_boot: true
+start_now: true
 
 # This is the list of systemd services that will be installed by default
 # daemon is required, and chia will fail to run properly without it
@@ -158,7 +158,7 @@ network_overrides:
 
 # If set 'True', the timelord will create compact proofs of time, instead of
 # extending the chain.
-sanitizer_mode: False
+sanitizer_mode: "False"
 
 # Number of VDF client processes to keep alive in the local machine.
 timelord_launcher_host: localhost
