@@ -13,3 +13,6 @@ cadt_ui_host: www.example.com
 
 # True or false
 cadt_ui_use_nginx: true
+
+# True or false
+basic_authentication: false
