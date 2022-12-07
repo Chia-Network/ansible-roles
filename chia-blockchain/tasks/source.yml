@@ -32,6 +32,7 @@
     version: "{{ repo_ref }}"
     update: true
     force: true
+    accept_newhostkey: true
   register: git_output
   notify: restart-chia
 
