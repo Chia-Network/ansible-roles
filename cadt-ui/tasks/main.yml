@@ -21,6 +21,32 @@
   when: cadt_ui_hosting == "local"
   tags: cadt-ui
 
+- name: Install htpasswd prerequisites for ansible
+  become: true
+  ansible.builtin.apt:
+    pkg:
+      - python3-passlib
+    state: present
+    update_cache: true
+    cache_valid_time: 300
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+  when: basic_authentication
+  tags: cadt-ui
+
+- name: Create htpasswd file for basic authentication
+  become: true
+  community.general.htpasswd:
+    path: /etc/nginx/.htpasswd
+    name: "{{ basic_authentication_user }}"
+    password: "{{ basic_authentication_password }}"
+    owner: root
+    group: www-data
+    mode: '0640'
+  when: basic_authentication
+  tags: cadt-ui
+
 - name: Template Nginx config for CADT
   become: true
   ansible.builtin.template:

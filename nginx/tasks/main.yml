@@ -56,7 +56,7 @@
   become: true
   ansible.builtin.get_url:
     url: https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf
-    dest: /etc/letsencrypt/options-ssl-nginx.conf
+    dest: /etc/nginx/snippets/options-ssl-nginx.conf
     mode: '0440'
   notify: Reload-nginx
 
