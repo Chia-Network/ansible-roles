@@ -86,6 +86,6 @@
     name: "CADT backups"
     minute: "51"
     hour: "1"
-    job: "bash /home/{{ user }}/backups.sh > /home/{{ user }}/backup.log"
+    job: "bash /home/{{ user }}/backups.sh > /home/{{ user }}/backup.log 2>&1"
     user: "{{ user }}"
   tags: cadt
