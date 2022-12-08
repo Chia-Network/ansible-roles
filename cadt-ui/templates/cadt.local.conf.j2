@@ -9,7 +9,7 @@ server {
     include /etc/nginx/snippets/lets-encrypt-webroot.conf;
 
     location / {
-        rewrite (.*) {{ cadt_ui_host }}$1 permanent;
+        rewrite (.*) https://$host$1 permanent;
     }
 }
 
