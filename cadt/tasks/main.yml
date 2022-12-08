@@ -61,3 +61,31 @@
     group: root
     mode: '0644'
   notify: restart-monit
+
+- name: Make backup directory
+  ansible.builtin.file:
+    path: "{{ backup_dir }}"
+    state: directory
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: '0755'
+  tags: cadt
+
+- name: Copy backup script
+  become: true
+  ansible.builtin.template:
+    src: backups.sh.j2
+    dest: /home/{{ user }}/backups.sh
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: '0755'
+  tags: cadt
+
+- name: Create cron job for backups
+  ansible.builtin.cron:
+    name: "CADT backups"
+    minute: "51"
+    hour: "1"
+    job: "bash /home/{{ user }}/backups.sh > /home/{{ user }}/backup.log 2>&1"
+    user: "{{ user }}"
+  tags: cadt
