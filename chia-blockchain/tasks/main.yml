@@ -133,7 +133,6 @@
   become_user: "{{ user }}"
   no_log: true # Don't expose secrets in logs
   ansible.builtin.shell: |
-    set -o pipefail
     echo "{{ item }}" | chia keys add -l ""
   environment:
     PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
