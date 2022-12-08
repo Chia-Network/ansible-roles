@@ -81,14 +81,7 @@
   with_items:
     - "lets-encrypt-webroot.conf"
   notify: Reload-nginx
-
-- name: Ensure we have the latest nginx options from certbot
-  become: true
-  ansible.builtin.get_url:
-    url: https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf
-    dest: /etc/nginx/snippets/options-ssl-nginx.conf
-    mode: '0440'
-  notify: Reload-nginx
+  when: certbot_validation_strategy == "webroot"
 
 # Run any handlers that have been triggered up to this point now
 # We need the default servers to work with our templates before we
