@@ -26,10 +26,3 @@
     dest: /etc/nginx/snippets/options-ssl-nginx.conf
     mode: '0440'
   notify: Reload-nginx
-
-# Run any handlers that have been triggered up to this point now
-# Useful if we need an nginx config reload or somethign along those lines
-# because other roles (certbot for example) expect the config to be in a good state
-# to issue a cert
-- name: Flush handlers
-  ansible.builtin.meta: flush_handlers
