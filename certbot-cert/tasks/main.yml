@@ -38,6 +38,30 @@
     creates: /etc/letsencrypt/live/{{ certbot_domains | first }}/privkey.pem
   when: certbot_validation_strategy == "cloudflare"
 
+- name: Remove existing default Nginx site configuration(s)
+  become: true
+  ansible.builtin.file:
+    path: "/etc/nginx/sites-enabled/{{ item }}"
+    state: absent
+  with_items:
+    - default
+    - default.conf
+  notify: Reload-nginx
+  when: certbot_validation_strategy == "webroot"
+
+- name: Copy default config
+  become: true
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "/etc/nginx/conf.d/{{ item }}"
+    owner: root
+    group: root
+    mode: '0644'
+  with_items:
+    - "custom-default.conf"
+  notify: Reload-nginx
+  when: certbot_validation_strategy == "webroot"
+
 - name: Ensure certbot webroot directory exists
   become: true
   ansible.builtin.file:
@@ -45,6 +69,25 @@
     state: directory
     mode: '0755'
   when: certbot_validation_strategy == "webroot"
+
+- name: Copy snippets
+  become: true
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "/etc/nginx/snippets/{{ item }}"
+    owner: root
+    group: root
+    mode: '0644'
+  with_items:
+    - "lets-encrypt-webroot.conf"
+  notify: Reload-nginx
+  when: certbot_validation_strategy == "webroot"
+
+# Run any handlers that have been triggered up to this point now
+# We need the default servers to work with our templates before we
+# try to issue any certificates.
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers
 
 - name: Issue certbot certificate using webroot validation
   become: true

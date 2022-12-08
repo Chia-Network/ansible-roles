@@ -1,7 +1,3 @@
 ---
 nginx_start_on_boot: true
 nginx_start_now: true
-
-# Settings for when validation strategy is "webroot"
-# Matches the default in certbot-cert role
-certbot_webroot_path: "/var/www/letsencrypt/"

@@ -3,11 +3,11 @@
   ansible.builtin.service:
     name: nginx
     state: restarted
-  when: start_now
+  when: nginx_start_now
 
 - name: Reload-nginx
   become: true
   ansible.builtin.service:
     name: nginx
     state: reloaded
-  when: start_now
+  when: nginx_start_now
