@@ -9,8 +9,7 @@ mkdir -p {{ backup_dir }}
 # Backup Chia Wallet dbs
 pushd {{ chia_root }}/wallet/db/
 shopt -s nullglob
-for wallet in blockchain_wallet_v2_r1_mainnet*.sqlite
-do
+for wallet in blockchain_wallet_v2_r1_mainnet*.sqlite; do
 	echo "Doing backup for ${wallet}"
 	nice -n 19 sqlite3 ${wallet} ".backup '{{ backup_dir }}/${wallet}.backup'"
 done
