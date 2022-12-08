@@ -1,0 +1,44 @@
+#!/bin/bash
+
+#
+# Backup script for CADT, including supporting Chia services.
+#
+
+mkdir -p {{ backup_dir }}
+
+# Backup Chia Wallet dbs
+pushd {{ chia_root }}/wallet/db/
+shopt -s nullglob
+for wallet in blockchain_wallet_v2_r1_mainnet*.sqlite
+do
+        echo "Doing backup for ${wallet}"
+        nice -n 19 sqlite3 ${wallet} ".backup '{{ backup_dir }}/${wallet}.backup'"
+done
+popd
+shopt -u nullglob
+
+# Backup Datalayer db
+pushd {{ chia_root }}/data_layer/db/
+echo "Backing up data layer db"
+nice -n 19 sqlite3 data_layer_mainnet.sqlite ".backup '{{ backup_dir }}/data_layer_mainnet.sqlite.backup'"
+popd
+
+# Backup CADT db
+pushd {{ chia_root }}/climate-warehouse/v1/
+echo "Backing up CADT db"
+nice -n 19 sqlite3 data.sqlite3 ".backup '{{ backup_dir }}/cadt.data.sqlite3.backup'"
+popd
+
+# Compress backup files
+echo "gzipping...."
+nice -n 19 gzip -v {{ backup_dir }}/*.backup
+
+# Copy data layer files to backup dir
+echo "Copying data layer files"
+cp -rv {{ chia_root }}/data_layer/db/server_files_location_mainnet {{ backup_dir }}/
+
+# Sync to S3
+nice -n 19 /usr/bin/aws s3 sync --no-progress {{ backup_base_dir }} s3://{{ cadt_backup_bucket }}
+
+# Remove backups now that they've been sent to S3
+rm -rf {{ backup_dir }}
