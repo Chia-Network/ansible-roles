@@ -52,6 +52,7 @@
   args:
     creates: /etc/letsencrypt/live/{{ certbot_domains | first }}/privkey.pem
   when: certbot_validation_strategy == "webroot"
+  notify: Reload-nginx
 
 - name: Add cron job for certbot renewal
   become: true
@@ -62,6 +63,7 @@
     hour: "5"
     user: "root"
 
+# This takes care of reloading Nginx when certificates are renewed
 - name: Add cron job to reload nginx configs, in case new certs are available
   become: true
   ansible.builtin.cron:
