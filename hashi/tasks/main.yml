@@ -1,4 +1,13 @@
 ---
+- name: Load architecture specific vars
+  ansible.builtin.include_vars: "{{ lookup('first_found', params) }}"
+  vars:
+    params:
+      files:
+        - '{{ansible_architecture}}.yml'
+      paths:
+        - 'vars'
+
 - name: Get hashicorp key
   ansible.builtin.apt_key:
     url: https://apt.releases.hashicorp.com/gpg
@@ -6,4 +15,4 @@
 
 - name: Hashicorp repository
   ansible.builtin.apt_repository:
-    repo: deb [arch=amd64] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main
+    repo: deb [arch={{ hashi_repo_arch }}] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main
