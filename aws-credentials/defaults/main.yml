@@ -1,6 +1,6 @@
 ---
-aws_user: ubuntu
-aws_group: ubuntu
+user: ubuntu
+group: ubuntu
 aws_profile: chia
 aws_key_id: ""
 aws_key: ""
