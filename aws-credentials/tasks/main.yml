@@ -3,8 +3,8 @@
   ansible.builtin.file:
     path: /home/{{ user }}/.aws/
     state: directory
-    owner: "{{ aws_user }}"
-    group: "{{ aws_group }}"
+    owner: "{{ user }}"
+    group: "{{ group }}"
     mode: "{{ aws_cred_dir_mode }}"
 - name: Copy the aws ID and key into a file
   ansible.builtin.copy:
