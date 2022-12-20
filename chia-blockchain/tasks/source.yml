@@ -53,7 +53,14 @@
   until: install_action is success or ('Unable to acquire the dpkg frontend lock' not in install_action.stderr)
 
 - name: Check for fix-ssl-permissions support
+  become: true
+  become_user: "{{ user }}"
   command: chia init --help
+  args:
+    chdir: "/home/{{ user }}/chia-blockchain"
+  environment:
+    PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    CHIA_ROOT: "{{ chia_root }}"
   register: init_help_output
 
 - name: Fix SSL Permissions
