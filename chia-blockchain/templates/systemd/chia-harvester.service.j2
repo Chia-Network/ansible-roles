@@ -8,6 +8,7 @@ PartOf={{ chia_service_base }}.target
 Type=simple
 Environment=CHIA_ROOT={{ chia_root }}
 {% if chia_installation_method == "source" %}
+WorkingDirectory=/home/{{ user }}/chia-blockchain
 Environment=PATH=/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/home/{{ user }}/chia-blockchain/venv/bin/chia_harvester
 {% else %}
