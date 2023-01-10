@@ -4,13 +4,21 @@
 # Backup script for CADT, including supporting Chia services.
 #
 
+NOW=$(date +"%m-%d-%Y_%T")
+
+echo "*"
+echo "* Starting backup at ${NOW}"
+echo "*"
+
 mkdir -p {{ backup_dir }}
 
 # Backup Chia Wallet dbs
 pushd {{ chia_root }}/wallet/db/
 shopt -s nullglob
 for wallet in blockchain_wallet_v2_r1_mainnet*.sqlite; do
-	echo "Doing backup for ${wallet}"
+	echo "*"
+	echo "* Doing backup for ${wallet}"
+	echo "*"
 	nice -n 19 sqlite3 ${wallet} ".backup '{{ backup_dir }}/${wallet}.backup'"
 done
 popd
@@ -18,22 +26,30 @@ shopt -u nullglob
 
 # Backup Datalayer db
 pushd {{ chia_root }}/data_layer/db/
-echo "Backing up data layer db"
+echo "*"
+echo "* Backing up data layer db"
+echo "*"
 nice -n 19 sqlite3 data_layer_mainnet.sqlite ".backup '{{ backup_dir }}/data_layer_mainnet.sqlite.backup'"
 popd
 
 # Backup CADT db
 pushd {{ chia_root }}/climate-warehouse/v1/
-echo "Backing up CADT db"
+echo "*"
+echo "* Backing up CADT db"
+echo "*"
 nice -n 19 sqlite3 data.sqlite3 ".backup '{{ backup_dir }}/cadt.data.sqlite3.backup'"
 popd
 
 # Compress backup files
-echo "gzipping...."
+echo "*"
+echo "* gzipping...."
+echo "*"
 nice -n 19 gzip -v {{ backup_dir }}/*.backup
 
 # Copy data layer files to backup dir
-echo "Copying data layer files"
+echo "*"
+echo "* Copying data layer files"
+echo "*"
 cp -rv {{ chia_root }}/data_layer/db/server_files_location_mainnet {{ backup_dir }}/
 
 # Sync to S3
@@ -41,3 +57,9 @@ nice -n 19 /usr/bin/aws s3 sync --no-progress {{ backup_base_dir }} s3://{{ cadt
 
 # Remove backups now that they've been sent to S3
 rm -rf {{ backup_dir }}
+
+NOW=$(date +"%m-%d-%Y_%T")
+
+echo "*"
+echo "* Backups complete at ${NOW}"
+echo "*"
