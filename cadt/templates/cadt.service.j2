@@ -1,13 +1,30 @@
+#
+# If using this file outside of Ansible, replace any variables
+# in double-braces {{ }} with your values.
+#
+
 [Unit]
-Description=CADT for {{ user }}
+Description=CADT
+
+# If not running Chia using systemd, or if Chia
+# is on a different machine, remove the following
+# 4 lines
 Requires=chia-data-layer.service
 After=chia-data-layer.service
 Requires=chia-wallet.service
 After=chia-wallet.service
 
 [Service]
-Environment=CHIA_ROOT={{ chia_root }}
+Environment=CHIA_ROOT={{ chia_root }}  # Usually this is /home/<user>/.chia/mainnet
+
+# Replace this with the path to the climate-warehouse executable.
+# If installing via the apt repo, this will be
+# /opt/climate-warehouse/climate-warehouse
 ExecStart=/home/{{ user }}/cadt/linux-x64/climate-warehouse
+
+# If running Chia on the same system as Climate Warehouse, fill
+# in these settings with the user and group that Chia runs as.
+# Otherwise, pick a user for Climate Warehouse to run as.
 User={{ user }}
 Group={{ group }}
 
