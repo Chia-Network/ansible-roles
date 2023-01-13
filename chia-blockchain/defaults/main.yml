@@ -119,6 +119,7 @@ keys: []
 
 # Harvester Settings
 plot_directories: []
+recursive_plot_scan: false
 
 # Pool Settings
 pool_xch_target_address: ""
@@ -126,6 +127,10 @@ pool_list: []
 
 # Farmer Settings
 farmer_xch_target_address: ""
+
+# Wallet Settings
+spam_filter_after_n_txs: 200
+xch_spam_amount: 1000000
 
 # This is the network overrides section of config.yaml
 # When this runs, we attempt to pull the network overrides from the ref specified, but
