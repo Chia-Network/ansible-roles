@@ -1,3 +1,4 @@
+.idea/*
 super-linter.log
 playbook.yml
 hosts
