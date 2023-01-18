@@ -1,0 +1,47 @@
+user: ubuntu
+group: ubuntu
+chia_root: "/home/ubuntu/.chia"
+
+pool_reference_repo_url: https://github.com/chia-network/pool-reference.git
+pool_reference_repo_ref: main
+pool_reference_service: chia-pool
+
+pool_reference_default_res: "Chia reference pool"
+pool_reference_name: "The Reference Pool"
+pool_reference_logo_url: "https://www.chia.net/wp-content/uploads/2023/01/chia-logo-dark.svg"
+pool_reference_description: "(example) The Reference Pool allows you to pool with low fees, paying out daily using Chia."
+pool_reference_welcome_message: "Welcome to the reference pool!"
+pool_reference_pool_fee: 0.01
+pool_reference_block_claim_fee: 0
+pool_reference_pool_url: "https://referencepool.example.com"
+pool_reference_min_difficulty: 10
+pool_reference_default_difficulty: 10
+pool_reference_default_target_address: "txch1h8vdax8vtspx7yt8kz6cwu2awymlgwmdr4qts8v643kusd2lmc5qht7ltq"
+pool_reference_pool_fee_address: "txch1jhydnk47xl40jn3pgwjd708uk2wqzqexagy9xxjcwt2qeaumv3fqcrw6e2"
+pool_reference_wallet_fingerprint: 3967641394
+pool_reference_authentication_token_timeout: 5
+pool_reference_wallet_id: 1
+pool_reference_partial_time_limit: 25
+pool_reference_partial_confirmation_delay: 300
+pool_reference_scan_start_height: 1000
+pool_reference_collect_pool_rewards_interval: 600
+pool_reference_confirmation_security_threshold: 32
+pool_reference_payment_interval: 600
+pool_reference_max_additions_per_transaction: 400
+pool_reference_number_of_partials_target: 300
+pool_reference_time_target: 86400
+pool_reference_relative_lock_height: 32
+pool_reference_log_path: /var/log/chia
+pool_reference_log_filename: pool-server.log
+pool_reference_log_level: INFO
+pool_reference_log_maxfilesrotation: 7
+pool_reference_log_stdout: "false"
+pool_reference_server_host: 0.0.0.0
+pool_reference_server_port: 80
+pool_reference_server_use_ssl: "false"
+pool_reference_server_ssl_crt: "config/ssl/domain/domain_srv.crt"
+pool_reference_server_ssl_key: "config/ssl/domain/domain_srv.key"
+
+# Matches variable name/defaults from chia-blockchain role
+chia_full_node_rpc_port: 8555
+chia_wallet_rpc_port: 9256
