@@ -1,4 +1,4 @@
-- name: Ensure source directory exists
+- name: Ensure directories exist
   become: true
   ansible.builtin.file:
     path: "{{ item }}"
@@ -8,6 +8,7 @@
     recurse: true
   with_items:
     - "/home/{{ user }}/pool-reference"
+    - "{{ pool_reference_log_path }}"
 
 - name: Ensure correct ref is checked out
   become: true
