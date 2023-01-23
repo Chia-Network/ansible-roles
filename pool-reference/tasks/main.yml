@@ -1,0 +1,64 @@
+- name: Ensure source directory exists
+  become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ user }}"
+    group: "{{ group }}"
+    recurse: true
+  with_items:
+    - "/home/{{ user }}/pool-reference"
+
+- name: Ensure correct ref is checked out
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.git:
+    repo: "{{ pool_reference_repo_url }}"
+    dest: "/home/{{ user }}/pool-reference"
+    version: "{{ pool_reference_repo_ref }}"
+    update: true
+    force: true
+    accept_newhostkey: true
+  register: git_output
+  notify: restart-pool
+
+- name: Create venv
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.shell: |
+    python3 -m venv venv
+  args:
+    chdir: "/home/{{ user }}/pool-reference"
+  when: git_output.changed
+
+- name: Install Deps
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.shell: |
+    pip install chia-blockchain==1.6.2
+  args:
+    chdir: "/home/{{ user }}/pool-reference"
+  environment:
+    PATH: "/home/{{ user }}/pool-reference/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    CHIA_ROOT: "{{ chia_root }}"
+  when: git_output.changed
+
+- name: Pool Config
+  become: true
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "/home/{{ user }}/pool-reference/config.yaml"
+    owner: "{{ user }}"
+    group: "{{ group }}"
+    mode: "0644"
+  notify: restart-pool
+
+- name: Pool Systemd Config Files
+  become: true
+  ansible.builtin.template:
+    src: "chia-pool.service.j2"
+    dest: "/etc/systemd/system/{{ pool_reference_service }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart-pool

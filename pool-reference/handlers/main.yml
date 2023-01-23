@@ -1,0 +1,5 @@
+- name: restart-pool
+  become: true
+  ansible.builtin.service:
+    name: "{{ pool_reference_service }}.service"
+    state: restarted

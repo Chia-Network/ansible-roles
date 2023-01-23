@@ -1,0 +1,16 @@
+[Unit]
+Description=Chia Pool Service for {{ user }}
+
+[Service]
+Type=simple
+Environment=CHIA_ROOT={{ chia_root }}
+WorkingDirectory=/home/{{ user }}/pool-reference
+Environment=PATH=/home/{{ user }}/pool-reference/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/{{ user }}/pool-reference/venv/bin/python -m pool
+User={{ user }}
+Group={{ group }}
+LimitNOFILE=1048576
+LimitNPROC=1048576
+
+[Install]
+WantedBy=multi-user.target
