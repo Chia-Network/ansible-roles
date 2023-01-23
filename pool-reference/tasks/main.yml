@@ -44,6 +44,11 @@
     CHIA_ROOT: "{{ chia_root }}"
   when: git_output.changed
 
+- name: Allow python in venv to bind low ports
+  become: true
+  ansible.builtin.shell: |
+    setcap CAP_NET_BIND_SERVICE=+eip $(readlink -f /home/{{ user }}/pool-reference/venv/bin/python)
+
 - name: Pool Config
   become: true
   ansible.builtin.template:
