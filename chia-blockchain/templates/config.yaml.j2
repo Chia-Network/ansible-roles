@@ -139,7 +139,7 @@ farmer:
   port: {{ chia_farmer_port }}
   # The farmer will attempt to connect to this full node and harvester
   full_node_peer:
-    host: *self_hostname
+    host: {{ chia_farmer_full_node_peer_host }}
     port: {{ full_node_port }}
   harvester_peer:
     host: *self_hostname
@@ -186,7 +186,7 @@ timelord:
     ips_estimate:
       - 150000
   full_node_peer:
-    host: *self_hostname
+    host: {{ chia_timelord_full_node_peer_host }}
     port: {{ full_node_port }}
   # Maximum number of seconds allowed for a client to reconnect to the server.
   max_connection_time: 60
@@ -414,7 +414,7 @@ wallet:
     {{ dns_servers | to_nice_yaml(indent=2) | indent(4) }}
 
   full_node_peer:
-    host: *self_hostname
+    host: {{ chia_wallet_full_node_peer_host }}
     port: {{ full_node_port }}
   # The path of NFT off-chain metadata cache
   nft_metadata_cache_path: "nft_cache"

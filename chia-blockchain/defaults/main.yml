@@ -62,6 +62,9 @@ wallet_db_version: v2
 chia_top_level_hostname: "localhost"
 # This is the hostname the services use to reach each other on (farmer -> node, etc)
 chia_service_hostname: "localhost"
+chia_farmer_full_node_peer_host: "localhost"
+chia_timelord_full_node_peer_host: "localhost"
+chia_wallet_full_node_peer_host: "localhost"
 
 # What network we're running on
 # This impacts the backup we retrieve from S3 as well as whether or not we configure for testnet
