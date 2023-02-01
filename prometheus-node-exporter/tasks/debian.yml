@@ -1,0 +1,20 @@
+---
+- name: Install Prometheus Node Exporter
+  become: yes
+  ansible.builtin.apt:
+    name:
+      - prometheus-node-exporter
+    state: present
+    update_cache: yes
+    cache_valid_time: 300
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
+- name: Ensure service is in desired boot and current state
+  become: yes
+  ansible.builtin.systemd:
+    name: prometheus-node-exporter
+    daemon_reload: yes
+    enabled: "{{ start_on_boot }}"
+    state: "{{ start_now | ternary('started','stopped') }}"

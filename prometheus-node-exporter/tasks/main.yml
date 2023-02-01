@@ -1,50 +1,9 @@
 ---
-- name: Install Prometheus Node Exporter
-  become: yes
-  ansible.builtin.apt:
-    name:
-      - prometheus-node-exporter
-    state: present
-    update_cache: yes
-    cache_valid_time: 300
-  when: ansible_os_family == "Debian"
-  register: apt_action
-  retries: 100
-  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
-
-- name: Ensure service is in desired boot and current state
-  become: yes
-  ansible.builtin.systemd:
-    name: prometheus-node-exporter
-    daemon_reload: yes
-    enabled: "{{ start_on_boot }}"
-    state: "{{ start_now | ternary('started','stopped') }}"
+#This workflow is constructed to support multiple OSs
+- name: Install from node-exporter on Debian-based OSs
+  ansible.builtin.include_tasks: "debian.yml"
   when: ansible_os_family == "Debian"
 
-- name: Install Prometheus Node Exporter
-  become: yes
-  homebrew:
-    name: node-exporter
-    state: present
+- name: Install from node-exporter on Darwin-based OSs
+  ansible.builtin.include_tasks: "Darwin.yml"
   when: ansible_os_family == "Darwin"
-  retries: 100
-  until: result is successful
-
-- name: Ensure service is in desired boot and current state
-  become: yes
-  shell: brew services start node_exporter
-  when: ansible_os_family == "Debian"
-
-pre_tasks:
-  - name: Ensuring Homebrew Is Installed
-        stat:
-          path: /usr/local/bin/brew
-        register: homebrew_check
-    when: ansible_os_family == "Darwin"
-
-  - name: Fail If Homebrew Is Not Installed and install_homebrew_if_missing Is False
-    fail:
-      msg: Homebrew is missing...Install from http://brew.sh/
-    when:
-      - not homebrew_check.stat.exists
-      - ansible_os_family == "Darwin"
