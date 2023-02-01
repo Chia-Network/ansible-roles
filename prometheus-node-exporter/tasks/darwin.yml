@@ -4,11 +4,9 @@
   homebrew:
     name: node-exporter
     state: present
-  when: ansible_os_family == "Darwin"
   retries: 100
   until: result is successful
 
 - name: Ensure service is in desired boot and current state
   become: yes
   shell: brew services start node_exporter
-  when: ansible_os_family == "Debian"
