@@ -1,0 +1,10 @@
+---
+- name: Install Prometheus Node Exporter
+  become: yes
+  homebrew:
+    name: node-exporter
+    state: present
+
+- name: Ensure service is in desired boot and current state
+  become: yes
+  shell: brew services start node_exporter
