@@ -4,8 +4,6 @@
   homebrew:
     name: node-exporter
     state: present
-  retries: 100
-  until: result is successful
 
 - name: Ensure service is in desired boot and current state
   become: yes
