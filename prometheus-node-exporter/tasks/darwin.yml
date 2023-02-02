@@ -1,5 +1,7 @@
 ---
-- include_role: geerlingguy.mac.homebrew
+- name: Ensure that homebrew is installed
+  include_role:
+  - name: geerlingguy.mac.homebrew
 
 - name: Install Prometheus Node Exporter
   become: no
