@@ -6,5 +6,5 @@
     state: present
 
 - name: Ensure service is in desired boot and current state
-  become: yes
+  become: no
   shell: brew services start node_exporter
