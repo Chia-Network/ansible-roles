@@ -2,7 +2,7 @@
 - name: Install Prometheus Node Exporter
   become: no
   homebrew:
-    name: node-exporter
+    name: node_exporter
     state: present
 
 - name: Ensure service is in desired boot and current state
