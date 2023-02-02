@@ -1,4 +1,14 @@
 ---
+# For choosing correct installation file and compatability with installer naming pattern
+- name: Load architecture specific vars
+  ansible.builtin.include_vars: "{{ lookup('first_found', params) }}"
+  vars:
+    params:
+      files:
+        - '{{ansible_architecture}}.yml'
+      paths:
+        - 'vars'
+
 # Use ephemeral AWS credentials provided in the CI/CD actions. Make sure the
 # following variables are set:
 #   tmp_aws_access_key
@@ -6,10 +16,10 @@
 #   tmp_aws_session_token
 #   sentinelone_debian_installer
 - name: Download SentinelOne installer from private S3 bucket
-  ansible.builtin.shell: "aws --no-progress s3 cp s3://{{ sentinelone_bucket }}/sentinelone/SentinelAgent_linux_v22_1_1_4.deb /tmp/SentinelAgent_linux_v22_1_1_4.deb"
+  ansible.builtin.shell: "aws --no-progress s3 cp s3://{{ sentinelone_bucket }}/sentinelone/SentinelAgent{{ sentinelone_arch }}_linux_v{{ sentinelone_version }}.deb /tmp/SentinelAgent_linux_v{{ sentinelone_version }}.deb"
   args:
-    creates: /tmp/SentinelAgent_linux_v22_1_1_4.deb
-  become: yes
+    creates: /tmp/SentinelAgent_linux_v{{ sentinelone_version }}.deb
+  become: true
   when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
 
 - name: Transfer SentinelOne configuration file that will be used during installation only
@@ -19,13 +29,13 @@
     owner: root
     group: root
     mode: '0700'
-  become: yes
+  become: true
 
 - name: Install SentinelOne package
   ansible.builtin.apt:
-    deb: /tmp/SentinelAgent_linux_v22_1_1_4.deb
+    deb: /tmp/SentinelAgent_linux_v{{ sentinelone_version }}.deb
     state: present
-  become: yes
+  become: true
   environment:
     S1_AGENT_INSTALL_CONFIG_PATH: "/tmp/s1-config.cfg"
   when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
@@ -35,9 +45,8 @@
   ansible.builtin.file:
     path: /tmp/s1-config.cfg
     state: absent
-  become: yes
+  become: true
 
 - name: Start SentinelOne agent
   ansible.builtin.command: "/opt/sentinelone/bin/sentinelctl control start"
-  become: yes
-
+  become: true
