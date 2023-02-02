@@ -1,6 +1,6 @@
 ---
 - name: Install Prometheus Node Exporter
-  become: yes
+  become: no
   homebrew:
     name: node-exporter
     state: present
