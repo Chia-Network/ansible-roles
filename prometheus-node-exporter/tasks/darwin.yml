@@ -12,3 +12,4 @@
 - name: Ensure service is in desired boot and current state
   become: no
   shell: brew services start node_exporter
+  ignore_errors: yes
