@@ -1,12 +1,12 @@
 - name: restart-chia-exporter
-  become: yes
+  become: true
   service:
     name: "{{ chia_exporter_service_name }}"
     state: restarted
   when: chia_exporter_start_now
 
 - name: restart-monit
-  become: yes
+  become: true
   service:
     name: monit
     state: restarted
