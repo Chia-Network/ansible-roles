@@ -1,15 +1,15 @@
 ---
 - name: Ensure that homebrew is installed
-  include_role:
+  ansible.builtin.include_role:
     name: geerlingguy.mac.homebrew
 
 - name: Install Prometheus Node Exporter
-  become: no
-  homebrew:
+  become: false
+  community.general.homebrew:
     name: node_exporter
     state: present
 
 - name: Ensure service is in desired boot and current state
-  become: no
-  shell: brew services start node_exporter
-  ignore_errors: yes
+  become: false
+  ansible.builtin.shell: brew services start node_exporter
+  ignore_errors: true
