@@ -169,6 +169,9 @@
   # get the difference of 2 lists (items in chia_all_services that don’t exist in chia_enabled_services)
   # also specifically excludes daemon, since that will never be listed in enabled_services, but is in all_services, but it shouldn't be touched by this step
   with_items: "{{ chia_all_services | difference(chia_enabled_services) | difference([\"daemon\"]) }}"
+  register: systemd_action
+  retries: 100
+  until: systemd_action is success
 
 - name: Chia Systemd Target
   become: true
@@ -187,6 +190,9 @@
     daemon_reload: true
     enabled: "{{ start_on_boot }}"
     state: "{{ start_now | ternary('started','stopped') }}"
+  register: systemd_action
+  retries: 100
+  until: systemd_action is success
 
 - name: Add vector config
   become: true
