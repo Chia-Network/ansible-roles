@@ -4,6 +4,9 @@
     name: "{{ chia_service_base }}.target"
     state: restarted
   when: start_now
+  register: systemd_action
+  retries: 10
+  until: systemd_action is success
 
 - name: restart-vector
   become: true
@@ -11,6 +14,9 @@
     name: vector
     state: restarted
   when: add_vector_config and vector_start_now
+  register: systemd_action
+  retries: 10
+  until: systemd_action is success
 
 - name: restart-monit
   become: true
@@ -18,3 +24,6 @@
     name: monit
     state: restarted
   when: add_monit_config and monit_start_now
+  register: systemd_action
+  retries: 10
+  until: systemd_action is success
