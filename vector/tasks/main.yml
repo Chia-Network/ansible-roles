@@ -40,6 +40,13 @@
     src: vector.service
     dest: /etc/systemd/system/vector.service
 
+- name: Add the vector user to the ubuntu group so it can read log files owned by ubuntu
+  become: yes
+  ansible.builtin.user:
+    name: vector
+    groups: ubuntu
+    append: yes
+
 - name: Set desired boot state
   become: yes
   ansible.builtin.systemd:
