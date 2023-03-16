@@ -3,6 +3,9 @@ type = "file"
 ignore_older_secs = 600
 include = ["{{ chia_root }}/log/debug.log"]
 read_from = "beginning"
+multiline.start_pattern = ".*"
+multiline.condition_pattern = "^(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-(?P<day>[0-9]{2})T"
+multiline.mode = "halt_before"
 
 [sinks.loki]
 type = "loki"
