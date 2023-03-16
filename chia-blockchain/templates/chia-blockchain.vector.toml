@@ -6,6 +6,7 @@ read_from = "beginning"
 multiline.start_pattern = ".*"
 multiline.condition_pattern = "^(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-(?P<day>[0-9]{2})T"
 multiline.mode = "halt_before"
+multiline.timeout_ms = 15000
 
 [sinks.loki]
 type = "loki"
