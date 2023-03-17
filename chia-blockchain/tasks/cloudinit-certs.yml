@@ -2,7 +2,7 @@
   become: true
   ansible.builtin.template:
     src: "cloudinit/chia-certs.sh"
-    dest: "/var/lib/cloud/scripts/per-instance"
+    dest: "/var/lib/cloud/scripts/per-instance/chia-certs.sh"
     owner: root
     group: root
     mode: "0755"
