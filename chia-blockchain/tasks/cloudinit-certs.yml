@@ -1,0 +1,8 @@
+- name: Chia Cert Script
+  become: true
+  ansible.builtin.template:
+    src: "cloudinit/chia-certs.sh"
+    dest: "/var/lib/cloud/scripts/per-instance"
+    owner: root
+    group: root
+    mode: "0755"

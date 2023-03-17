@@ -234,3 +234,7 @@
   with_items: "{{ chia_periodic_connect_peers }}"
   when:
     - chia_periodic_connect_peers | length
+
+- name: Set up script to generate new certs on first boot
+  ansible.builtin.include_tasks: "cloudinit-certs.yml"
+  when: chia_cloudinit_new_certs

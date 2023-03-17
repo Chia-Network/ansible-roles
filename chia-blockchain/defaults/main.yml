@@ -11,6 +11,9 @@ chia_apt_package: chia-blockchain-cli
 chia_service_base: chia
 start_on_boot: true
 start_now: true
+# If set to true, a script will be put in place to generate new certs on first boot
+# so that nodes launched from AMIs all have unique node IDs and can connect to each other
+chia_cloudinit_new_certs: false
 
 # This is the list of systemd services that will be installed by default
 # daemon is required, and chia will fail to run properly without it
