@@ -47,6 +47,7 @@
     state: absent
   become: true
 
-- name: Start SentinelOne agent
-  ansible.builtin.command: "/opt/sentinelone/bin/sentinelctl control start"
+# Enable sentinelone, but do not have it start on
+- name: Enable SentinelOne agent
+  ansible.builtin.command: "/opt/sentinelone/bin/sentinelctl control enable"
   become: true
