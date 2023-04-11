@@ -1,5 +1,8 @@
 - name: restart-sshd
   become: yes
-  service:
+  ansible.builtin.service:
     name: sshd
     state: restarted
+  register: systemd_action
+  retries: 10
+  until: systemd_action is success

@@ -1,5 +1,8 @@
 - name: restart-vector
-  service:
+  ansible.builtin.service:
     name: vector
     state: restarted
   when: vector_start_now
+  register: systemd_action
+  retries: 10
+  until: systemd_action is success

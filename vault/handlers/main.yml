@@ -1,5 +1,8 @@
 - name: restart-vault
-  service:
+  ansible.builtin.service:
     name: vault
     state: restarted
   when: vault_start_now
+  register: systemd_action
+  retries: 10
+  until: systemd_action is success
