@@ -1,5 +1,8 @@
 - name: restart-dns-healthcheck
   become: yes
-  service:
+  ansible.builtin.service:
     name: dns-healthcheck
     state: restarted
+  register: systemd_action
+  retries: 10
+  until: systemd_action is success
