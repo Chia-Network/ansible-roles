@@ -1,0 +1,13 @@
+---
+chia_healthcheck_version: latest
+chia_healthcheck_service_name: chia-healthcheck.service
+chia_healthcheck_start_on_boot: true
+chia_healthcheck_start_now: true
+chia_healthcheck_port: 9915
+
+user: ubuntu
+group: ubuntu
+
+# This variable name + default needs to be kept in sync with the chia-blockchain role so that these roles are
+# compatible when used in the same playbook / on the same host
+chia_root: "/home/ubuntu/.chia"

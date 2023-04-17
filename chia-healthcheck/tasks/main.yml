@@ -1,0 +1,44 @@
+---
+- name: Load architecture specific vars
+  include_vars: "{{ lookup('first_found', params) }}"
+  vars:
+    params:
+      files:
+        - '{{ansible_architecture}}.yml'
+      paths:
+        - 'vars'
+
+- name: Chia Healthcheck Repository
+  become: yes
+  ansible.builtin.apt_repository:
+    repo: deb [arch={{ chia_healthcheck_repo_arch }} signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/chia-healthcheck/debian/ stable main
+    update_cache: yes
+
+- name: Install Chia Healthcheck
+  become: yes
+  ansible.builtin.apt:
+    name:
+      - "chia-healthcheck{{ ( chia_healthcheck_version == 'latest' ) | ternary('', '=' + chia_healthcheck_version) }}"
+    update_cache: yes
+    cache_valid_time: 300
+    state: "{{ ( chia_healthcheck_version == 'latest' ) | ternary('latest', 'present') }}"
+  notify: restart-chia-healthcheck
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
+- name: Chia Healthcheck Systemd Config
+  become: yes
+  ansible.builtin.template:
+    src: "chia-healthcheck.service.j2"
+    dest: "/etc/systemd/system/{{ chia_healthcheck_service_name }}"
+    owner: root
+    group: root
+  notify: restart-chia-healthcheck
+
+- name: Ensure chia-healthcheck service is in desired boot and current state
+  become: yes
+  ansible.builtin.systemd:
+    name: "{{ chia_healthcheck_service_name }}"
+    daemon_reload: yes
+    enabled: "{{ chia_healthcheck_start_on_boot }}"
+    state: "{{ chia_healthcheck_start_now | ternary('started','stopped') }}"
