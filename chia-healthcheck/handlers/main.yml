@@ -1,0 +1,9 @@
+- name: restart-chia-healthcheck
+  become: true
+  ansible.builtin.service:
+    name: "{{ chia_healthcheck_service_name }}"
+    state: restarted
+  when: chia_healthcheck_start_now
+  register: systemd_action
+  retries: 10
+  until: systemd_action is success

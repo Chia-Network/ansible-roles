@@ -1,0 +1,13 @@
+[Unit]
+Description=Chia Healthcheck Service for {{ user }}
+
+[Service]
+Type=simple
+Environment=CHIA_ROOT={{ chia_root }}
+Environment=CHIA_HEALTHCHECK_HEALTHCHECK_PORT={{ chia_healthcheck_port }}
+ExecStart=/usr/local/bin/chia-healthcheck serve
+User={{ user }}
+Group={{ group }}
+
+[Install]
+WantedBy=multi-user.target
