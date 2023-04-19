@@ -12,3 +12,5 @@ dependencies:
     when: chia_installation_method == "apt"
   - role: git
     when: chia_installation_method == "source"
+  - role: chia-healthcheck
+    when: chia_add_healthcheck_service
