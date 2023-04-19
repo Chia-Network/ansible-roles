@@ -200,6 +200,7 @@ loki_basic_auth_password: ""
 vector_start_now: true
 
 # monit service related
+chia_add_healthcheck_service: true
 add_monit_config: true
 monit_start_now: true
 # How many times the port check needs to fail before monit will restart the service
