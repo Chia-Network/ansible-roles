@@ -15,7 +15,7 @@
   register: chia_install
   notify: restart-chia
   retries: 100
-  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+  until: chia_install is success or ('Failed to lock apt for exclusive operation' not in chia_install.msg and '/var/lib/dpkg/lock' not in chia_install.msg)
 
 - name: Chia Init
   become: true
