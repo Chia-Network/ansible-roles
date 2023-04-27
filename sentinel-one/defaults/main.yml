@@ -11,7 +11,7 @@ sentinelone_version: "22_3_3_11"
 sentinelone_token: "SECRET_SENTINEL_ONE_SERVICE_TOKEN"
 sentinelone_type: "server" # Enter "server" or "desktop"
 
-AWS Keys for the account where the SentinelOne installers are saved in S3
+# AWS Keys for the account where the SentinelOne installers are saved in S3
 tmp_aws_access_key: "EXAMPLEKEY"
 tmp_aws_secret_key: "EXAMPLESECRET"
 tmp_aws_session_token: "EXAMPLETOKEN"
