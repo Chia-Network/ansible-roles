@@ -1,6 +1,11 @@
 ---
 # These defaults are placeholders - set the actual values in
 # group_vars or host_vars.
+
+# Bucket name with no "s3://" prefix, nor any trailing slash. 
+# The bucket should contain a folder called "sentinelone" and
+# in the sentinelone folder should be all the installers
+# with the default names as provided from SentinelOne
 sentinelone_bucket: "sentinelone-installer-bucket-name"
 sentinelone_version: "22_3_3_11"
 tmp_aws_access_key: "EXAMPLEKEY"
