@@ -6,6 +6,9 @@
     name: "{{ item }}"
     selection: hold
   with_items: "{{ apt_update_hold_items }}"
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('dpkg frontend lock was locked by another process' not in apt_action.msg)
 
 - name: Ensure apt packages are all up to date
   become: true
@@ -24,3 +27,6 @@
     name: "{{ item }}"
     selection: install
   with_items: "{{ apt_update_hold_items }}"
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('dpkg frontend lock was locked by another process' not in apt_action.msg)
