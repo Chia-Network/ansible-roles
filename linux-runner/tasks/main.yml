@@ -51,7 +51,7 @@
 - name: Configure the runner for GitHub
   become: yes
   become_user: "{{ runner_user }}"
-  shell: ./config.sh --url https://github.com/Chia-Network --token "{{ runner_registration_token }}" --runnergroup "{{ runner_github_group }}" --labels "{{ runner_tags }}" --name "{{ inventory_hostname }}" --unattended
+  ansible.builtin.command: ./config.sh --url https://github.com/Chia-Network --token "{{ runner_registration_token }}" --runnergroup "{{ runner_github_group }}" --labels "{{ runner_tags }}" --name "{{ inventory_hostname }}" --unattended
   args:
     chdir: "{{ runner_directory_path }}"
     creates: "{{ runner_directory_path }}/.runner"
@@ -62,8 +62,8 @@
 
 # The runner service becomes enabled in systemd after install
 - name: Install the runner service
-  shell: |
-    sudo ./svc.sh install {{ runner_user }}
+  become: yes
+  command: ./svc.sh install {{ runner_user }}
   args:
     chdir: "{{ runner_directory_path }}"
     creates: "/etc/systemd/system/actions.runner.Chia-Network.{{ inventory_hostname }}.service"
