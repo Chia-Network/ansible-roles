@@ -1,0 +1,8 @@
+- name: restart-runner
+  become: true
+  ansible.builtin.service:
+    name: "actions.runner.Chia-Network.{{ inventory_hostname }}.service"
+    state: restarted
+  register: systemd_action
+  retries: 10
+  until: systemd_action is success
