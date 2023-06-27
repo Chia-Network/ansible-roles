@@ -9,7 +9,7 @@ exclusions=({% for item in runner_post_run_exclusions %}
 
 for file in "$directory"/*; do
 	filename=$(basename "$file")
-		if [[ ! "${exclusions[*]}" =~ $filename ]]; then
-			sudo rm -rf "$directory/$filename"
-		fi
+	if [[ ! "${exclusions[*]}" =~ $filename ]]; then
+		sudo rm -rf "$directory/$filename"
+	fi
 done
