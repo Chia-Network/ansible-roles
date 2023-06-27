@@ -10,3 +10,11 @@ runner_tags: ""
 
 # Arch Specific Vars - These are set in vars/$arch.yml
 runner_download_arch: ""
+
+# A list of files/directories that should not be cleaned up after a job
+runner_post_run_exclusions:
+  - post-run.sh
+  - actions-runner
+  - .bash_logout
+  - .bashrc
+  - .profile
