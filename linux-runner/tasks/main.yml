@@ -81,11 +81,14 @@
     group: "{{ runner_group }}"
     mode: "0755"
 
-- name: Ensure the post-run script is set up in the .env file
-  ansible.builtin.lineinfile:
-    path: "{{ runner_directory_path }}/.env"
-    regexp: '^ACTIONS_RUNNER_HOOK_JOB_COMPLETED='
-    line: ACTIONS_RUNNER_HOOK_JOB_COMPLETED=/home/{{ runner_user }}/post-run.sh
+- name: Add the .env file
+  become: yes
+  ansible.builtin.template:
+    src: "env"
+    dest: "{{ runner_directory_path }}/.env"
+    owner: "{{ runner_user }}"
+    group: "{{ runner_group }}"
+    mode: "0644"
 
 - name: Ensure the service is in desired boot and current state
   become: true
