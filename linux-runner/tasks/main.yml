@@ -63,7 +63,7 @@
 # The runner service becomes enabled in systemd after install
 - name: Install the runner service
   shell: |
-    sudo ./svc.sh install
+    sudo ./svc.sh install {{ runner_user }}
   args:
     chdir: "{{ runner_directory_path }}"
     creates: "/etc/systemd/system/actions.runner.Chia-Network.{{ inventory_hostname }}.service"
@@ -72,13 +72,13 @@
 - debug:
     msg: "{{ install.stdout }}"
 
-- name: Start the runner service
-  shell: |
-    sudo ./svc.sh start
-    sudo ./svc.sh status
-  args:
-    chdir: "{{ runner_directory_path }}"
-  register: output
-
-- debug:
-    msg: "{{ output.stdout }}"
+- name: Ensure the service is in desired boot and current state
+  become: true
+  ansible.builtin.systemd:
+    name: "actions.runner.Chia-Network.{{ inventory_hostname }}.service"
+    daemon_reload: true
+    enabled: "true"
+    state: "started"
+  register: systemd_action
+  retries: 10
+  until: systemd_action is success

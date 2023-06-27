@@ -2,7 +2,7 @@
 runner_user: "ubuntu"
 runner_group: "ubuntu"
 
-runner_release_version: "2.290.1"
+runner_release_version: "2.305.0"
 runner_directory_path: ""
 runner_registration_token: ""
 runner_github_group: ""
