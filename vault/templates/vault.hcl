@@ -8,6 +8,12 @@ cluster_addr = "{{ vault_cluster_addr }}"
 storage "raft" {
   path = "{{ vault_data_path }}"
   node_id = "{{ vault_node_id }}"
+
+{% for other_node in vault_other_node_addresses %}
+  retry_join {
+    leader_api_addr = "{{ other_node }}"
+  }
+{% endfor %}
 }
 
 # HTTPS listener
