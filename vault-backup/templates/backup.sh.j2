@@ -23,6 +23,15 @@ trap cleanup EXIT
 touch $LOCK_FILE
 
 echo "Starting vault backup"
+
+# snapshot if leader
+if [ "$(vault operator raft list-peers --format=json | jq --raw-output '.data.config.servers[] | select(.leader==true) | .node_id')" = "$(hostname -a)" ]; then
+  echo "We are leader, continuing..."
+else
+  echo "not leader, skipping raft snapshot."
+  exit 0
+fi
+
 n=0
 until [ "$n" -ge 5 ]; do
 	vault operator raft snapshot save $BACKUP_FILE && break
