@@ -29,7 +29,7 @@ chia_all_services:
   - introducer
   - seeder
   - timelord
-  - timelord-launcher # This is not present in the installers
+  - timelord-launcher
   - wallet
 
 # This is the list of services that should be enabled on boot and started now (if set to start now)
