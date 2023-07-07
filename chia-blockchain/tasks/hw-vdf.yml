@@ -12,7 +12,7 @@
     update_cache: true
     cache_valid_time: 300
     state: "{{ (chia_hw_vdf_version == 'latest') | ternary('latest', 'present') }}"
-  register: hwvdf-install
+  register: hwvdf_install
   notify: restart-chia
   retries: 100
-  until: hwvdf-install is success or ('Failed to lock apt for exclusive operation' not in hwvdf-install.msg and '/var/lib/dpkg/lock' not in hwvdf-install.msg)
+  until: hwvdf_install is success or ('Failed to lock apt for exclusive operation' not in hwvdf_install.msg and '/var/lib/dpkg/lock' not in hwvdf_install.msg)
