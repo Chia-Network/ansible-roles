@@ -186,6 +186,7 @@ send_uncompact_interval: 0
 
 # HW VDF Config
 chia_enable_hw_vdf: false
+chia_hw_vdf_version: latest
 chia_hw_vdf_vdf_threads: 16
 chia_hw_vdf_proof_threads: 14
 chia_hw_vdf_freq: 1475
