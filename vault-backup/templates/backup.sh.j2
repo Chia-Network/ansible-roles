@@ -26,10 +26,10 @@ echo "Starting vault backup"
 
 # snapshot if leader
 if [ "$(vault operator raft list-peers --format=json | jq --raw-output '.data.config.servers[] | select(.leader==true) | .node_id')" = "$(hostname -a)" ]; then
-  echo "We are leader, continuing..."
+	echo "We are leader, continuing..."
 else
-  echo "not leader, skipping raft snapshot."
-  exit 0
+	echo "not leader, skipping raft snapshot."
+	exit 0
 fi
 
 n=0
