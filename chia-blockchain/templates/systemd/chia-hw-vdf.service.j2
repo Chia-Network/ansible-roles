@@ -6,7 +6,7 @@ PartOf={{ chia_service_base }}.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/hw_vdf_client --vdf-threads {{ chia_hw_vdf_vdf_threads }} --proof-threads {{ chia_hw_vdf_proof_threads }} --freq {{ chia_hw_vdf_freq }} --vdfs-mask {{ chia_hw_vdf_mask }} --ip {{ chia_hw_vdf_timelord_ip }} {{ chia_hw_vdf_timelord_port }}
+ExecStart=/usr/bin/hw_vdf_client --vdf-threads {{ chia_hw_vdf_vdf_threads }} --proof-threads {{ chia_hw_vdf_proof_threads }} --freq {{ chia_hw_vdf_freq }} --vdfs-mask {{ chia_hw_vdf_mask }} --ip {{ timelord_launcher_host }} {{ chia_timelord_launcher_port }}
 User={{ user }}
 Group={{ group }}
 LimitNOFILE=1048576

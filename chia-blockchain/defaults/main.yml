@@ -191,8 +191,6 @@ chia_hw_vdf_vdf_threads: 16
 chia_hw_vdf_proof_threads: 14
 chia_hw_vdf_freq: 1475
 chia_hw_vdf_mask: 1
-chia_hw_vdf_timelord_ip: "127.0.0.1"
-chia_hw_vdf_timelord_port: 8000
 
 # Seeder Config
 minimum_height: 240000
