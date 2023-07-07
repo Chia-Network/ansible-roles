@@ -26,6 +26,7 @@ chia_all_services:
   - farmer
   - full-node
   - harvester
+  - hw-vdf
   - introducer
   - seeder
   - timelord
@@ -182,6 +183,15 @@ vdf_server_hostname: localhost
 
 # 'send_uncompact_interval' seconds. Set to 0 if you don't use this feature. Recommended is 300
 send_uncompact_interval: 0
+
+# HW VDF Config
+chia_enable_hw_vdf: false
+chia_hw_vdf_vdf_threads: 16
+chia_hw_vdf_proof_threads: 14
+chia_hw_vdf_freq: 1475
+chia_hw_vdf_mask: 1
+chia_hw_vdf_timelord_ip: "127.0.0.1"
+chia_hw_vdf_timelord_port: 8000
 
 # Seeder Config
 minimum_height: 240000
