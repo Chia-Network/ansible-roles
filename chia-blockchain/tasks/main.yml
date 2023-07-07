@@ -54,6 +54,10 @@
     line: "export CHIA_ROOT={{ chia_root }}"
   when: chia_root_to_env
 
+- name: Install HW VDF Client
+  ansible.builtin.include_tasks: "hw-vdf.yml"
+  when: chia_enable_hw_vdf
+
 - name: Install from source
   ansible.builtin.include_tasks: "source.yml"
   when: chia_installation_method == "source"
