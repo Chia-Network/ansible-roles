@@ -15,6 +15,6 @@ for file in "$directory"/*; do
 done
 
 if [ -n "${GITHUB_WORKSPACE}" ]; then
-        parent=$(dirname "$GITHUB_WORKSPACE")
-        sudo rm -rf "$parent"
+	parent=$(dirname "$GITHUB_WORKSPACE")
+	sudo rm -rf "$parent"
 fi
