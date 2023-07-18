@@ -13,3 +13,8 @@ for file in "$directory"/*; do
 		sudo rm -rf "$directory/$filename"
 	fi
 done
+
+if [ -n "${GITHUB_WORKSPACE}" ]; then
+        parent=$(dirname "$GITHUB_WORKSPACE")
+        sudo rm -rf "$parent"
+fi
