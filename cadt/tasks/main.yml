@@ -1,41 +1,26 @@
 ---
-- name: Create CADT directory
-  ansible.builtin.file:
-    path: /home/{{ user }}/cadt
-    state: directory
-    owner: "{{ user }}"
-    group: "{{ user }}"
-    mode: '0755'
-  tags: cadt
-
-- name: Unzip CADT package
-  ansible.builtin.unarchive:
-    src: https://github.com/Chia-Network/climate-warehouse/releases/download/{{ cadt_api_version }}/linux-x64-{{ cadt_api_version }}.zip
-    dest: /home/{{ user }}/cadt
-    remote_src: true
-    owner: "{{ user }}"
-    group: "{{ user }}"
-    mode: '0755'
-  notify: restart-cadt
-  tags: cadt
-
-- name: Add CADT Systemd config
+- name: Add CADT Repository
   become: true
-  ansible.builtin.template:
-    src: "cadt.service.j2"
-    dest: "/etc/systemd/system/cadt.service"
-    owner: root
-    group: root
-    mode: '0644'
-  notify:
-    - restart-cadt
-    - systemd-reload
-  tags: cadt
+  ansible.builtin.apt_repository:
+    repo: deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/cadt/debian/ stable main
+    update_cache: true
+
+- name: Install CADT
+  become: true
+  ansible.builtin.apt:
+    name:
+      - "cadt{{ (cadt_api_version == 'latest') | ternary('', '=' + cadt_api_version) }}"
+    update_cache: true
+    cache_valid_time: 300
+    state: "{{ (cadt_api_version == 'latest') | ternary('latest', 'present') }}"
+  register: cadt_install
+  notify: restart-cadt
+  retries: 100
 
 - name: Ensure CADT is in desired boot and current state
   become: true
   ansible.builtin.systemd:
-    name: "cadt.service"
+    name: "cadt@{{ user }}.service"
     daemon_reload: true
     enabled: true
     state: started
@@ -44,7 +29,7 @@
 - name: Add CADT config file
   ansible.builtin.template:
     src: "config.yaml.j2"
-    dest: "{{ chia_root }}/climate-warehouse/v1/config.yaml"
+    dest: "{{ chia_root }}/cadt/v1/config.yaml"
     owner: "{{ user }}"
     group: "{{ user }}"
     mode: '0644'
@@ -56,7 +41,7 @@
   become: true
   ansible.builtin.template:
     src: monit_config.j2
-    dest: /etc/monit/conf.d/cadt_monit
+    dest: /etc/monit/conf.d/cadt_monit_{{ user }}
     owner: root
     group: root
     mode: '0644'
