@@ -10,7 +10,7 @@
   when: cadt_ui_hosting == "local"
   tags: cadt-ui
 
-- name: Copy and uncompress CADT files
+- name: Copy and uncompress CADT UI files
   become: true
   ansible.builtin.unarchive:
     src: https://github.com/Chia-Network/climate-warehouse-ui/releases/download/{{ cadt_ui_version }}/web-build.tar.gz
