@@ -27,7 +27,7 @@ chia_data_layer_rpc_port: 8562
 chia_wallet_rpc_port: 9256
 
 # Chia network
-network: "mainnet"
+cadt_network: "mainnet"
 
 # Backups
 backup_base_dir: /home/{{ user }}/backup
