@@ -13,7 +13,7 @@
 - name: Copy and uncompress CADT UI files
   become: true
   ansible.builtin.unarchive:
-    src: https://github.com/Chia-Network/climate-warehouse-ui/releases/download/{{ cadt_ui_version }}/web-build.tar.gz
+    src: https://github.com/Chia-Network/cadt-ui/releases/download/{{ cadt_ui_version }}/cadt-ui-web-build.tar.gz
     dest: /var/www/{{ cadt_ui_host }}
     owner: "{{ user }}"
     group: "{{ user }}"
