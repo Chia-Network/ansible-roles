@@ -1,6 +1,5 @@
 ---
 dependencies:
-  - role: chia-blockchain
   - role: monit
   - role: zip
   - role: sqlite3
