@@ -45,6 +45,10 @@ group: ubuntu
 chia_root: "/home/ubuntu/.chia"
 chia_root_to_env: true
 
+# If you are running Chia as multiple users, set this to true to force
+# the `chia init` process to run even if the install hasn't changed
+chia_force_init: false
+
 # Set the following vars if you need to run chia init with a specific CA
 chia_ca_crt: ""
 chia_ca_key: ""
