@@ -16,3 +16,8 @@ cadt_ui_use_nginx: true
 
 # True or false
 basic_authentication: false
+
+# True of false - should a proxy be setup to the CADT API?
+cadt_api_proxy: true
+# Path to the CADT API in the proxy - include leading and trailing slash
+cadt_api_proxy_path: "/api/"
