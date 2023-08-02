@@ -1,8 +1,8 @@
 [Unit]
 Description=Chia
-Wants={{ chia_service_base }}-daemon-{{ user }}.service
+Wants={{ chia_service_base }}-daemon.service
 {% for service in chia_enabled_services %}
-Wants={{ chia_service_base }}-{{ service }}-{{user}}.service
+Wants={{ chia_service_base }}-{{ service }}.service
 {% endfor %}
 
 [Install]

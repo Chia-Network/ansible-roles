@@ -156,7 +156,7 @@
   become: true
   ansible.builtin.template:
     src: "systemd/chia-{{ item }}.service.j2"
-    dest: "/etc/systemd/system/{{ chia_service_base }}-{{ item }}-{{ user }}.service"
+    dest: "/etc/systemd/system/{{ chia_service_base }}-{{ item }}.service"
     owner: root
     group: root
     mode: "0644"
@@ -166,7 +166,7 @@
 - name: Ensure services that are not supposed to be enabled are stopped and disabled in systemd
   become: true
   ansible.builtin.systemd:
-    name: "{{ chia_service_base }}-{{ item }}-{{ user }}.service"
+    name: "{{ chia_service_base }}-{{ item }}.service"
     daemon_reload: true
     enabled: "false"
     state: "stopped"
@@ -181,7 +181,7 @@
   become: true
   ansible.builtin.template:
     src: "systemd/chia.target.j2"
-    dest: "/etc/systemd/system/{{ chia_service_base }}-{{ user }}.target"
+    dest: "/etc/systemd/system/{{ chia_service_base }}.target"
     owner: root
     group: root
     mode: "0644"
@@ -190,7 +190,7 @@
 - name: Ensure the chia target is in desired boot and current state
   become: true
   ansible.builtin.systemd:
-    name: "{{ chia_service_base }}-{{ user }}.target"
+    name: "{{ chia_service_base }}.target"
     daemon_reload: true
     enabled: "{{ start_on_boot }}"
     state: "{{ start_now | ternary('started','stopped') }}"

@@ -1,7 +1,7 @@
 - name: restart-chia
   become: true
   ansible.builtin.service:
-    name: "{{ chia_service_base }}-{{ user }}.target"
+    name: "{{ chia_service_base }}.target"
     state: restarted
   when: start_now
   register: systemd_action
