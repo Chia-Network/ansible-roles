@@ -1,4 +1,4 @@
-check host cadt with address 127.0.0.1
+check host cadt_{{ user }} with address 127.0.0.1
     start program = "/bin/systemctl start cadt@{{ user }}" with timeout 600 seconds
     stop program = "/bin/systemctl stop cadt@{{ user }}"
     if failed
