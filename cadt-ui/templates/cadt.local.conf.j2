@@ -42,8 +42,7 @@ server {
         try_files $uri $uri/ =404;
     }
 
-{% if cadt_api_proxy %}
+
     include /etc/nginx/cadt_includes/*.inc;
-{% endif %}
 
 }
