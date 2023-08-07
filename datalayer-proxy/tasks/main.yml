@@ -1,0 +1,11 @@
+---
+- name: Nginx include file for datalayer HTTP proxy
+  become: true
+  ansible.builtin.template:
+    src: datalayer-proxy.inc.j2
+    dest: /etc/nginx/cadt_includes/datalayer-proxy-{{ chia_data_layer_host_port }}.inc
+    owner: root
+    group: root
+    mode: '0644'
+  tags: datalayer-proxy
+  notify: Reload-nginx

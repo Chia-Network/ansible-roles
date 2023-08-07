@@ -1,0 +1,6 @@
+---
+# Path of the datalayer proxy (include leading and trailing slash)
+datalayer_proxy_path: "/data/"
+
+
+chia_data_layer_host_port: 8575
