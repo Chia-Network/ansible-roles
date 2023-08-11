@@ -1,6 +1,6 @@
 ---
-# Path of the datalayer proxy (include leading and trailing slash)
-datalayer_proxy_path: "/data/"
+datalayer_public_host: data.example.com # URL that the public will use
+datalayer_public_path: "/data/" # Path of the datalayer proxy (include leading and trailing slash)
+datalayer_host: "127.0.0.1" # Host where the datalayer files are served
 
-
-chia_data_layer_host_port: 8575
+chia_data_layer_host_port: 8575 # Port for datalayer http server, set in chia-blockchain role

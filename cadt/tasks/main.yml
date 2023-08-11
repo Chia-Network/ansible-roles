@@ -7,12 +7,14 @@
         - '{{ansible_architecture}}.yml'
       paths:
         - 'vars'
+  tags: cadt
 
 - name: Add CADT Repository
   become: true
   ansible.builtin.apt_repository:
     repo: deb [arch={{ chia_repo_arch }} signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/cadt/debian/ stable main
     update_cache: true
+  tags: cadt
 
 - name: Install CADT
   become: true
@@ -25,6 +27,7 @@
   register: cadt_install
   notify: restart-cadt
   retries: 100
+  tags: cadt
 
 - name: Ensure CADT is in desired boot and current state
   become: true
@@ -46,6 +49,55 @@
     - restart-cadt
   tags: cadt
 
+- name: Create Nginx proxy for CADT
+  become: true
+  ansible.builtin.template:
+    src: cadt.conf.j2
+    dest: /etc/nginx/conf.d/{{ cadt_api_hosts | first }}.conf
+    owner: root
+    group: root
+    mode: '0644'
+  when: cadt_api_proxy == true and ((cadt_api_hosts | difference(cadt_ui_hosts)) | length>0)
+  tags: cadt
+  notify: Reload-nginx
+
+- name: Create directory for CADT API include
+  become: true
+  ansible.builtin.file:
+    path: /etc/nginx/cadt_proxy_includes
+    state: directory
+    mode: '0755'
+    owner: "root"
+    group: "root"
+  when:
+    - cadt_api_proxy == true
+  tags: cadt
+
+- name: Template Nginx config for CADT API proxy
+  become: true
+  ansible.builtin.template:
+    src: cadt-proxy.inc.j2
+    dest: /etc/nginx/cadt_proxy_includes/cadt-api-proxy-{{ cadt_port }}.inc
+    owner: root
+    group: root
+    mode: '0644'
+  when:
+    - cadt_api_proxy == true
+  tags: cadt
+  notify: Reload-nginx
+
+# If CADT domains are the same as the CADT-UI domains, use the existing CADT-UI Nginx file
+- name: Add CADT proxy include into existing CADT-UI Nginx config (if hosted on the same domain)
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/nginx/conf.d/{{ cadt_ui_hosts | first }}.conf
+    state: present
+    insertafter: '    index index.html;'
+    line: "    include /etc/nginx/cadt_proxy_includes/*.inc;"
+  when: ((cadt_api_hosts | difference(cadt_ui_hosts)) | length==0) and ((cadt_ui_hosts | difference(cadt_api_hosts)) | length==0)
+  tags: cadt
+  notify: Reload-nginx
+
 - name: Add custom monit config to conf.d for CADT
   become: true
   ansible.builtin.template:
@@ -55,6 +107,7 @@
     group: root
     mode: '0644'
   notify: restart-monit
+  tags: cadt
 
 - name: Make backup directory
   ansible.builtin.file:

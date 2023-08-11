@@ -1,25 +1,10 @@
 server {
-    listen 80;
-    listen [::]:80;
-
-    server_name {{ certbot_domains | join( " " ) }};
-
-    root /dev/null;
-
-    include /etc/nginx/snippets/lets-encrypt-webroot.conf;
-
-    location / {
-        rewrite (.*) https://$host$1 permanent;
-    }
-}
-
-server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
 
-    root /var/www/{{ cadt_ui_host }}/build;
+    root /dev/null;
 
-    server_name {{ certbot_domains | join( " " ) }};
+    server_name {{ datalayer_public_host }};
 
     ssl_certificate /etc/letsencrypt/live/{{ certbot_domains | first }}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/{{ certbot_domains | first }}/privkey.pem;
@@ -43,6 +28,6 @@ server {
     }
 
 
-    include /etc/nginx/cadt_includes/*.inc;
+    include /etc/nginx/datalayer_proxy_includes/*.inc;
 
 }

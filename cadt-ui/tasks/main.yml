@@ -2,7 +2,7 @@
 - name: Create directory for CADT UI files
   become: true
   ansible.builtin.file:
-    path: /var/www/{{ cadt_ui_host }}
+    path: /var/www/cadt_ui
     state: directory
     mode: '0755'
     owner: "{{ user }}"
@@ -13,8 +13,8 @@
 - name: Copy and uncompress CADT UI files
   become: true
   ansible.builtin.unarchive:
-    src: https://github.com/Chia-Network/cadt-ui/releases/download/{{ cadt_ui_version }}/cadt-ui-web-build.tar.gz
-    dest: /var/www/{{ cadt_ui_host }}
+    src: https://github.com/Chia-Network/cadt-ui/releases/{{ (cadt_api_version == 'latest') | ternary('latest/download', 'download/' +  cadt_ui_version )}}/cadt-ui-web-build.tar.gz
+    dest: /var/www/cadt_ui
     owner: "{{ user }}"
     group: "{{ user }}"
     remote_src: true
@@ -50,38 +50,11 @@
 - name: Template Nginx config for CADT
   become: true
   ansible.builtin.template:
-    src: cadt.local.conf.j2
-    dest: /etc/nginx/conf.d/cadt.conf
+    src: cadt-ui.local.conf.j2
+    dest: /etc/nginx/conf.d/{{ cadt_ui_hosts | first }}.conf
     owner: root
     group: root
     mode: '0644'
   when: cadt_ui_hosting == "local"
-  tags: cadt-ui
-  notify: Reload-nginx
-
-- name: Create directory for CADT API include
-  become: true
-  ansible.builtin.file:
-    path: /etc/nginx/cadt_includes
-    state: directory
-    mode: '0755'
-    owner: "root"
-    group: "root"
-  when:
-    - cadt_ui_hosting == "local"
-    - cadt_api_proxy == true
-  tags: cadt-ui
-
-- name: Template Nginx config for CADT API proxy
-  become: true
-  ansible.builtin.template:
-    src: cadt-proxy.inc.j2
-    dest: /etc/nginx/cadt_includes/cadt-api-proxy-{{ cadt_port }}.inc
-    owner: root
-    group: root
-    mode: '0644'
-  when:
-    - cadt_ui_hosting == "local"
-    - cadt_api_proxy == true
   tags: cadt-ui
   notify: Reload-nginx
