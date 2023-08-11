@@ -2,7 +2,7 @@
 - name: Create directory for CADT UI files
   become: true
   ansible.builtin.file:
-    path: /var/www/cadt_ui
+    path: /var/www/{{ cadt_ui_hosts | first }}
     state: directory
     mode: '0755'
     owner: "{{ user }}"
@@ -14,7 +14,7 @@
   become: true
   ansible.builtin.unarchive:
     src: https://github.com/Chia-Network/cadt-ui/releases/{{ (cadt_api_version == 'latest') | ternary('latest/download', 'download/' +  cadt_ui_version )}}/cadt-ui-web-build.tar.gz
-    dest: /var/www/cadt_ui
+    dest: /var/www/{{ cadt_ui_hosts | first }}
     owner: "{{ user }}"
     group: "{{ user }}"
     remote_src: true
