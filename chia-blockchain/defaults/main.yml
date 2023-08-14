@@ -106,6 +106,11 @@ exempt_peer_networks: []
 
 dns_servers:
   - "dns-introducer.chia.net"
+  - "chia.ctrlaltdel.ch"
+  - "seeder.dexie.space"
+  - "chia-seeder.h9.com"
+  - "chia.hoffmang.com"
+  - "seeder.xchpool.org"
 
 introducer_peer:
   host: introducer.chia.net
@@ -150,6 +155,9 @@ farmer_xch_target_address: ""
 # Wallet Settings
 spam_filter_after_n_txs: 200
 xch_spam_amount: 1000000
+reuse_public_key_for_change: {}
+  #Add your wallet fingerprint here, this is an example.
+  #"2999502625": False
 
 # This is the network overrides section of config.yaml
 # When this runs, we attempt to pull the network overrides from the ref specified, but
@@ -182,7 +190,7 @@ network_overrides:
 
 # If set 'True', the timelord will create compact proofs of time, instead of
 # extending the chain.
-sanitizer_mode: "False"
+bluebox_mode: "False"
 
 # Number of VDF client processes to keep alive in the local machine.
 timelord_launcher_host: localhost
