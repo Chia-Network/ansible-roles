@@ -224,7 +224,7 @@ timelord:
   # You must set 'send_uncompact_interval' in 'full_node' > 0 in the full_node
   # section below to have full_node send existing time proofs to be sanitized.
   # 1.3+ can swap to the new bluebox mode key
-  bluebox_mode: {{ sanitizer_mode }}
+  bluebox_mode: {{ bluebox_mode }}
   # This runs a less CPU intensive bluebox. Runs for windows. Settings apply as for `bluebox_mode`.
   # Optionally set `process_count` in `timelord_launcher` to 0, since timelord launcher won't be used in this case.
   # IMPORTANT! `bluebox_mode` must also be set to True for this option to work.
