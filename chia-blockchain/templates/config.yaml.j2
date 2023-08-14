@@ -125,6 +125,18 @@ harvester:
     crt: "config/ssl/ca/chia_ca.crt"
     key: "config/ssl/ca/chia_ca.key"
 
+  # Compressed harvesting.
+  parallel_decompressor_count: {{ chia_parallel_decompressor_count }}
+  # If set to 0, `decompressor_thread_count` will default to half of nproc available on the machine.
+  # A non-zero number overrides this default.
+  decompressor_thread_count: {{ chia_decompressor_thread_count }}
+  disable_cpu_affinity: {{ chia_harvester_disable_cpu_affinity }}
+  # Ignore compressed plots with compression level greater than this.
+  max_compression_level_allowed: {{ chia_max_compression_level_allowed }}
+  use_gpu_harvesting: {{ chia_use_gpu_harvesting }}
+  gpu_index: {{ chia_gpu_index }}
+  enforce_gpu_index: {{ chia_enforce_gpu_index }}
+
 pool:
   # Replace this with a real puzzle hash
   xch_target_address: "{{ pool_xch_target_address }}"

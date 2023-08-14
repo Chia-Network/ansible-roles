@@ -132,6 +132,13 @@ keys: []
 # Harvester Settings
 plot_directories: []
 recursive_plot_scan: false
+chia_parallel_decompressor_count: 0
+chia_decompressor_thread_count: 0
+chia_harvester_disable_cpu_affinity: false
+chia_max_compression_level_allowed: 7
+chia_use_gpu_harvesting: false
+chia_gpu_index: 0
+chia_enforce_gpu_index: false
 
 # Pool Settings
 pool_xch_target_address: ""
