@@ -6,6 +6,7 @@
     classic: true
     options:
       - trust-plugin-with-root=ok
+  tags: certbot
 
 - name: Install certbot DNS Plugin
   become: true
@@ -13,6 +14,7 @@
     name: certbot-dns-cloudflare
     classic: true
   when: certbot_validation_strategy == "cloudflare"
+  tags: certbot
 
 - name: Symlink certbot into place.
   become: true
@@ -20,6 +22,7 @@
     src: /snap/bin/certbot
     dest: /usr/bin/certbot
     state: link
+  tags: certbot
 
 - name: Template cloudflare credentials ini for certbot
   become: true
@@ -30,6 +33,7 @@
     group: root
     mode: '0600'
   when: certbot_validation_strategy == "cloudflare"
+  tags: certbot
 
 - name: Issue certbot certificate using DNS validation
   become: true
@@ -37,6 +41,7 @@
   args:
     creates: /etc/letsencrypt/live/{{ certbot_domains | first }}/privkey.pem
   when: certbot_validation_strategy == "cloudflare"
+  tags: certbot
 
 - name: Remove existing default Nginx site configuration(s)
   become: true
@@ -48,6 +53,7 @@
     - default.conf
   notify: Reload-nginx
   when: certbot_validation_strategy == "webroot"
+  tags: certbot
 
 - name: Copy default config
   become: true
@@ -61,6 +67,7 @@
     - "custom-default.conf"
   notify: Reload-nginx
   when: certbot_validation_strategy == "webroot"
+  tags: certbot
 
 - name: Ensure certbot webroot directory exists
   become: true
@@ -69,6 +76,7 @@
     state: directory
     mode: '0755'
   when: certbot_validation_strategy == "webroot"
+  tags: certbot
 
 - name: Copy snippets
   become: true
@@ -82,12 +90,14 @@
     - "lets-encrypt-webroot.conf"
   notify: Reload-nginx
   when: certbot_validation_strategy == "webroot"
+  tags: certbot
 
 # Run any handlers that have been triggered up to this point now
 # We need the default servers to work with our templates before we
 # try to issue any certificates.
 - name: Flush handlers
   ansible.builtin.meta: flush_handlers
+  tags: certbot
 
 - name: Issue certbot certificate using webroot validation
   become: true
@@ -96,6 +106,7 @@
     creates: /etc/letsencrypt/live/{{ certbot_domains | first }}/privkey.pem
   when: certbot_validation_strategy == "webroot"
   notify: Reload-nginx
+  tags: certbot
 
 - name: Add cron job for certbot renewal
   become: true
@@ -105,6 +116,7 @@
     minute: "30"
     hour: "5"
     user: "root"
+  tags: certbot
 
 # This takes care of reloading Nginx when certificates are renewed
 - name: Add cron job to reload nginx configs, in case new certs are available
@@ -115,3 +127,4 @@
     minute: "45"
     hour: "5"
     user: "root"
+  tags: certbot

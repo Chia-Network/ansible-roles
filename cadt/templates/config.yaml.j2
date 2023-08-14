@@ -9,10 +9,18 @@ APP:
   WALLET_URL: https://localhost:{{ chia_wallet_rpc_port }}
   USE_SIMULATOR: false
   READ_ONLY: {{ cadt_read_only }}
-  API_KEY: null
-  CHIA_NETWORK: {{ network }}
+  CADT_API_KEY: {{ cadt_api_key }}
+  CHIA_NETWORK: {{ cadt_network }}
+  USE_DEVELOPMENT_MODE: false
   IS_GOVERNANCE_BODY: {{ cadt_is_governance_body }}
   DEFAULT_FEE: 300000000
   DEFAULT_COIN_AMOUNT: 300000000
+  DATALAYER_FILE_SERVER_URL: {{ datalayer_http_location }}
+  TASKS:
+    AUDIT_SYNC_TASK_INTERVAL: 30
+    DATAMODEL_SYNC_TASK_INTERVAL: 60
+    GOVERNANCE_SYNC_TASK_INTERVAL: 1800
+    ORGANIZATION_META_SYNC_TASK_INTERVAL: 300
+    PICKLIST_SYNC_TASK_INTERVAL: 30
 GOVERNANCE:
   GOVERNANCE_BODY_ID: {{ cadt_governance_body_id }}

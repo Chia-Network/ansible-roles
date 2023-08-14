@@ -24,4 +24,4 @@
     chia init --fix-ssl-permissions
   environment:
     CHIA_ROOT: "{{ chia_root }}"
-  when: chia_install.changed
+  when: chia_install.changed or chia_force_init

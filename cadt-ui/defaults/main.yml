@@ -1,5 +1,5 @@
 ---
-cadt_ui_version: "1.0.14"
+cadt_ui_version: "latest"
 
 # Where to host the UI - options are "local" or "s3"
 cadt_ui_hosting: local
@@ -8,11 +8,14 @@ cadt_ui_hosting: local
 user: ubuntu
 group: ubuntu
 
-# No https:// or path - just domain
-cadt_ui_host: www.example.com
+# No https:// or path - just domain.
+cadt_ui_hosts:
+  - www.example.com
+  - site2.example.com
 
 # True or false
 cadt_ui_use_nginx: true
 
 # True or false
 basic_authentication: false
+
