@@ -12,7 +12,7 @@
 - name: Add CADT Repository
   become: true
   ansible.builtin.apt_repository:
-    repo: deb [arch={{ chia_repo_arch }} signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/cadt/debian/ stable main
+    repo: deb [arch={{ cadt_repo_arch }} signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/cadt/debian/ stable main
     update_cache: true
   tags: cadt
 
