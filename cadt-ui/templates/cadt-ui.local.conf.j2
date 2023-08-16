@@ -22,10 +22,10 @@ server {
 {% endif %}
 
     index index.html;
+    include /etc/nginx/cadt_proxy_includes/*.inc;
 
     location / {
         try_files $uri $uri/ =404;
     }
-
 
 }

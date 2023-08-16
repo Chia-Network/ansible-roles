@@ -86,7 +86,8 @@
   tags: cadt
   notify: Reload-nginx
 
-# If CADT domains are the same as the CADT-UI domains, use the existing CADT-UI Nginx file
+# If CADT domains are the same as the CADT-UI domains, use the existing CADT-UI Nginx file.
+# (this like should already exist in the UI .conf file, but just in case)
 - name: Add CADT proxy include into existing CADT-UI Nginx config (if hosted on the same domain)
   become: true
   ansible.builtin.lineinfile:

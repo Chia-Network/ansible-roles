@@ -10,6 +10,21 @@
   when: cadt_ui_hosting == "local"
   tags: cadt-ui
 
+# Create this directory to be used for the CADT API proxy files.  If CADT isn't
+# proxying, this directory is empty and won't do anything.  The cadt ansible role
+# will manage adding files to this directory and reloading Nginx.
+- name: Create directory for CADT API include
+  become: true
+  ansible.builtin.file:
+    path: /etc/nginx/cadt_proxy_includes
+    state: directory
+    mode: '0755'
+    owner: "root"
+    group: "root"
+  when:
+    - cadt_api_proxy == true
+  tags: cadt-ui
+
 - name: Copy and uncompress CADT UI files
   become: true
   ansible.builtin.unarchive:
