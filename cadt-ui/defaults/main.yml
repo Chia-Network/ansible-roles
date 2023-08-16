@@ -19,3 +19,5 @@ cadt_ui_use_nginx: true
 # True or false
 basic_authentication: false
 
+# True or false if Nginx will be proxying the CADT API
+cadt_api_proxy: true
