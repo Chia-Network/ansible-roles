@@ -54,16 +54,21 @@
 - name: Download runner tarball
   get_url:
     url: https://github.com/actions/runner/releases/download/v{{ runner_release_version }}/actions-runner-osx-{{ runner_download_arch }}-{{ runner_release_version }}.tar.gz
-    dest: "{{ runner_directory_path }}"
+    dest: "/tmp/actions-runner-osx.tar.gz"
     mode: '0755'
+
+# Creates param of unarchive is busted on macos
+- name: Check if runner is unarchived
+  stat:
+    path: "{{ runner_directory_path }}/svc.sh"
+  register: runner_unarchived
 
 - name: Unarchive runner tarball
   ansible.builtin.unarchive:
-    src: "{{ runner_directory_path }}/actions-runner-osx-{{ runner_download_arch }}-{{ runner_release_version }}.tar.gz"
+    src: "/tmp/actions-runner-osx.tar.gz"
     dest: "{{ runner_directory_path }}"
     remote_src: yes
-    list_files: yes
-    creates: "{{ runner_directory_path }}/svc.sh"
+  when: not runner_unarchived.stat.exists
 
 - name: Configure the runner for GitHub
   shell: ./config.sh --url https://github.com/Chia-Network --token "{{ runner_registration_token }}" --runnergroup "{{ runner_github_group }}" --labels "{{ runner_tags }}" --name "{{ inventory_hostname }}" --unattended
