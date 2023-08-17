@@ -35,7 +35,6 @@
     src: "{{ runner_directory_path }}/actions-runner-linux-{{ runner_download_arch }}-{{ runner_release_version }}.tar.gz"
     dest: "{{ runner_directory_path }}"
     remote_src: yes
-    list_files: yes
     creates: "{{ runner_directory_path }}/svc.sh"
 
 - name: Ensure actions-runner directory has correct permissions
