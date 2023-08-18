@@ -208,8 +208,8 @@ chia_enable_hw_vdf: false
 chia_hw_vdf_version: latest
 chia_hw_vdf_vdf_threads: 16
 chia_hw_vdf_proof_threads: 14
-chia_hw_vdf_freq: 1475
-chia_hw_vdf_mask: 1
+chia_hw_vdf_freq: 1100
+chia_hw_vdf_mask: 7
 
 # Seeder Config
 minimum_height: 240000
