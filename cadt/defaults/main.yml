@@ -32,6 +32,10 @@ cadt_is_governance_body: false
 cadt_read_only: false
 cadt_governance_body_id: 23f6498e015ebcd7190c97df30c032de8deb5c8934fc1caa928bc310e2b8a57e
 
+# Bind to port 127.0.0.1 by default. Change to public IP or "0.0.0.0" to listen
+# on public interface.
+cadt_bind_address: 127.0.0.1
+
 # Chia Datalayer RPC port
 chia_data_layer_rpc_port: 8562
 chia_wallet_rpc_port: 9256

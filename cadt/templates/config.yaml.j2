@@ -5,6 +5,7 @@ MIRROR_DB:
   DB_HOST: {{ cadt_db_host }}
 APP:
   CW_PORT: {{ cadt_port }}
+  BIND_ADDRESS: {{ cadt_bind_address }}
   DATALAYER_URL: https://localhost:{{ chia_data_layer_rpc_port }}
   WALLET_URL: https://localhost:{{ chia_wallet_rpc_port }}
   USE_SIMULATOR: false
