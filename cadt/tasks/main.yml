@@ -24,6 +24,7 @@
     update_cache: true
     cache_valid_time: 300
     state: "{{ (cadt_api_version == 'latest') | ternary('latest', 'present') }}"
+    allow_downgrade: true
   register: cadt_install
   notify: restart-cadt
   retries: 100
