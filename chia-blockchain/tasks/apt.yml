@@ -12,6 +12,7 @@
     update_cache: true
     cache_valid_time: 300
     state: "{{ (repo_ref == 'latest') | ternary('latest', 'present') }}"
+    allow_downgrade: true
   register: chia_install
   notify: restart-chia
   retries: 100

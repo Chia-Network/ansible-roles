@@ -9,7 +9,7 @@
         - 'vars'
 
 - name: Ensure old installation methods are cleaned up
-  become: yes
+  become: true
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
@@ -17,26 +17,27 @@
     - "/home/{{ user }}/bin/chia-exporter"
 
 - name: Chia Exporter Repository
-  become: yes
+  become: true
   ansible.builtin.apt_repository:
     repo: deb [arch={{ chia_exporter_repo_arch }} signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/chia-exporter/debian/ stable main
     update_cache: yes
 
 - name: Install Chia Exporter
-  become: yes
+  become: true
   ansible.builtin.apt:
     name:
       - "chia-exporter{{ ( chia_exporter_version == 'latest' ) | ternary('', '=' + chia_exporter_version) }}"
     update_cache: yes
     cache_valid_time: 300
     state: "{{ ( chia_exporter_version == 'latest' ) | ternary('latest', 'present') }}"
+    allow_downgrade: true
   notify: restart-chia-exporter
   register: apt_action
   retries: 100
   until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
 - name: Copy maxmind DB from S3
-  become: yes
+  become: true
   become_user: "{{ user }}"
   shell: |
     aws --no-progress s3 cp "s3://{{ maxmind_db_backup_bucket }}/{{ maxmind_db_name }}" "/home/{{ user }}/bin/{{ maxmind_db_name }}"
@@ -46,7 +47,7 @@
   when: download_maxmind_db
 
 - name: Chia Exporter Systemd Config
-  become: yes
+  become: true
   ansible.builtin.template:
     src: "chia-exporter.service.j2"
     dest: "/etc/systemd/system/{{ chia_exporter_service_name }}"
@@ -55,7 +56,7 @@
   notify: restart-chia-exporter
 
 - name: Ensure chia-exporter service is in desired boot and current state
-  become: yes
+  become: true
   ansible.builtin.systemd:
     name: "{{ chia_exporter_service_name }}"
     daemon_reload: yes
@@ -63,7 +64,7 @@
     state: "{{ chia_exporter_start_now | ternary('started','stopped') }}"
 
 - name: Add custom monit config to conf.d
-  become: yes
+  become: true
   ansible.builtin.template:
     src: monit_config.j2
     dest: /etc/monit/conf.d/chia_exporter_monit
@@ -71,7 +72,7 @@
   notify: restart-monit
 
 - name: Start Monit Service
-  become: yes
+  become: true
   ansible.builtin.service:
     name: monit
     state: started
