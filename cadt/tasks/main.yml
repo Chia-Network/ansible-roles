@@ -65,7 +65,7 @@
 - name: Create directory for CADT API include
   become: true
   ansible.builtin.file:
-    path: /etc/nginx/cadt_proxy_includes
+    path: /etc/nginx/proxy_includes
     state: directory
     mode: '0755'
     owner: "root"
@@ -78,7 +78,7 @@
   become: true
   ansible.builtin.template:
     src: cadt-proxy.inc.j2
-    dest: /etc/nginx/cadt_proxy_includes/cadt-api-proxy-{{ cadt_port }}.inc
+    dest: /etc/nginx/proxy_includes/cadt-api-proxy-{{ cadt_port }}.inc
     owner: root
     group: root
     mode: '0644'
@@ -95,7 +95,7 @@
     path: /etc/nginx/conf.d/{{ cadt_ui_hosts | first }}.conf
     state: present
     insertafter: '    index index.html;'
-    line: "    include /etc/nginx/cadt_proxy_includes/*.inc;"
+    line: "    include /etc/nginx/proxy_includes/*.inc;"
   when: ((cadt_api_hosts | difference(cadt_ui_hosts)) | length==0) and ((cadt_ui_hosts | difference(cadt_api_hosts)) | length==0)
   tags: cadt
   notify: Reload-nginx

@@ -53,3 +53,6 @@ cadt_network: "mainnet"
 backup_base_dir: /home/{{ user }}/backup
 backup_dir: "{{ backup_base_dir }}/{{ cadt_port }}"
 cadt_backup_bucket: cadt_backup_bucket
+
+# CHIA_ROOT used for config file path
+chia_root: "/home/ubuntu/.chia"

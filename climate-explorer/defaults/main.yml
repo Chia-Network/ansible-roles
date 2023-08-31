@@ -1,0 +1,33 @@
+---
+# This should be set as a host or group variable
+climate_explorer_api_hosts:
+  - api1.example.com
+  - api2.example.com
+climate_explorer_api_proxy: true
+climate_explorer_api_version: latest
+
+# Path to the climate_explorer API in the proxy - include leading and trailing slash
+climate_explorer_api_proxy_path: "/explorer/"
+
+# Set climate_explorer_ui_hosts to a blank array so we can compare it with climate_explorer_api_hosts.
+# If the UI is configured with the same playbook, this variable will be set to a value.
+# If the UI and API are hosted at the same domain, we need to setup Nginx differently.
+climate_explorer_ui_hosts: []
+
+user: ubuntu
+
+# Port that the climate_explorer API will listen on
+climate_explorer_port: 31313
+
+# Bind to port 127.0.0.1 by default. Change to public IP or "0.0.0.0" to listen
+# on public interface.
+climate_explorer_bind_address: 127.0.0.1
+
+climate_explorer_cadt_api_server_host: https://observer.climateactiondata.org/api/
+climate_explorer_cadt_api_key: null
+
+chia_full_node_rpc_port: 8555
+chia_wallet_rpc_port: 9256
+
+# CHIA_ROOT used for config file path
+chia_root: "/home/ubuntu/.chia"
