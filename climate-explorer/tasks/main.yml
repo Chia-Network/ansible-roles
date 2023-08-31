@@ -1,0 +1,151 @@
+---
+- name: Load architecture specific vars
+  ansible.builtin.include_vars: "{{ lookup('first_found', params) }}"
+  vars:
+    params:
+      files:
+        - '{{ansible_architecture}}.yml'
+      paths:
+        - 'vars'
+  tags: climate-explorer
+
+- name: Add Climate Repository
+  become: true
+  ansible.builtin.apt_repository:
+    repo: deb [arch={{ climate_explorer_repo_arch }} signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/climate-tokenization/debian/ stable main
+    update_cache: true
+  tags: climate-explorer
+
+- name: Install Climate Explorer
+  become: true
+  ansible.builtin.apt:
+    name:
+      - "climate-explorer-chia{{ (climate_explorer_api_version == 'latest') | ternary('', '=' + climate_explorer_api_version) }}"
+    update_cache: true
+    cache_valid_time: 300
+    state: "{{ (climate_explorer_api_version == 'latest') | ternary('latest', 'present') }}"
+    allow_downgrade: true
+  register: climate_explorer_install
+  notify: restart-climate-explorer
+  retries: 100
+  tags: climate-explorer
+
+- name: Ensure Climate Explorer is in desired boot and current state
+  become: true
+  ansible.builtin.systemd:
+    name: "climate-explorer-chia@{{ user }}.service"
+    daemon_reload: true
+    enabled: true
+    state: started
+  tags: climate-explorer
+
+- name: Wait for Climate Explorer config file to be present before continuing
+  ansible.builtin.wait_for:
+    path: "{{ chia_root }}/climate_token/config/config.yaml"
+    timeout: 20
+
+- name: Edit bind address in existing climate token driver config file
+  become: true
+  ansible.builtin.replace:
+    path: "{{ chia_root }}/climate_token/config/config.yaml"
+    regexp: 'SERVER_HOST: \d+\.\d+\.\d+\.\d+'
+    replace: "SERVER_HOST: {{ climate_explorer_bind_address }}"
+  tags: climate-explorer
+  notify: restart-climate-explorer
+
+- name: Edit CADT API host in existing climate token driver config file
+  become: true
+  ansible.builtin.replace:
+    path: "{{ chia_root }}/climate_token/config/config.yaml"
+    regexp: 'CADT_API_SERVER_HOST: .*'
+    replace: "CADT_API_SERVER_HOST: {{ climate_explorer_cadt_api_server_host }}"
+  tags: climate-explorer
+  notify: restart-climate-explorer
+
+- name: Edit CADT API host in existing climate token driver config file
+  become: true
+  ansible.builtin.replace:
+    path: "{{ chia_root }}/climate_token/config/config.yaml"
+    regexp: 'CADT_API_KEY.*'
+    replace: "CADT_API_KEY: {{ climate_explorer_cadt_api_key }}"
+  tags: climate-explorer
+  notify: restart-climate-explorer
+
+- name: Edit Chia full node rpc port in existing climate token driver config file
+  become: true
+  ansible.builtin.replace:
+    path: "{{ chia_root }}/climate_token/config/config.yaml"
+    regexp: 'CHIA_FULL_NODE_RPC_PORT: \d+'
+    replace: "CHIA_FULL_NODE_RPC_PORT: {{ chia_full_node_rpc_port }}"
+  tags: climate-explorer
+  notify: restart-climate-explorer
+
+- name: Edit Chia wallet rpc port in existing climate token driver config file
+  become: true
+  ansible.builtin.replace:
+    path: "{{ chia_root }}/climate_token/config/config.yaml"
+    regexp: 'CHIA_WALLET_RPC_PORT: \d+'
+    replace: "CHIA_WALLET_RPC_PORT: {{ chia_wallet_rpc_port }}"
+  tags: climate-explorer
+  notify: restart-climate-explorer
+
+- name: Create Nginx proxy for Climate Explorer
+  become: true
+  ansible.builtin.template:
+    src: climate-explorer.conf.j2
+    dest: /etc/nginx/conf.d/{{ climate_explorer_api_hosts | first }}.conf
+    owner: root
+    group: root
+    mode: '0644'
+  when: climate_explorer_api_proxy == true and ((climate_explorer_api_hosts | difference(cadt_ui_hosts)) | length>0)
+  tags: climate-explorer
+  notify: Reload-nginx
+
+- name: Create directory for Climate Explorer API include
+  become: true
+  ansible.builtin.file:
+    path: /etc/nginx/proxy_includes
+    state: directory
+    mode: '0755'
+    owner: "root"
+    group: "root"
+  when:
+    - climate_explorer_api_proxy == true
+  tags: climate-explorer
+
+- name: Template Nginx config for Climate Explorer API proxy
+  become: true
+  ansible.builtin.template:
+    src: climate-explorer-proxy.inc.j2
+    dest: /etc/nginx/proxy_includes/climate-explorer-api-proxy-{{ climate_explorer_port }}.inc
+    owner: root
+    group: root
+    mode: '0644'
+  when:
+    - climate_explorer_api_proxy == true
+  tags: climate-explorer
+  notify: Reload-nginx
+
+# If Climate Explorer domains are the same as the CADT-UI domains, use the existing CADT-UI Nginx file.
+# (this like should already exist in the UI .conf file, but just in case)
+- name: Add Climate Explorer proxy include into existing CADT-UI Nginx config (if hosted on the same domain)
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/nginx/conf.d/{{ cadt_ui_hosts | first }}.conf
+    state: present
+    insertafter: '    index index.html;'
+    line: "    include /etc/nginx/proxy_includes/*.inc;"
+  when: ((climate_explorer_api_hosts | difference(cadt_ui_hosts)) | length==0) and ((cadt_ui_hosts | difference(climate_explorer_api_hosts)) | length==0)
+  tags: climate-explorer
+  notify: Reload-nginx
+
+- name: Add custom monit config to conf.d for Climate Explorer
+  become: true
+  ansible.builtin.template:
+    src: monit_config.j2
+    dest: /etc/monit/conf.d/climate_explorer_monit_{{ user }}
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart-monit
+  tags: climate-explorer
