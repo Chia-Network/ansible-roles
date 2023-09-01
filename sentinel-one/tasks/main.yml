@@ -14,7 +14,9 @@
 #   tmp_aws_access_key
 #   tmp_aws_secret_key
 #   tmp_aws_session_token
-#   sentinelone_debian_installer
+#   sentinelone_bucket
+#   sentinelone_version
+# The sentinelone_arch variable is set automatically in the task above.
 - name: Download SentinelOne installer from private S3 bucket
   ansible.builtin.shell: "aws --no-progress s3 cp s3://{{ sentinelone_bucket }}/sentinelone/SentinelAgent{{ sentinelone_arch }}_linux_v{{ sentinelone_version }}.deb /tmp/SentinelAgent_linux_v{{ sentinelone_version }}.deb"
   args:
