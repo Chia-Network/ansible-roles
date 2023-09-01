@@ -1,0 +1,18 @@
+- name: HW VDF Repository
+  become: true
+  ansible.builtin.apt_repository:
+    repo: deb [arch={{ chia_repo_arch }} signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/chiavdf-hw/debian/ stable main
+    update_cache: true
+
+- name: Install HW VDF Client
+  become: true
+  ansible.builtin.apt:
+    name:
+      - "chiavdf-hw{{ (chia_hw_vdf_version == 'latest') | ternary('', '=' + chia_hw_vdf_version) }}"
+    update_cache: true
+    cache_valid_time: 300
+    state: "{{ (chia_hw_vdf_version == 'latest') | ternary('latest', 'present') }}"
+  register: hwvdf_install
+  notify: restart-chia
+  retries: 100
+  until: hwvdf_install is success or ('Failed to lock apt for exclusive operation' not in hwvdf_install.msg and '/var/lib/dpkg/lock' not in hwvdf_install.msg)

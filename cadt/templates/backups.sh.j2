@@ -33,7 +33,7 @@ nice -n 19 sqlite3 data_layer_mainnet.sqlite ".backup '{{ backup_dir }}/data_lay
 popd
 
 # Backup CADT db
-pushd {{ chia_root }}/climate-warehouse/v1/
+pushd {{ chia_root }}/cadt/v1/
 echo "*"
 echo "* Backing up CADT db"
 echo "*"

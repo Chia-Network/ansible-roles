@@ -1,6 +1,9 @@
 ---
 dependencies:
-  - role: chia-blockchain
   - role: monit
   - role: zip
   - role: sqlite3
+  # Setup the CADT-UI first if it uses the same domains as
+  # the CADT API so the UI can setup Nginx first.
+  - role: cadt-ui
+    when: ((cadt_api_hosts | difference(cadt_ui_hosts)) | length==0) and ((cadt_ui_hosts | difference(cadt_api_hosts)) | length==0)

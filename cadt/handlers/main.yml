@@ -2,7 +2,7 @@
 - name: restart-cadt
   become: true
   ansible.builtin.service:
-    name: cadt.service
+    name: cadt@{{ user }}.service
     state: restarted
 
 - name: systemd-reload

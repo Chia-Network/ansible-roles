@@ -12,7 +12,7 @@ WorkingDirectory=/home/{{ user }}/chia-blockchain
 Environment=PATH=/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/home/{{ user }}/chia-blockchain/venv/bin/chia_timelord_launcher
 {% else %}
-ExecStart=/bin/false
+ExecStart=/opt/chia/timelord_launcher
 {% endif %}
 User={{ user }}
 Group={{ group }}

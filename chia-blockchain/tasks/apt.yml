@@ -12,6 +12,7 @@
     update_cache: true
     cache_valid_time: 300
     state: "{{ (repo_ref == 'latest') | ternary('latest', 'present') }}"
+    allow_downgrade: true
   register: chia_install
   notify: restart-chia
   retries: 100
@@ -24,4 +25,4 @@
     chia init --fix-ssl-permissions
   environment:
     CHIA_ROOT: "{{ chia_root }}"
-  when: chia_install.changed
+  when: chia_install.changed or chia_force_init

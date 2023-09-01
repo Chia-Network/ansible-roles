@@ -2,7 +2,7 @@
 - name: Create directory for CADT UI files
   become: true
   ansible.builtin.file:
-    path: /var/www/{{ cadt_ui_host }}
+    path: /var/www/{{ cadt_ui_hosts | first }}
     state: directory
     mode: '0755'
     owner: "{{ user }}"
@@ -10,11 +10,26 @@
   when: cadt_ui_hosting == "local"
   tags: cadt-ui
 
-- name: Copy and uncompress CADT files
+# Create this directory to be used for the CADT API proxy files.  If CADT isn't
+# proxying, this directory is empty and won't do anything.  The cadt ansible role
+# will manage adding files to this directory and reloading Nginx.
+- name: Create directory for CADT API include
+  become: true
+  ansible.builtin.file:
+    path: /etc/nginx/cadt_proxy_includes
+    state: directory
+    mode: '0755'
+    owner: "root"
+    group: "root"
+  when:
+    - cadt_api_proxy == true
+  tags: cadt-ui
+
+- name: Copy and uncompress CADT UI files
   become: true
   ansible.builtin.unarchive:
-    src: https://github.com/Chia-Network/climate-warehouse-ui/releases/download/{{ cadt_ui_version }}/web-build.tar.gz
-    dest: /var/www/{{ cadt_ui_host }}
+    src: https://github.com/Chia-Network/cadt-ui/releases/{{ (cadt_api_version == 'latest') | ternary('latest/download', 'download/' +  cadt_ui_version )}}/cadt-ui-web-build.tar.gz
+    dest: /var/www/{{ cadt_ui_hosts | first }}
     owner: "{{ user }}"
     group: "{{ user }}"
     remote_src: true
@@ -50,8 +65,8 @@
 - name: Template Nginx config for CADT
   become: true
   ansible.builtin.template:
-    src: cadt.local.conf.j2
-    dest: /etc/nginx/conf.d/cadt.conf
+    src: cadt-ui.local.conf.j2
+    dest: /etc/nginx/conf.d/{{ cadt_ui_hosts | first }}.conf
     owner: root
     group: root
     mode: '0644'

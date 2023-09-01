@@ -26,10 +26,11 @@ chia_all_services:
   - farmer
   - full-node
   - harvester
+  - hw-vdf
   - introducer
   - seeder
   - timelord
-  - timelord-launcher # This is not present in the installers
+  - timelord-launcher
   - wallet
 
 # This is the list of services that should be enabled on boot and started now (if set to start now)
@@ -43,6 +44,10 @@ group: ubuntu
 
 chia_root: "/home/ubuntu/.chia"
 chia_root_to_env: true
+
+# If you are running Chia as multiple users, set this to true to force
+# the `chia init` process to run even if the install hasn't changed
+chia_force_init: false
 
 # Set the following vars if you need to run chia init with a specific CA
 chia_ca_crt: ""
@@ -101,10 +106,16 @@ exempt_peer_networks: []
 
 dns_servers:
   - "dns-introducer.chia.net"
+  - "chia.ctrlaltdel.ch"
+  - "seeder.dexie.space"
+  - "chia-seeder.h9.com"
+  - "chia.hoffmang.com"
+  - "seeder.xchpool.org"
 
 introducer_peer:
   host: introducer.chia.net
   port: 8444
+  enable_private_networks: false
 
 application: chia-blockchain
 # Currently only used for a vector label
@@ -126,6 +137,13 @@ keys: []
 # Harvester Settings
 plot_directories: []
 recursive_plot_scan: false
+chia_parallel_decompressor_count: 0
+chia_decompressor_thread_count: 0
+chia_harvester_disable_cpu_affinity: false
+chia_max_compression_level_allowed: 7
+chia_use_gpu_harvesting: false
+chia_gpu_index: 0
+chia_enforce_gpu_index: false
 
 # Pool Settings
 pool_xch_target_address: ""
@@ -137,6 +155,9 @@ farmer_xch_target_address: ""
 # Wallet Settings
 spam_filter_after_n_txs: 200
 xch_spam_amount: 1000000
+reuse_public_key_for_change: {}
+  #Add your wallet fingerprint here, this is an example.
+  #"2999502625": False
 
 # This is the network overrides section of config.yaml
 # When this runs, we attempt to pull the network overrides from the ref specified, but
@@ -169,7 +190,7 @@ network_overrides:
 
 # If set 'True', the timelord will create compact proofs of time, instead of
 # extending the chain.
-sanitizer_mode: "False"
+bluebox_mode: "False"
 
 # Number of VDF client processes to keep alive in the local machine.
 timelord_launcher_host: localhost
@@ -181,6 +202,22 @@ vdf_server_hostname: localhost
 
 # 'send_uncompact_interval' seconds. Set to 0 if you don't use this feature. Recommended is 300
 send_uncompact_interval: 0
+
+# HW VDF Config
+chia_enable_hw_vdf: false
+chia_hw_vdf_version: latest
+chia_hw_vdf_vdf_threads: 16
+chia_hw_vdf_proof_threads: 14
+chia_hw_vdf_freq: 1100
+# Mask: Enabled Core(s)
+# 1: 0
+# 2: 1
+# 3: 0,1
+# 4: 2
+# 5: 0,2
+# 6: 1,2
+# 7: 1,2,3
+chia_hw_vdf_mask: 7
 
 # Seeder Config
 minimum_height: 240000

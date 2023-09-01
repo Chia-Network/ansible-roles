@@ -6,6 +6,8 @@ vault_version: 1.12.2-1
 
 vault_api_addr: "https://vault.example.com:8200"
 vault_cluster_addr: "http://10.11.12.13:8201"
+vault_other_node_addresses: []
+#  - "http://10.11.12.14:8200"
 vault_data_path: "/opt/vault/data"
 vault_node_id: "vault00"
 

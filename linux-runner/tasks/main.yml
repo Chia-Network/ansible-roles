@@ -35,7 +35,6 @@
     src: "{{ runner_directory_path }}/actions-runner-linux-{{ runner_download_arch }}-{{ runner_release_version }}.tar.gz"
     dest: "{{ runner_directory_path }}"
     remote_src: yes
-    list_files: yes
     creates: "{{ runner_directory_path }}/svc.sh"
 
 - name: Ensure actions-runner directory has correct permissions
@@ -51,7 +50,7 @@
 - name: Configure the runner for GitHub
   become: yes
   become_user: "{{ runner_user }}"
-  shell: ./config.sh --url https://github.com/Chia-Network --token "{{ runner_registration_token }}" --runnergroup "{{ runner_github_group }}" --labels "{{ runner_tags }}" --name "{{ inventory_hostname }}" --unattended
+  ansible.builtin.command: ./config.sh --url https://github.com/Chia-Network --token "{{ runner_registration_token }}" --runnergroup "{{ runner_github_group }}" --labels "{{ runner_tags }}" --name "{{ inventory_hostname }}" --unattended
   args:
     chdir: "{{ runner_directory_path }}"
     creates: "{{ runner_directory_path }}/.runner"
@@ -62,8 +61,8 @@
 
 # The runner service becomes enabled in systemd after install
 - name: Install the runner service
-  shell: |
-    sudo ./svc.sh install
+  become: yes
+  ansible.builtin.command: ./svc.sh install {{ runner_user }}
   args:
     chdir: "{{ runner_directory_path }}"
     creates: "/etc/systemd/system/actions.runner.Chia-Network.{{ inventory_hostname }}.service"
@@ -72,13 +71,32 @@
 - debug:
     msg: "{{ install.stdout }}"
 
-- name: Start the runner service
-  shell: |
-    sudo ./svc.sh start
-    sudo ./svc.sh status
-  args:
-    chdir: "{{ runner_directory_path }}"
-  register: output
+- name: Add the post-run.sh script
+  become: yes
+  ansible.builtin.template:
+    src: post-run.sh
+    dest: "/home/{{ runner_user }}/post-run.sh"
+    owner: "{{ runner_user }}"
+    group: "{{ runner_group }}"
+    mode: "0755"
 
-- debug:
-    msg: "{{ output.stdout }}"
+- name: Add the .env file
+  become: yes
+  ansible.builtin.template:
+    src: "env"
+    dest: "{{ runner_directory_path }}/.env"
+    owner: "{{ runner_user }}"
+    group: "{{ runner_group }}"
+    mode: "0644"
+  notify: restart-runner
+
+- name: Ensure the service is in desired boot and current state
+  become: true
+  ansible.builtin.systemd:
+    name: "actions.runner.Chia-Network.{{ inventory_hostname }}.service"
+    daemon_reload: true
+    enabled: "true"
+    state: "started"
+  register: systemd_action
+  retries: 10
+  until: systemd_action is success

@@ -41,15 +41,11 @@
   environment:
     S1_AGENT_INSTALL_CONFIG_PATH: "/tmp/s1-config.cfg"
   when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
+  notify: Enable-SentinelOne
 
 # Don't leave the sensitive config file on the system after install
 - name: Remove SentinelOne installation configuration file
   ansible.builtin.file:
     path: /tmp/s1-config.cfg
     state: absent
-  become: true
-
-# Enable sentinelone, but do not have it start on the packer instance
-- name: Enable SentinelOne agent
-  ansible.builtin.command: "/opt/sentinelone/bin/sentinelctl control enable"
   become: true

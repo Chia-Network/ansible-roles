@@ -1,0 +1,11 @@
+---
+- name: restart-climate-explorer
+  become: true
+  ansible.builtin.service:
+    name: climate-explorer-chia@{{ user }}.service
+    state: restarted
+
+- name: systemd-reload
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: true
