@@ -35,6 +35,14 @@ cadt_governance_body_id: 23f6498e015ebcd7190c97df30c032de8deb5c8934fc1caa928bc31
 
 cadt_auto_subscribe_filestore: false
 
+cadt_audit_sync_task_interval: 30
+cadt_datamodel_sync_task_interval: 60
+cadt_governance_sync_task_interval: 180
+cadt_organization_meta_sync_task_interval: 300
+cadt_picklist_sync_task_interval: 30
+cadt_default_fee: 300000000 # mojos
+cadt_default_coin_amount: 300000000 # mojos
+
 # Bind to port 127.0.0.1 by default. Change to public IP or "0.0.0.0" to listen
 # on public interface.
 cadt_bind_address: 127.0.0.1
