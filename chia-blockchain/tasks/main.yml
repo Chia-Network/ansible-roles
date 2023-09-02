@@ -194,7 +194,9 @@
     owner: root
     group: root
     mode: "0644"
-  notify: restart-chia
+  notify:
+    - systemd-daemon-reload
+    - restart-chia
   with_items: "{{ chia_all_services }}"
 
 - name: Ensure services that are not supposed to be enabled are stopped and disabled in systemd

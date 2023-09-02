@@ -209,6 +209,8 @@ chia_hw_vdf_version: latest
 chia_hw_vdf_vdf_threads: 16
 chia_hw_vdf_proof_threads: 14
 chia_hw_vdf_freq: 1100
+# 0 will have the effect of not enabling it
+chia_hw_vdf_auto_freq_period: 0
 # Mask: Enabled Core(s)
 # 1: 0
 # 2: 1
@@ -216,8 +218,9 @@ chia_hw_vdf_freq: 1100
 # 4: 2
 # 5: 0,2
 # 6: 1,2
-# 7: 1,2,3
+# 7: 0,1,2
 chia_hw_vdf_mask: 7
+chia_hw_num_vdfs: "{{ '1' if chia_hw_vdf_mask in [1,2,4] else '2' if chia_hw_vdf_mask in [3,5,6] else '3' }}"
 
 # Seeder Config
 minimum_height: 240000
