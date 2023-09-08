@@ -12,6 +12,7 @@
     update_cache: true
     cache_valid_time: 300
     state: "{{ (chia_hw_vdf_version == 'latest') | ternary('latest', 'present') }}"
+    allow_downgrade: true
   register: hwvdf_install
   notify: restart-chia
   retries: 100
