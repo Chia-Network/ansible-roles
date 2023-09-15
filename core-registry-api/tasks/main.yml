@@ -1,0 +1,151 @@
+---
+- name: Load architecture specific vars
+  ansible.builtin.include_vars: "{{ lookup('first_found', params) }}"
+  vars:
+    params:
+      files:
+        - '{{ansible_architecture}}.yml'
+      paths:
+        - 'vars'
+  tags: core-registry-api
+
+- name: Add Climate Repository
+  become: true
+  ansible.builtin.apt_repository:
+    repo: deb [arch={{ climate_explorer_repo_arch }} signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/climate-tokenization/debian/ stable main
+    update_cache: true
+  tags: core-registry-api
+
+- name: Install Core Registry
+  become: true
+  ansible.builtin.apt:
+    name:
+      - "core-registry-api{{ (core_registry_api_version == 'latest') | ternary('', '=' + core_registry_api_version) }}"
+    update_cache: true
+    cache_valid_time: 300
+    state: "{{ (core_registry_api_version == 'latest') | ternary('latest', 'present') }}"
+    allow_downgrade: true
+  register: core_registry_api_install
+  notify: restart-core-registry-api
+  retries: 100
+  tags: core-registry-api
+
+- name: Ensure Core Registry is in desired boot and current state
+  become: true
+  ansible.builtin.systemd:
+    name: "core-registry-api@{{ user }}.service"
+    daemon_reload: true
+    enabled: true
+    state: started
+  tags: core-registry-api
+
+- name: Wait for Core Registry config file to be present before continuing
+  ansible.builtin.wait_for:
+    path: "{{ chia_root }}/climate_token/config/config.yaml"
+    timeout: 20
+
+- name: Edit bind address in existing climate token driver config file
+  become: true
+  ansible.builtin.replace:
+    path: "{{ chia_root }}/climate_token/config/config.yaml"
+    regexp: 'SERVER_HOST: \d+\.\d+\.\d+\.\d+'
+    replace: "SERVER_HOST: {{ climate_explorer_bind_address }}"
+  tags: core-registry-api
+  notify: restart-core-registry-api
+
+- name: Edit CADT API host in existing climate token driver config file
+  become: true
+  ansible.builtin.replace:
+    path: "{{ chia_root }}/climate_token/config/config.yaml"
+    regexp: 'CADT_API_SERVER_HOST: .*'
+    replace: "CADT_API_SERVER_HOST: {{ climate_explorer_cadt_api_server_host }}"
+  tags: core-registry-api
+  notify: restart-core-registry-api
+
+- name: Edit CADT API host in existing climate token driver config file
+  become: true
+  ansible.builtin.replace:
+    path: "{{ chia_root }}/climate_token/config/config.yaml"
+    regexp: 'CADT_API_KEY.*'
+    replace: "CADT_API_KEY: {{ climate_explorer_cadt_api_key }}"
+  tags: core-registry-api
+  notify: restart-core-registry-api
+
+- name: Edit Chia full node rpc port in existing climate token driver config file
+  become: true
+  ansible.builtin.replace:
+    path: "{{ chia_root }}/climate_token/config/config.yaml"
+    regexp: 'CHIA_FULL_NODE_RPC_PORT: \d+'
+    replace: "CHIA_FULL_NODE_RPC_PORT: {{ chia_full_node_rpc_port }}"
+  tags: core-registry-api
+  notify: restart-core-registry-api
+
+- name: Edit Chia wallet rpc port in existing climate token driver config file
+  become: true
+  ansible.builtin.replace:
+    path: "{{ chia_root }}/climate_token/config/config.yaml"
+    regexp: 'CHIA_WALLET_RPC_PORT: \d+'
+    replace: "CHIA_WALLET_RPC_PORT: {{ chia_wallet_rpc_port }}"
+  tags: core-registry-api
+  notify: restart-core-registry-api
+
+- name: Create Nginx proxy for Core Registry
+  become: true
+  ansible.builtin.template:
+    src: app.conf.j2
+    dest: /etc/nginx/conf.d/{{ core_registry_api_hosts | first }}.conf
+    owner: root
+    group: root
+    mode: '0644'
+  when: core_registry_api_proxy == true and ((core_registry_api_hosts | difference(cadt_ui_hosts)) | length>0)
+  tags: core-registry-api
+  notify: Reload-nginx
+
+- name: Create directory for Core Registry API include
+  become: true
+  ansible.builtin.file:
+    path: /etc/nginx/proxy_includes
+    state: directory
+    mode: '0755'
+    owner: "root"
+    group: "root"
+  when:
+    - core_registry_api_proxy == true
+  tags: core-registry-api
+
+- name: Template Nginx config for Core Registry API proxy
+  become: true
+  ansible.builtin.template:
+    src: proxy.inc.j2
+    dest: /etc/nginx/proxy_includes/core-registry-api-proxy-{{ climate_explorer_port }}.inc
+    owner: root
+    group: root
+    mode: '0644'
+  when:
+    - core_registry_api_proxy == true
+  tags: core-registry-api
+  notify: Reload-nginx
+
+# If Core Registry domains are the same as the CADT-UI domains, use the existing CADT-UI Nginx file.
+# (this like should already exist in the UI .conf file, but just in case)
+- name: Add Core Registry proxy include into existing CADT-UI Nginx config (if hosted on the same domain)
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/nginx/conf.d/{{ cadt_ui_hosts | first }}.conf
+    state: present
+    insertafter: '    index index.html;'
+    line: "    include /etc/nginx/proxy_includes/*.inc;"
+  when: ((core_registry_api_hosts | difference(cadt_ui_hosts)) | length==0) and ((cadt_ui_hosts | difference(core_registry_api_hosts)) | length==0)
+  tags: core-registry-api
+  notify: Reload-nginx
+
+- name: Add custom monit config to conf.d for Core Registry
+  become: true
+  ansible.builtin.template:
+    src: monit_config.j2
+    dest: /etc/monit/conf.d/climate_explorer_monit_{{ user }}
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart-monit
+  tags: core-registry-api

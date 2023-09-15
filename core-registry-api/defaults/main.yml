@@ -1,0 +1,33 @@
+---
+# This should be set as a host or group variable
+core_registry_api_hosts:
+  - api1.example.com
+  - api2.example.com
+core_registry_api_proxy: true
+core_registry_api_version: latest
+
+# Path to the core_registry_api API in the proxy - include leading and trailing slash
+core_registry_api_proxy_path: "/explorer/"
+
+# Set core_registry_ui_hosts to a blank array so we can compare it with core_registry_api_hosts.
+# If the UI is configured with the same playbook, this variable will be set to a value.
+# If the UI and API are hosted at the same domain, we need to setup Nginx differently.
+core_registry_ui_hosts: []
+
+user: ubuntu
+
+# Port that the core_registry_api API will listen on
+core_registry_api_port: 31313
+
+# Bind to port 127.0.0.1 by default. Change to public IP or "0.0.0.0" to listen
+# on public interface.
+core_registry_api_bind_address: 127.0.0.1
+
+core_registry_api_cadt_api_server_host: https://observer.climateactiondata.org/api/
+core_registry_api_cadt_api_key: null
+
+chia_full_node_rpc_port: 8555
+chia_wallet_rpc_port: 9256
+
+# CHIA_ROOT used for config file path
+chia_root: "/home/ubuntu/.chia"
