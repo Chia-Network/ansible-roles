@@ -2,9 +2,9 @@ server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
 
-    root /var/www/{{ cadt_ui_hosts | first }}/build;
+    root /var/www/{{ core_registry_ui_hosts | first }}/build;
 
-    server_name {{ cadt_ui_hosts | join( " " ) }};
+    server_name {{ core_registry_ui_hosts | join( " " ) }};
 
     ssl_certificate /etc/letsencrypt/live/{{ certbot_domains | first }}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/{{ certbot_domains | first }}/privkey.pem;
@@ -22,7 +22,7 @@ server {
 {% endif %}
 
     index index.html;
-    include /etc/nginx/cadt_proxy_includes/*.inc;
+    include /etc/nginx/proxy_includes/*.inc;
 
     location / {
         try_files $uri $uri/ =404;
