@@ -1,0 +1,12 @@
+LOG_PATH: climate_token/log/debug.log
+DB_PATH: climate_explorer/db/climate_activity_CHALLENGE.sqlite
+SERVER_HOST: {{ token_driver_bind_address }}
+BLOCK_START: 1500000
+BLOCK_RANGE: 10000
+MIN_DEPTH: 4
+CADT_API_SERVER_HOST: {{ token_driver_cadt_api_server_host }}
+CADT_API_KEY: {{ cadt_api_key }}
+CHIA_HOSTNAME: {{ chia_hostname }}
+CHIA_FULL_NODE_RPC_PORT: {{ chia_full_node_rpc_port }}
+CHIA_WALLET_RPC_PORT: {{ chia_wallet_rpc_port }}
+DEFAULT_FEE: 1000000000  # mojos

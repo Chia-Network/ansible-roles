@@ -1,11 +1,11 @@
-    location {{ climate_explorer_api_proxy_path }} {
+    location {{ proxy_path }} {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_pass http://127.0.0.1:{{ climate_explorer_port }}/;
+        proxy_pass http://127.0.0.1:{{ proxy_port }}/;
     }
 
-    location {{ climate_explorer_api_proxy_path }}socket.io {
+    location {{ proxy_path }}socket.io {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_pass http://127.0.0.1:{{ climate_explorer_port }}/socket.io;
+        proxy_pass http://127.0.0.1:{{ proxy_port }}/socket.io;
 
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
