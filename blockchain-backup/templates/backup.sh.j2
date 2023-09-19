@@ -61,7 +61,7 @@ log "Starting sub-epoch-summaries cache file upload to s3"
 (aws --no-progress s3 cp "/tmp/sub-epoch-summaries" "s3://{{ blockchain_backup_bucket }}/{{ network }}/sub-epoch-summaries" && log "Done uploading sub-epoch-summaries") &
 
 log "Compressing database..."
-(gzip -c "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite" >"/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" && log "Done compressing") &
+(pigz -c "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite" >"/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" && log "Done compressing") &
 
 log "Waiting for initial uploads and compression to complete..."
 wait
