@@ -1,0 +1,23 @@
+---
+core_registry_ui_version: "latest"
+
+# Where to host the UI - options are "local" or "s3"
+core_registry_ui_hosting: local
+
+# Use the same user and group variables as the chia-blockchain and cadt roles
+user: ubuntu
+group: ubuntu
+
+# No https:// or path - just domain.
+core_registry_ui_hosts:
+  - www.example.com
+  - site2.example.com
+
+# True or false
+core_registry_ui_use_nginx: true
+
+# True or false
+basic_authentication: false
+
+# True or false if Nginx will be proxying the CADT API
+core_registry_api_proxy: true

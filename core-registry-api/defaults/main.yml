@@ -110,4 +110,5 @@ climate_tokenization_port: 31312
 # Climate Tokenization Engine Settings
 #
 climate_tokenization_engine_api_proxy_path: "/engine/"
-climate_tokenization_engine_port:
+climate_tokenization_engine_port: 31311
+climate_tokenization_engine_api_key: null
