@@ -66,7 +66,7 @@
   become: true
   ansible.builtin.template:
     src: cadt-ui.local.conf.j2
-    dest: /etc/nginx/conf.d/{{ dore_registry_ui_hosts | first }}.conf
+    dest: /etc/nginx/conf.d/{{ core_registry_ui_hosts | first }}.conf
     owner: root
     group: root
     mode: '0644'
