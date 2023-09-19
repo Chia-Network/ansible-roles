@@ -113,10 +113,10 @@
     proxy_path: "{{ item.proxy_path }}"
     proxy_port: "{{ item.proxy_port }}"
   loop:
-    - "{ proxy_type: cadt, proxy_path: {{ cadt_api_proxy_path }}, proxy_port: {{ cadt_port }} }"
-    - "{ proxy_type: explorer, proxy_path: {{ climate_explorer_api_proxy_path }}, proxy_port: {{ climate_explorer_port }} }"
-    - "{ proxy_type: registry, proxy_path: {{ climate_tokenization_chia_api_proxy_path }}, proxy_port: {{ climate_tokenization_port }} }"
-    - "{ proxy_type: registry, proxy_path: {{ climate_tokenization_engine_api_proxy_path }}, proxy_port: {{ climate_tokenization_engine_port }} }"
+    - { proxy_type: 'cadt', proxy_path: "{{ cadt_api_proxy_path }}", proxy_port: "{{ cadt_port }}" }
+    - { proxy_type: 'explorer', proxy_path: "{{ climate_explorer_api_proxy_path }}", proxy_port: "{{ climate_explorer_port }}" }
+    - { proxy_type: 'registry', proxy_path: "{{ climate_tokenization_chia_api_proxy_path }}", proxy_port: "{{ climate_tokenization_port }}" }
+    - { proxy_type: 'engine', proxy_path: "{{ climate_tokenization_engine_api_proxy_path }}", proxy_port: "{{ climate_tokenization_engine_port }}" }
   when:
     - core_registry_api_proxy == true
   tags: core-registry-api
