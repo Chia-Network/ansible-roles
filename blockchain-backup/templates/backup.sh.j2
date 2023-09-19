@@ -75,10 +75,10 @@ log "Uploading compressed database to secondary backup bucket..."
 (aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" && log "Done uploading to secondary bucket") &
 
 log "Authenticating with b2 service"
-/usr/local/sbin/b2 authorize-account {{ b2_application_key_id }} {{ b2_application_key }}
+b2 authorize-account {{ b2_application_key_id }} {{ b2_application_key }}
 
 log "Uploading compressed database to b2 bucket..."
-(/usr/local/sbin/b2 upload-file --noProgress chia-public-databases "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "blockchain_{{ db_version }}_{{ network }}.sqlite.gz" && log "Done uploading to b2") &
+(b2 upload-file --noProgress chia-public-databases "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "blockchain_{{ db_version }}_{{ network }}.sqlite.gz" && log "Done uploading to b2") &
 
 {% endif %}
 {% endif %}
