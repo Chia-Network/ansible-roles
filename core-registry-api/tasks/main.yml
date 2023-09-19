@@ -57,7 +57,7 @@
 
 - name: Add token driver config file
   ansible.builtin.template:
-    src: "token-driver-config.yaml.j2"
+    src: "climate-token-config.yaml.j2"
     dest: "{{ chia_root }}/climate_token/config/config.yaml"
     owner: "{{ user }}"
     group: "{{ user }}"
