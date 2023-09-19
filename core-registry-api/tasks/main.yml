@@ -30,6 +30,20 @@
   retries: 100
   tags: core-registry-api
 
+- name: Create config directories
+  become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ user }}"
+    group: "{{ user }}"
+  loop:
+    - "{{ chia_root }}/cadt/v1/"
+    - "{{ chia_root }}/climate_token/config/"
+    - "{{ chia_root }}/climate-tokenization-engine/"
+  tags: core-registry-api
+
 - name: Add core registry CADT config file
   ansible.builtin.template:
     src: "cadt-config.yaml.j2"
