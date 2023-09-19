@@ -10,16 +10,16 @@ log "Starting backup"
 LOCK_FILE="/tmp/blockchain-backup.lock"
 
 cleanup() {
-	log "Removing lock file..."
-	rm -f "$LOCK_FILE"
 	log "Removing *.sqlite files..."
 	rm -f /tmp/*.sqlite
 	log "Removing *.sqlite.gz files..."
 	rm -f /tmp/*.sqlite.gz
-	log "Starting Chia..."
-	sudo systemctl start chia.target
-	log "Starting Monit..."
-	sudo systemctl start monit
+	log "Removing height-to-hash file..."
+	rm -f /tmp/height-to-hash
+	log "Removing sub-epoch-summaries file..."
+	rm -f /tmp/sub-epoch-summaries
+	log "Removing lock file..."
+	rm -f "$LOCK_FILE"
 	log "Done! Exiting..."
 }
 
@@ -32,38 +32,35 @@ trap cleanup EXIT
 
 touch $LOCK_FILE
 
-log "Stopping monit services..."
-sudo systemctl stop monit
-log "Stopping chia services..."
-sudo systemctl stop chia.target
+# In case this is a source install, load the venv
+if test -f /home/{{ user }}/chia-blockchain/venv/bin/activate; then
+	source /home/{{ user }}/chia-blockchain/venv/bin/activate || true
+fi
 
-count=1
-while :; do
-	processes=$(ps -aux | grep chia | grep -v grep | grep -v chia-exporter | grep -v chia-healthcheck | wc -l)
-	log "found $processes running chia processes. Waiting for all processes to stop..."
 
-	# Exit conditions
-	[[ $processes > 0 ]] || break
-	[[ $count -lt 30 ]] || exit 2
+log "Copying height-to-hash file..."
+cp "{{ chia_root }}/db/height-to-hash" /tmp/height-to-hash
 
-	count=$(expr $count + 1)
-	sleep 5
-done
+log "Copying sub-epoch-summaries file..."
+cp "{{ chia_root }}/db/sub-epoch-summaries" /tmp/sub-epoch-summaries
+
+log "Running chia db backup command..."
+chia db backup --backup_file /tmp/blockchain_{{ db_version }}_{{ network }}.sqlite
 
 log "Compressing database..."
-gzip -c "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite" >"/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
+gzip -c "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite" >"/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
 
 log "Starting database upload to s3 (uncompressed)..."
-aws --no-progress s3 cp "{{ chia_root }}/db/blockchain_{{ db_version }}_{{ network }}.sqlite" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite"
+aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite"
 
 log "Starting database upload to s3 (compressed)..."
 aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
 
 log "Starting height-to-hash cache file upload to s3"
-aws --no-progress s3 cp "{{ chia_root }}/db/height-to-hash" "s3://{{ blockchain_backup_bucket }}/{{ network }}/height-to-hash"
+aws --no-progress s3 cp "/tmp/height-to-hash" "s3://{{ blockchain_backup_bucket }}/{{ network }}/height-to-hash"
 
 log "Starting sub-epoch-summaries cache file upload to s3"
-aws --no-progress s3 cp "{{ chia_root }}/db/sub-epoch-summaries" "s3://{{ blockchain_backup_bucket }}/{{ network }}/sub-epoch-summaries"
+aws --no-progress s3 cp "/tmp/sub-epoch-summaries" "s3://{{ blockchain_backup_bucket }}/{{ network }}/sub-epoch-summaries"
 
 {% if network != "mainnet" %}
 {% if secondary_backup_bucket != "" %}
