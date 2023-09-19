@@ -39,10 +39,10 @@ fi
 
 # First, queue up a few copies/backups in the background, and then wait
 log "Copying height-to-hash file..."
-(cp "{{ chia_root }}/db/height-to-hash" /tmp/height-to-hash && log "Done copying height-to-hash file) &
+(cp "{{ chia_root }}/db/height-to-hash" /tmp/height-to-hash && log "Done copying height-to-hash file") &
 
 log "Copying sub-epoch-summaries file..."
-(cp "{{ chia_root }}/db/sub-epoch-summaries" /tmp/sub-epoch-summaries && log "Done copying sub-epoch-summaries file) &
+(cp "{{ chia_root }}/db/sub-epoch-summaries" /tmp/sub-epoch-summaries && log "Done copying sub-epoch-summaries file") &
 
 log "Running chia db backup command..."
 (chia db backup --backup_file /tmp/blockchain_{{ db_version }}_{{ network }}.sqlite && log "Completed chia db backup command") &

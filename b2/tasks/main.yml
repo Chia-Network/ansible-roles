@@ -1,10 +1,27 @@
 ---
-# Use self-contained b2 tool to interact with the Backblaze b2
-# object storage. See https://www.backblaze.com/b2/docs/quick_command_line.html
-# for more documentation.
-- name: Add b2 client
+# Installing from PIP to ensure this can also work on arm
+- name: Install python deps
+  become: yes
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-pip
+    update_cache: yes
+    cache_valid_time: 300
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
+- name: Install b2 from pip
   become: true
-  ansible.builtin.get_url:
-    url: https://github.com/Backblaze/B2_Command_Line_Tool/releases/latest/download/b2-linux
-    dest: /usr/local/sbin/b2
-    mode: '0755'
+  become_user: "{{ user }}"
+  ansible.builtin.pip:
+    name: b2
+    extra_args: --user
+
+- name: Ensure pip bin directory is in PATH
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.lineinfile:
+    path: "/home/{{ user }}/.bashrc"
+    line: "export PATH=/home/{{ user }}/.local/bin:$PATH"
