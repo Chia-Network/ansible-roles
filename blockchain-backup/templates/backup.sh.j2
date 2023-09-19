@@ -37,42 +37,53 @@ if test -f /home/{{ user }}/chia-blockchain/venv/bin/activate; then
 	source /home/{{ user }}/chia-blockchain/venv/bin/activate || true
 fi
 
+# First, queue up a few copies/backups in the background, and then wait
 log "Copying height-to-hash file..."
-cp "{{ chia_root }}/db/height-to-hash" /tmp/height-to-hash
+(cp "{{ chia_root }}/db/height-to-hash" /tmp/height-to-hash && log "Done copying height-to-hash file) &
 
 log "Copying sub-epoch-summaries file..."
-cp "{{ chia_root }}/db/sub-epoch-summaries" /tmp/sub-epoch-summaries
+(cp "{{ chia_root }}/db/sub-epoch-summaries" /tmp/sub-epoch-summaries && log "Done copying sub-epoch-summaries file) &
 
 log "Running chia db backup command..."
-chia db backup --backup_file /tmp/blockchain_{{ db_version }}_{{ network }}.sqlite
+(chia db backup --backup_file /tmp/blockchain_{{ db_version }}_{{ network }}.sqlite && log "Completed chia db backup command") &
 
-log "Compressing database..."
-gzip -c "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite" >"/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
+log "Waiting for background tasks to complete..."
+wait
 
+# Now, we can start the uncompressed uploads in the background while we work on compressing
 log "Starting database upload to s3 (uncompressed)..."
-aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite"
-
-log "Starting database upload to s3 (compressed)..."
-aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
+(aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite" && log "Done uploading to primary bucket uncompressed") &
 
 log "Starting height-to-hash cache file upload to s3"
-aws --no-progress s3 cp "/tmp/height-to-hash" "s3://{{ blockchain_backup_bucket }}/{{ network }}/height-to-hash"
+(aws --no-progress s3 cp "/tmp/height-to-hash" "s3://{{ blockchain_backup_bucket }}/{{ network }}/height-to-hash" && log "Done uploading height-to-hash") &
 
 log "Starting sub-epoch-summaries cache file upload to s3"
-aws --no-progress s3 cp "/tmp/sub-epoch-summaries" "s3://{{ blockchain_backup_bucket }}/{{ network }}/sub-epoch-summaries"
+(aws --no-progress s3 cp "/tmp/sub-epoch-summaries" "s3://{{ blockchain_backup_bucket }}/{{ network }}/sub-epoch-summaries" && log "Done uploading sub-epoch-summaries") &
+
+log "Compressing database..."
+(gzip -c "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite" >"/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" && log "Done compressing") &
+
+log "Waiting for initial uploads and compression to complete..."
+wait
+
+log "Starting database upload to s3 (compressed)..."
+(aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "s3://{{ blockchain_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" && log "Done uploading primary compressed version") &
 
 {% if network != "mainnet" %}
 {% if secondary_backup_bucket != "" %}
 log "Uploading compressed database to secondary backup bucket..."
-aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
+(aws --no-progress s3 cp "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "s3://{{ secondary_backup_bucket }}/{{ network }}/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" && log "Done uploading to secondary bucket") &
 
 log "Authenticating with b2 service"
 /usr/local/sbin/b2 authorize-account {{ b2_application_key_id }} {{ b2_application_key }}
 
 log "Uploading compressed database to b2 bucket..."
-/usr/local/sbin/b2 upload-file --noProgress chia-public-databases "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "blockchain_{{ db_version }}_{{ network }}.sqlite.gz"
+(/usr/local/sbin/b2 upload-file --noProgress chia-public-databases "/tmp/blockchain_{{ db_version }}_{{ network }}.sqlite.gz" "blockchain_{{ db_version }}_{{ network }}.sqlite.gz" && log "Done uploading to b2") &
 
 {% endif %}
 {% endif %}
+
+log "Waiting for secondary uploads to complete..."
+wait
 
 log "Backup Complete!"
