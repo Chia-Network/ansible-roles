@@ -37,7 +37,6 @@ if test -f /home/{{ user }}/chia-blockchain/venv/bin/activate; then
 	source /home/{{ user }}/chia-blockchain/venv/bin/activate || true
 fi
 
-
 log "Copying height-to-hash file..."
 cp "{{ chia_root }}/db/height-to-hash" /tmp/height-to-hash
 
