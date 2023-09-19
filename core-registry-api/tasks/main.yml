@@ -108,35 +108,14 @@
   tags: core-registry-api
   notify: Reload-nginx
 
-
-
-
-
-
-
-
-
-
-# If Core Registry domains are the same as the CADT-UI domains, use the existing CADT-UI Nginx file.
-# (this like should already exist in the UI .conf file, but just in case)
-- name: Add Core Registry proxy include into existing CADT-UI Nginx config (if hosted on the same domain)
-  become: true
-  ansible.builtin.lineinfile:
-    path: /etc/nginx/conf.d/{{ cadt_ui_hosts | first }}.conf
-    state: present
-    insertafter: '    index index.html;'
-    line: "    include /etc/nginx/proxy_includes/*.inc;"
-  when: ((core_registry_api_hosts | difference(cadt_ui_hosts)) | length==0) and ((cadt_ui_hosts | difference(core_registry_api_hosts)) | length==0)
-  tags: core-registry-api
-  notify: Reload-nginx
-
-- name: Add custom monit config to conf.d for Core Registry
-  become: true
-  ansible.builtin.template:
-    src: monit_config.j2
-    dest: /etc/monit/conf.d/core_registry_api_monit_{{ user }}
-    owner: root
-    group: root
-    mode: '0644'
-  notify: restart-monit
-  tags: core-registry-api
+# TO BE ADDED IN NEAR FUTURE
+# - name: Add custom monit configs to conf.d for Core Registry
+#   become: true
+#   ansible.builtin.template:
+#     src: monit_config.j2
+#     dest: /etc/monit/conf.d/core_registry_api_monit_{{ user }}
+#     owner: root
+#     group: root
+#     mode: '0644'
+#   notify: restart-monit
+#   tags: core-registry-api
