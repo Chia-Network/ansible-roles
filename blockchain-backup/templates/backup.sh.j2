@@ -15,6 +15,8 @@ cleanup() {
 	rm -f /tmp/*.sqlite
 	log "Removing *.sqlite.gz files..."
 	rm -f /tmp/*.sqlite.gz
+	log "Removing *.sqlite-journal files..."
+	rm -f /tmp/*.sqlite-journal
 	log "Removing height-to-hash file..."
 	rm -f /tmp/height-to-hash
 	log "Removing sub-epoch-summaries file..."
