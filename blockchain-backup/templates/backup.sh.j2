@@ -8,7 +8,7 @@ log() {
 log "Starting backup"
 
 LOCK_FILE="/tmp/blockchain-backup.lock"
-CHIA_ROOT="{{ chia_root }}"
+export CHIA_ROOT="{{ chia_root }}"
 
 cleanup() {
 	log "Removing *.sqlite files..."
