@@ -1,4 +1,4 @@
 ---
 dependencies:
   - role: nginx
-    when: cadt_ui_hosting == "local"
+    when: core_registry_ui_hosting == "local"
