@@ -103,7 +103,6 @@ climate_explorer_port: 31313
 #
 # Climate Tokenization Chia Settings (token driver in registry mode)
 #
-climate_tokenization_chia_api_proxy_path: "/registry/"
 climate_tokenization_port: 31312
 
 #
