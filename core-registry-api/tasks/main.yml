@@ -89,7 +89,7 @@
   tags: core-registry-api
   notify: Reload-nginx
 
-- name: Create directory for CADT API include
+- name: Create directory for API proxy include
   become: true
   ansible.builtin.file:
     path: /etc/nginx/proxy_includes
@@ -98,7 +98,7 @@
     owner: "root"
     group: "root"
   when:
-    - cadt_api_proxy == true
+    - core_registry_api_proxy == true
   tags: core-registry-api
 
 - name: Template Nginx config for API proxies
