@@ -251,3 +251,6 @@ chia_periodic_connect_interval:
   minute: "*/5"
   hour: "*"
 chia_periodic_connect_peers: []
+
+# Set to false to limit connections to trusted nodes only (like localhost)
+chia_wallet_connect_to_unknown_peers: true

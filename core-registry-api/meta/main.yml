@@ -1,0 +1,8 @@
+---
+dependencies:
+  - role: monit
+  - role: sqlite3
+  - role: core-registry-ui
+    when: ((core_registry_api_hosts | difference(core_registry_ui_hosts)) | length==0) and ((core_registry_ui_hosts | difference(core_registry_api_hosts)) | length==0)
+  - role: nginx
+    when: ((core_registry_api_hosts | difference(core_registry_ui_hosts)) | length>0) or ((core_registry_ui_hosts | difference(core_registry_api_hosts)) | length>0)

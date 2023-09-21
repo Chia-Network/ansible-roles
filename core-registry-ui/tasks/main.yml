@@ -1,19 +1,19 @@
 ---
-- name: Create directory for CADT UI files
+- name: Create directory for Core Registry UI files
   become: true
   ansible.builtin.file:
-    path: /var/www/{{ cadt_ui_hosts | first }}
+    path: /var/www/{{ core_registry_ui_hosts | first }}
     state: directory
     mode: '0755'
     owner: "{{ user }}"
     group: "{{ group }}"
-  when: cadt_ui_hosting == "local"
-  tags: cadt-ui
+  when: core_registry_ui_hosting == "local"
+  tags: core-registry-ui
 
-# Create this directory to be used for the CADT API proxy files.  If CADT isn't
-# proxying, this directory is empty and won't do anything.  The cadt ansible role
+# Create this directory to be used for the Core Registry API proxy files.  If core registry isn't
+# proxying, this directory is empty and won't do anything.  The core-registry-api ansible role
 # will manage adding files to this directory and reloading Nginx.
-- name: Create directory for CADT API include
+- name: Create directory for Core Registry API include
   become: true
   ansible.builtin.file:
     path: /etc/nginx/proxy_includes
@@ -22,19 +22,19 @@
     owner: "root"
     group: "root"
   when:
-    - cadt_api_proxy == true
-  tags: cadt-ui
+    - core_registry_api_proxy == true
+  tags: core-registry-ui
 
-- name: Copy and uncompress CADT UI files
+- name: Copy and uncompress Core Registry UI files
   become: true
   ansible.builtin.unarchive:
-    src: https://github.com/Chia-Network/cadt-ui/releases/{{ (cadt_api_version == 'latest') | ternary('latest/download', 'download/' +  cadt_ui_version )}}/cadt-ui-web-build.tar.gz
-    dest: /var/www/{{ cadt_ui_hosts | first }}
+    src: https://github.com/Chia-Network/core-registry-ui/releases/{{ (core_registry_ui_version == 'latest') | ternary('latest/download', 'download/' +  core_registry_ui_version )}}/core-registry-ui-web-build.tar.gz
+    dest: /var/www/{{ core_registry_ui_hosts | first }}
     owner: "{{ user }}"
     group: "{{ user }}"
     remote_src: true
-  when: cadt_ui_hosting == "local"
-  tags: cadt-ui
+  when: core_registry_ui_hosting == "local"
+  tags: core-registry-ui
 
 - name: Install htpasswd prerequisites for ansible
   become: true
@@ -48,7 +48,7 @@
   retries: 100
   until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
   when: basic_authentication
-  tags: cadt-ui
+  tags: core-registry-ui
 
 - name: Create htpasswd file for basic authentication
   become: true
@@ -60,16 +60,16 @@
     group: www-data
     mode: '0640'
   when: basic_authentication
-  tags: cadt-ui
+  tags: core-registry-ui
 
-- name: Template Nginx config for CADT
+- name: Template Nginx config for Core Registry
   become: true
   ansible.builtin.template:
     src: cadt-ui.local.conf.j2
-    dest: /etc/nginx/conf.d/{{ cadt_ui_hosts | first }}.conf
+    dest: /etc/nginx/conf.d/{{ core_registry_ui_hosts | first }}.conf
     owner: root
     group: root
     mode: '0644'
-  when: cadt_ui_hosting == "local"
-  tags: cadt-ui
+  when: core_registry_ui_hosting == "local"
+  tags: core-registry-ui
   notify: Reload-nginx

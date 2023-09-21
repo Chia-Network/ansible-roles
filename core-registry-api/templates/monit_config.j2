@@ -1,0 +1,9 @@
+check host cadt_{{ user }} with address 127.0.0.1
+    start program = "/bin/systemctl start cadt@{{ user }}" with timeout 600 seconds
+    stop program = "/bin/systemctl stop cadt@{{ user }}"
+    if failed
+        port {{ cadt_port }}
+        protocol http
+        request "/v1/projects"
+    then restart
+    if 5 restarts within 5 cycles then timeout

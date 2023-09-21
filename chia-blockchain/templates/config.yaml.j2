@@ -425,7 +425,7 @@ wallet:
   # configurable
   db_readers: 2
 
-  connect_to_unknown_peers: True
+  connect_to_unknown_peers: {{ chia_wallet_connect_to_unknown_peers }}
 
   initial_num_public_keys: 425
   reuse_public_key_for_change:

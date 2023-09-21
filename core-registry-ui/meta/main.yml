@@ -1,0 +1,4 @@
+---
+dependencies:
+  - role: nginx
+    when: core_registry_ui_hosting == "local"

@@ -1,0 +1,113 @@
+---
+#
+# Core Registy Settings
+#
+core_registry_api_version: latest
+
+# Set core_registry_ui_hosts to a blank array so we can compare it with core_registry_api_hosts.
+# If the UI is configured with the same playbook, this variable will be set to a value.
+# If the UI and API are hosted at the same domain, we need to setup Nginx differently.
+core_registry_ui_hosts: []
+
+core_registry_api_hosts:
+  - api1.example.com
+  - api2.example.com
+
+core_registry_api_proxy: true
+
+#
+# Chia Settings
+#
+
+user: ubuntu
+
+chia_hostname: localhost
+chia_full_node_rpc_port: 8555
+chia_wallet_rpc_port: 9256
+chia_data_layer_rpc_port: 8562
+
+# Datalayer HTTP location, including schema (http:// or https://).
+datalayer_http_location: "http://{{ core_registry_api_hosts | first }}:8575"
+
+# CHIA_ROOT used for config file path
+chia_root: "/home/ubuntu/.chia"
+
+#
+# CADT Settings
+#
+
+cadt_api_version: latest
+
+# Path to the CADT API in the proxy - include leading and trailing slash
+cadt_api_proxy_path: "/api/"
+
+# Any publicly available endpoint that is writeable
+# should have an api key set
+cadt_api_key: null
+
+# Set cadt_ui_hosts to a blank array so we can compare it with cadt_api_hosts.
+# If the UI is configured with the same playbook, this variable will be set to a value.
+# If the UI and API are hosted at the same domain, we need to setup Nginx differently.
+cadt_ui_hosts: []
+
+# Connection to MySQL database (optional)
+cadt_db_username: null
+cadt_db_password: null
+cadt_db_name: null
+cadt_db_host: null
+
+# Port that the CADT API will listen on
+cadt_port: 31310
+
+cadt_is_governance_body: false
+cadt_read_only: false
+cadt_governance_body_id: 23f6498e015ebcd7190c97df30c032de8deb5c8934fc1caa928bc310e2b8a57e
+
+cadt_auto_subscribe_filestore: false
+
+cadt_audit_sync_task_interval: 30
+cadt_datamodel_sync_task_interval: 60
+cadt_governance_sync_task_interval: 120
+cadt_organization_meta_sync_task_interval: 180
+cadt_picklist_sync_task_interval: 30
+cadt_default_fee: 300000000 # mojos
+cadt_default_coin_amount: 300000000 # mojos
+
+# Bind to port 127.0.0.1 by default. Change to public IP or "0.0.0.0" to listen
+# on public interface.
+cadt_bind_address: 127.0.0.1
+
+# Chia network as set in CADT (mainnet or testnet)
+cadt_network: "mainnet"
+
+# Backups
+backup_base_dir: /home/{{ user }}/backup
+backup_dir: "{{ backup_base_dir }}/{{ cadt_port }}"
+cadt_backup_bucket: cadt_backup_bucket
+
+#
+# Token Driver Settings
+#
+
+# This always has to be localhost for the climate-tokenization-chia
+# application that the climate tokenization engine relies on
+token_driver_bind_address: 127.0.0.1
+token_driver_cadt_api_server_host: "http://127.0.0.1:{{ cadt_port }}"
+
+#
+# Climate Explorer Settings
+#
+climate_explorer_api_proxy_path: "/explorer/"
+climate_explorer_port: 31313
+
+#
+# Climate Tokenization Chia Settings (token driver in registry mode)
+#
+climate_tokenization_port: 31312
+
+#
+# Climate Tokenization Engine Settings
+#
+climate_tokenization_engine_api_proxy_path: "/engine/"
+climate_tokenization_engine_port: 31311
+climate_tokenization_engine_api_key: null

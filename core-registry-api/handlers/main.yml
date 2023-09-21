@@ -1,0 +1,11 @@
+---
+- name: restart-core-registry-api
+  become: true
+  ansible.builtin.service:
+    name: core-registry-api@{{ user }}.service
+    state: restarted
+
+- name: systemd-reload
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: true
