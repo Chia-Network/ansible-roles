@@ -121,6 +121,15 @@
   tags: core-registry-api
   notify: Reload-nginx
 
+- name: Ensure Core Registry API is in desired boot and current state
+  become: true
+  ansible.builtin.systemd:
+    name: "core-registry-api@{{ user }}.service"
+    daemon_reload: true
+    enabled: true
+    state: started
+  tags: core-registry-api
+
 # TO BE ADDED IN NEAR FUTURE
 # - name: Add custom monit configs to conf.d for Core Registry
 #   become: true
