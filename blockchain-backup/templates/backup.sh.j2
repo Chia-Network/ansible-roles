@@ -21,6 +21,8 @@ cleanup() {
 	rm -f /tmp/height-to-hash
 	log "Removing sub-epoch-summaries file..."
 	rm -f /tmp/sub-epoch-summaries
+	log "Restarting chia"
+	sudo systemctl restart chia.target
 	log "Removing lock file..."
 	rm -f "$LOCK_FILE"
 	log "Done! Exiting..."
