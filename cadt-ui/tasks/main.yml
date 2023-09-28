@@ -16,7 +16,7 @@
 - name: Create directory for CADT API include
   become: true
   ansible.builtin.file:
-    path: /etc/nginx/proxy_includes
+    path: /etc/nginx/{{ cadt_api_hosts | first }}_proxy_includes
     state: directory
     mode: '0755'
     owner: "root"
