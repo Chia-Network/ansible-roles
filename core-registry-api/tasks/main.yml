@@ -105,7 +105,7 @@
   become: true
   ansible.builtin.template:
     src: proxy.inc.j2
-    dest: /etc/nginx/proxy_includes/{{ item.proxy_type }}-api-proxy-{{ item.proxy_port }}.inc
+    dest: /etc/nginx/{{ core_registry_api_hosts | first }}_proxy_includes/{{ item.proxy_type }}-api-proxy-{{ item.proxy_port }}.inc
     owner: root
     group: root
     mode: '0644'
