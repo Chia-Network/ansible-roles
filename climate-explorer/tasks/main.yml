@@ -104,7 +104,7 @@
 - name: Create directory for Climate Explorer API include
   become: true
   ansible.builtin.file:
-    path: /etc/nginx/proxy_includes
+    path: /etc/nginx/{{ climate_explorer_api_hosts | first }}_proxy_includes
     state: directory
     mode: '0755'
     owner: "root"
@@ -117,7 +117,7 @@
   become: true
   ansible.builtin.template:
     src: climate-explorer-proxy.inc.j2
-    dest: /etc/nginx/proxy_includes/climate-explorer-api-proxy-{{ climate_explorer_port }}.inc
+    dest: /etc/nginx/{{ climate_explorer_api_hosts | first }}_proxy_includes/climate-explorer-api-proxy-{{ climate_explorer_port }}.inc
     owner: root
     group: root
     mode: '0644'
@@ -134,7 +134,7 @@
     path: /etc/nginx/conf.d/{{ cadt_ui_hosts | first }}.conf
     state: present
     insertafter: '    index index.html;'
-    line: "    include /etc/nginx/proxy_includes/*.inc;"
+    line: "    include /etc/nginx/{{ climate_explorer_api_hosts | first }}_proxy_includes/*.inc;"
   when: ((climate_explorer_api_hosts | difference(cadt_ui_hosts)) | length==0) and ((cadt_ui_hosts | difference(climate_explorer_api_hosts)) | length==0)
   tags: climate-explorer
   notify: Reload-nginx

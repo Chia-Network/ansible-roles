@@ -20,6 +20,6 @@ server {
         try_files $uri $uri/ =404;
     }
 
-    include /etc/nginx/proxy_includes/*.inc;
+    include /etc/nginx/{{ cadt_api_hosts | first }}_proxy_includes/*.inc;
 
 }
