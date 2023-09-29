@@ -241,6 +241,7 @@ vector_start_now: true
 
 # monit service related
 chia_add_healthcheck_service: true
+chia_healthcheck_port: 9950
 add_monit_config: true
 monit_start_now: true
 # How many times the port check needs to fail before monit will restart the service

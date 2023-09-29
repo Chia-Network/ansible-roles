@@ -3,7 +3,8 @@ chia_healthcheck_version: latest
 chia_healthcheck_service_name: chia-healthcheck.service
 chia_healthcheck_start_on_boot: true
 chia_healthcheck_start_now: true
-chia_healthcheck_port: 9915
+chia_healthcheck_port: 9950
+chia_healthcheck_dns_hostname: ""
 
 user: ubuntu
 group: ubuntu

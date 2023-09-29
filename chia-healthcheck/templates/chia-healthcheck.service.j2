@@ -5,6 +5,7 @@ Description=Chia Healthcheck Service for {{ user }}
 Type=simple
 Environment=CHIA_ROOT={{ chia_root }}
 Environment=CHIA_HEALTHCHECK_HEALTHCHECK_PORT={{ chia_healthcheck_port }}
+Environment=CHIA_HEALTHCHECK_DNS_HOSTNAME={{ chia_healthcheck_dns_hostname }}
 ExecStart=/usr/local/bin/chia-healthcheck serve
 User={{ user }}
 Group={{ group }}
