@@ -30,7 +30,6 @@
       full_node_port: "{{ full_node_port }}"
       introducer_port: "{{ introducer_port }}"a
       chia_farmer_port: "{{ chia_farmer_port }}"
-      chia_wallet_port: "{{ chia_wallet_port }}"
       chia_full_node_rpc_port: "{{ chia_full_node_rpc_port }}"
       chia_farmer_rpc_port: "{{ chia_farmer_rpc_port }}"
       chia_harvester_rpc_port: "{{ chia_harvester_rpc_port }}"
