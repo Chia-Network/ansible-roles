@@ -34,7 +34,6 @@
       chia_farmer_rpc_port: "{{ chia_farmer_rpc_port }}"
       chia_harvester_rpc_port: "{{ chia_harvester_rpc_port }}"
       chia_wallet_rpc_port: "{{ chia_wallet_rpc_port }}"
-      chia_data_layer_port: "{{ chia_data_layer_port }}"
       chia_data_layer_rpc_port: "{{ chia_data_layer_rpc_port }}"
       chia_data_layer_host_port: "{{ chia_data_layer_host_port }}"
 

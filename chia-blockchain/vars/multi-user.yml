@@ -21,7 +21,6 @@ chia_full_node_rpc_port: "{{ 2000 + (chia_reserved_ports_per_user * (chia_multi_
 chia_farmer_rpc_port: "{{ 2000 + (chia_reserved_ports_per_user * (chia_multi_user_number - 1)) + 9 }}"
 chia_harvester_rpc_port: "{{ 2000 + (chia_reserved_ports_per_user * (chia_multi_user_number - 1)) + 10 }}"
 chia_wallet_rpc_port: "{{ 2000 + (chia_reserved_ports_per_user * (chia_multi_user_number - 1)) + 11 }}"
-chia_data_layer_port: "{{ 2000 + (chia_reserved_ports_per_user * (chia_multi_user_number - 1)) + 12 }}"
-# Crawler also uses the same port as data_layer by default, but its not currently a variable
+# chia_data_layer_port used to be here, but was not used. + 12 is now free again for a new port in the future
 chia_data_layer_rpc_port: "{{ 2000 + (chia_reserved_ports_per_user * (chia_multi_user_number - 1)) + 13 }}"
 chia_data_layer_host_port: "{{ 2000 + (chia_reserved_ports_per_user * (chia_multi_user_number - 1)) + 14 }}"
