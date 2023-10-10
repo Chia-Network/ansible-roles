@@ -32,7 +32,6 @@
       introducer_port: "{{ introducer_port }}"
       chia_timelord_port: "{{ chia_timelord_port }}"
       chia_farmer_port: "{{ chia_farmer_port }}"
-      chia_harvester_port: "{{ chia_harvester_port }}"
       chia_wallet_port: "{{ chia_wallet_port }}"
       chia_full_node_rpc_port: "{{ chia_full_node_rpc_port }}"
       chia_farmer_rpc_port: "{{ chia_farmer_rpc_port }}"

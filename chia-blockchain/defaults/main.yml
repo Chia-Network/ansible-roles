@@ -87,7 +87,6 @@ log_level: "ERROR"
 
 # Other ports, usually only needing to be changed if multiple instances are on the same host
 chia_daemon_port: 55400
-chia_harvester_port: 8448
 chia_harvester_rpc_port: 8560
 chia_farmer_port: 8447
 chia_farmer_rpc_port: 8559
