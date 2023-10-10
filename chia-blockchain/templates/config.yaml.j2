@@ -367,8 +367,9 @@ full_node:
   use_chia_loop_policy: True
 
 ui:
-  # The ui node server (if run) will run on this port
-  port: {{ chia_ui_port }}
+  # Which port to use to communicate with the full node
+  rpc_port: {{ chia_full_node_rpc_port }}
+
 
   # This SSH key is for the ui SSH server
   ssh_filename: config/ssh_host_key
