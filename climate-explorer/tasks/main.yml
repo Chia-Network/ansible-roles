@@ -48,8 +48,8 @@
   become: true
   ansible.builtin.replace:
     path: "{{ chia_root }}/climate_token/config/config.yaml"
-    regexp: 'SERVER_HOST: \d+\.\d+\.\d+\.\d+'
-    replace: "SERVER_HOST: {{ climate_explorer_bind_address }}"
+    regexp: 'CLIMATE_EXPLORER_SERVER_HOST: \d+\.\d+\.\d+\.\d+'
+    replace: "CLIMATE_EXPLORER_SERVER_HOST: {{ climate_explorer_bind_address }}"
   tags: climate-explorer
   notify: restart-climate-explorer
 
