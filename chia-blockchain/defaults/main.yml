@@ -91,7 +91,6 @@ chia_harvester_rpc_port: 8560
 chia_farmer_port: 8447
 chia_farmer_rpc_port: 8559
 chia_timelord_launcher_port: 8000
-chia_timelord_port: 8446
 chia_wallet_port: 8449
 chia_wallet_rpc_port: 9256
 chia_ui_port: 8222

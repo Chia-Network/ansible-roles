@@ -29,8 +29,7 @@
       chia_timelord_launcher_port: "{{ chia_timelord_launcher_port }}"
       chia_ui_port: "{{ chia_ui_port }}"
       full_node_port: "{{ full_node_port }}"
-      introducer_port: "{{ introducer_port }}"
-      chia_timelord_port: "{{ chia_timelord_port }}"
+      introducer_port: "{{ introducer_port }}"a
       chia_farmer_port: "{{ chia_farmer_port }}"
       chia_wallet_port: "{{ chia_wallet_port }}"
       chia_full_node_rpc_port: "{{ chia_full_node_rpc_port }}"

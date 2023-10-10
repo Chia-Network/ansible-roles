@@ -13,7 +13,7 @@ chia_timelord_launcher_port: "{{ 2000 + (chia_reserved_ports_per_user * (chia_mu
 chia_ui_port: "{{ 2000 + (chia_reserved_ports_per_user * (chia_multi_user_number - 1)) + 2 }}"
 full_node_port: "{{ 2000 + (chia_reserved_ports_per_user * (chia_multi_user_number - 1)) + 3 }}"
 introducer_port: "{{ 2000 + (chia_reserved_ports_per_user * (chia_multi_user_number - 1)) + 3 }}"
-chia_timelord_port: "{{ 2000 + (chia_reserved_ports_per_user * (chia_multi_user_number - 1)) + 4 }}"
+# chia_timelord_port used to be here, but was not used. + 4 is now free again for a new port in the future
 chia_farmer_port: "{{ 2000 + (chia_reserved_ports_per_user * (chia_multi_user_number - 1)) + 5 }}"
 # chia_harvester_port used to be here, but was not used. + 6 is now free again for a new port in the future
 chia_wallet_port: "{{ 2000 + (chia_reserved_ports_per_user * (chia_multi_user_number - 1)) + 7 }}"

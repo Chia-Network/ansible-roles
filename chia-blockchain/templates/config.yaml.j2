@@ -184,8 +184,6 @@ timelord_launcher:
   logging: *logging
 
 timelord:
-  # The timelord server (if run) will run on this port
-  port: {{ chia_timelord_port }}
   # Provides a list of VDF clients expected to connect to this timelord.
   # For each client, an IP is provided, together with the estimated iterations per second.
   vdf_clients:
