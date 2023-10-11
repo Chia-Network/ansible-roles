@@ -42,6 +42,7 @@
     - "{{ chia_root }}/cadt/v1/"
     - "{{ chia_root }}/climate_token/config/"
     - "{{ chia_root }}/climate-tokenization-engine/"
+    - "{{ chia_root }}/core-registry/"
   tags: core-registry-api
 
 - name: Add core registry CADT config file
@@ -70,6 +71,17 @@
   ansible.builtin.template:
     src: "climate-tokenization-engine-config.yaml.j2"
     dest: "{{ chia_root }}/climate-tokenization-engine/config.yaml"
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: '0644'
+  notify:
+    - restart-core-registry-api
+  tags: core-registry-api
+
+- name: Add core-registry unified config file
+  ansible.builtin.template:
+    src: "unified-config.yaml.j2"
+    dest: "{{ chia_root }}/core-registry/config.yaml"
     owner: "{{ user }}"
     group: "{{ user }}"
     mode: '0644'
