@@ -1,0 +1,55 @@
+GENERAL:
+  CORE_REGISTRY_MODE: true
+  LOG_LEVEL: info
+  LOG_RETENTION_DAYS: '30'
+CHIA:
+  DATALAYER_HOST: https://localhost:{{ chia_data_layer_rpc_port }}
+  WALLET_HOST: https://localhost:{{ chia_wallet_rpc_port }}
+  CERTIFICATE_FOLDER_PATH: null
+  ALLOW_SELF_SIGNED_CERTIFICATES: true
+  DATALAYER_FILE_SERVER_URL: {{ datalayer_http_location }}
+  DEFAULT_FEE: 300000000
+  DEFAULT_COIN_AMOUNT: 300000000
+CADT:
+  PROTOCOL: http
+  HOST: 127.0.0.1
+  PORT: {{ cadt_port }}
+  API_KEY: {{ cadt_api_key }}
+  BIND_ADDRESS: {{ cadt_bind_address }}
+  USE_SIMULATOR: false
+  READ_ONLY: {{ cadt_read_only }}
+  USE_DEVELOPMENT_MODE: false
+  IS_GOVERNANCE_BODY: {{ cadt_is_governance_body }}
+  AUTO_SUBSCRIBE_FILESTORE: {{ cadt_auto_subscribe_filestore }}
+  TASKS:
+    AUDIT_SYNC_TASK_INTERVAL: {{ cadt_audit_sync_task_interval }}
+    DATAMODEL_SYNC_TASK_INTERVAL: {{ cadt_datamodel_sync_task_interval }}
+    GOVERNANCE_SYNC_TASK_INTERVAL: {{ cadt_governance_sync_task_interval }}
+    ORGANIZATION_META_SYNC_TASK_INTERVAL: {{ cadt_organization_meta_sync_task_interval }}
+    PICKLIST_SYNC_TASK_INTERVAL: {{ cadt_organization_meta_sync_task_interval }}
+  MIRROR_DB:
+    DB_USERNAME: {{ cadt_db_username }}
+    DB_PASSWORD: {{ cadt_db_password }}
+    DB_NAME: {{ cadt_db_name }}
+    DB_HOST: {{ cadt_db_host }}
+  GOVERNANCE:
+    GOVERNANCE_BODY_ID: {{ cadt_governance_body_id }}
+RETIREMENT_EXPLORER:
+  PROTOCOL: http
+  HOST: 127.0.0.1
+  PORT: {{ climate_explorer_port }}
+  API_KEY: null
+CHIA_CLIMATE_TOKENIZATION:
+  PROTOCOL: http
+  HOST: 127.0.0.1
+  PORT: {{ climate_tokenization_port }}
+  API_KEY: null
+TOKENIZATION_ENGINE:
+  PROTOCOL: http
+  HOST: 127.0.0.1
+  API_KEY: {{ climate_tokenization_engine_api_key }}
+  PORT: {{ climate_tokenization_engine_port }}
+  BIND_ADDRESS: localhost
+  UNITS_FILTER: unitStatus:["Retired", "Cancelled", "Expired"]:not
+  TASKS:
+    SYNC_RETIREMENTS_TO_REGISTRY_INTERVAL_SECONDS: 300
