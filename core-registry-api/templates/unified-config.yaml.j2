@@ -1,6 +1,6 @@
 GENERAL:
   CORE_REGISTRY_MODE: true
-  LOG_LEVEL: info
+  LOG_LEVEL: {{ core_registry_log_level }}
   LOG_RETENTION_DAYS: '30'
 CHIA:
   DATALAYER_HOST: https://localhost:{{ chia_data_layer_rpc_port }}
