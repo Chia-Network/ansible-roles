@@ -1,0 +1,11 @@
+---
+# Bucket to pull plots from
+plots_pull_bucket: "chia.network.plots"
+# Subdir in the bucket to pull plots from. Must have trailing slash if used
+plots_pull_bucket_dir: "farmer1-beta1.8/"
+# The destination on the host to pull the plots to
+plots_pull_destination_dir: "/chia-plots/"
+# Max number of plots to pull from S3 (pulls up to this many plots, but may pull less if less exist in the bucket)
+plots_pull_max_count: 512
+user: ubuntu
+group: ubuntu

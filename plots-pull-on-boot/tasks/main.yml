@@ -1,0 +1,17 @@
+- name: Ensure the per-instance directory exists
+  become: true
+  ansible.builtin.file:
+    path: /var/lib/cloud/scripts/per-instance/
+    state: directory
+    owner: root
+    group: root
+    recurse: true
+
+- name: plots-pull.sh script
+  become: true
+  template:
+    src: "plots-pull.sh.j2"
+    dest: "/var/lib/cloud/scripts/per-instance/plots-pull.sh"
+    owner: root
+    group: root
+    mode: 0755

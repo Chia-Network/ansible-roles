@@ -1,0 +1,25 @@
+#!/bin/bash
+LOCK_FILE="/tmp/plots-pull.lock"
+LIST_FILE="/tmp/plots-pull-list.txt"
+
+cleanup() {
+	rm -f "$LOCK_FILE"
+	rm -f "$LIST_FILE"
+}
+
+if [ -e "$LOCK_FILE" ]; then
+	echo "Lock file exists, not pulling plots"
+	exit 1
+fi
+
+trap cleanup EXIT INT TERM
+
+touch $LOCK_FILE
+
+echo "Downloading plots from s3..."
+aws s3 ls s3://{{ plots_pull_bucket }}/{{ plots_pull_bucket_dir }} --recursive --human-readable | awk '{print $5}' | sed -n -e '2,{{ plots_pull_max_count + 1 }}p' > $LIST_FILE
+while read f; do
+	aws s3 cp "s3://{{ plots_pull_bucket }}/$f" "{{ plots_pull_destination_dir }}";
+done <$LIST_FILE
+
+chown -R "{{ user }}":"{{ group }}" "{{ plots_pull_destination_dir }}"
