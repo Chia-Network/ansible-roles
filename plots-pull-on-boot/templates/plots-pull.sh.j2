@@ -16,6 +16,8 @@ trap cleanup EXIT INT TERM
 
 touch $LOCK_FILE
 
+mkdir -p "{{ plots_pull_destination_dir }}"
+
 echo "Downloading plots from s3..."
 aws s3 ls s3://{{ plots_pull_bucket }}/{{ plots_pull_bucket_dir }} --recursive --human-readable | awk '{print $5}' | sed -n -e '2,{{ plots_pull_max_count + 1 }}p' >$LIST_FILE
 while read f; do
