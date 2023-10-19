@@ -14,6 +14,7 @@ core_registry_api_hosts:
   - api2.example.com
 
 core_registry_api_proxy: true
+core_registry_log_level: info
 
 #
 # Chia Settings
