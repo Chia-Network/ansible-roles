@@ -25,12 +25,6 @@
     - cadt_api_proxy == true
   tags: cadt-ui
 
-- name: Check if custom CADT UI web build exists in ansible
-  delegate_to: localhost
-  stat:
-    path: /tmp/cadt-ui-web-build.tar.gz
-  register: stat_custom_build
-
 - name: Copy and uncompress CADT UI files from Github
   become: true
   ansible.builtin.unarchive:
@@ -39,17 +33,17 @@
     owner: "{{ user }}"
     group: "{{ user }}"
     remote_src: true
-  when: cadt_ui_hosting == "local" and stat_custom_build == false
+  when: cadt_ui_hosting == "local" and cadt_ui_use_custom_build == false
   tags: cadt-ui
 
 - name: Upload custom CADT UI web build
   become: true
   ansible.builtin.copy:
-    src: files/cadt-ui-web-build.tar.gz
+    src: cadt-ui-web-build.tar.gz
     dest: /tmp/cadt-ui-web-build.tar.gz
     owner: "{{ user }}"
     group: "{{ user }}"
-  when: cadt_ui_hosting == "local" and stat_custom_build == true
+  when: cadt_ui_hosting == "local" and cadt_ui_use_custom_build == true
   tags: cadt-ui
 
 - name: Uncompress custom CADT UI tar.gz
@@ -60,7 +54,7 @@
     owner: "{{ user }}"
     group: "{{ user }}"
     remote_src: true
-  when: cadt_ui_hosting == "local" and stat_custom_build == true
+  when: cadt_ui_hosting == "local" and cadt_ui_use_custom_build == true
   tags: cadt-ui
 
 - name: Install htpasswd prerequisites for ansible
