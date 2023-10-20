@@ -1,0 +1,27 @@
+---
+# Checking this way since when things are actually mounted, ownership could change
+- name: Check for the mount path
+  ansible.builtin.stat:
+    path: "{{ drive_mount_path }}"
+  register: mount
+
+- name: Ensure the mount target exists
+  become: true
+  ansible.builtin.file:
+    path: "{{ drive_mount_path }}"
+    state: directory
+    owner: root
+    group: root
+    recurse: true
+  when:
+    - drive_mount_path | length > 0
+    - mount.stat.isdir is not defined or not mount.stat.isdir
+
+- name: Ensure the entry exists in fstab
+  become: true
+  ansible.posix.mount:
+    path: "{{ drive_mount_path }}"
+    src: "{{ drive_mount_src }}"
+    fstype: "{{ drive_filesystem }}"
+    opts: "{{ drive_mount_options }}"
+    state: "{{ drive_mount_now | ternary('mounted','present') }}"
