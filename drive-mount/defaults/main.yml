@@ -1,0 +1,16 @@
+# Source of the drive
+# UUID=abc123
+# /dev/disk/by-id/...
+# fs-abcd1234.efs.us-west-2.amazonaws.com:/
+drive_mount_src: ""
+
+# Where to mount the drive
+drive_mount_path: ""
+
+# ext4
+# nfs4
+# etc
+drive_filesystem: "nfs4"
+
+drive_mount_options: "defaults"
+drive_mount_now: yes
