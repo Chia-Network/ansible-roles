@@ -5,5 +5,6 @@ check host climate_explorer_{{ user }} with address 127.0.0.1
         port {{ climate_explorer_port }}
         protocol http
         request "/v1/activities?page=1&limit=3"
+        for 3 cycles
     then restart
     if 5 restarts within 5 cycles then timeout
