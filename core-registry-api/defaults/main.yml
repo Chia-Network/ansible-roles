@@ -101,6 +101,11 @@ token_driver_cadt_api_server_host: "http://127.0.0.1:{{ cadt_port }}"
 climate_explorer_api_proxy_path: "/explorer/"
 climate_explorer_port: 31313
 
+# This is the block number where climate explorer will start scanning for climate
+# tokens. Default of 1500000 appropriate for mainnet. If on a custom testnet,
+# setting as low as zero may be needed.
+climate_explorer_block_start: 1500000
+
 #
 # Climate Tokenization Chia Settings (token driver in registry mode)
 #

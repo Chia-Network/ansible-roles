@@ -1,7 +1,7 @@
 LOG_PATH: climate_token/log/debug.log
 DB_PATH: climate_explorer/db/climate_activity_CHALLENGE.sqlite
 CLIMATE_EXPLORER_SERVER_HOST: {{ token_driver_bind_address }}
-BLOCK_START: 1500000
+BLOCK_START: {{ climate_explorer_block_start }}
 BLOCK_RANGE: 10000
 MIN_DEPTH: 4
 CADT_API_SERVER_HOST: {{ token_driver_cadt_api_server_host }}

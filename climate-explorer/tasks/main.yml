@@ -53,6 +53,15 @@
   tags: climate-explorer
   notify: restart-climate-explorer
 
+- name: Edit BLOCK_START host in existing climate token driver config file
+  become: true
+  ansible.builtin.replace:
+    path: "{{ chia_root }}/climate_token/config/config.yaml"
+    regexp: 'BLOCK_START: .*'
+    replace: "BLOCK_START: {{ climate_explorer_block_start }}"
+  tags: climate-explorer
+  notify: restart-climate-explorer
+
 - name: Edit CADT API host in existing climate token driver config file
   become: true
   ansible.builtin.replace:
