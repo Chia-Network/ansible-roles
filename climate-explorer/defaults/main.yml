@@ -23,6 +23,11 @@ climate_explorer_port: 31313
 # on public interface.
 climate_explorer_bind_address: 127.0.0.1
 
+# This is the block number where climate explorer will start scanning for climate
+# tokens. Default of 1500000 appropriate for mainnet. If on a custom testnet,
+# setting as low as zero may be needed.
+climate_explorer_block_start: 1500000
+
 climate_explorer_cadt_api_server_host: https://observer.climateactiondata.org/api/
 climate_explorer_cadt_api_key: null
 
