@@ -83,6 +83,7 @@ chia_full_node_rpc_port: 8555
 introducer_port: 8444
 target_outbound_peer_count: 8
 target_peer_count: 80
+chia_max_inbound_wallet: 20
 log_level: "ERROR"
 
 # Other ports, usually only needing to be changed if multiple instances are on the same host
