@@ -302,7 +302,7 @@ full_node:
   exempt_peer_networks:
     {{ exempt_peer_networks | to_nice_yaml(indent=2) | indent(4) }}
   # Accept at most # of inbound connections for different node types.
-  max_inbound_wallet: 20
+  max_inbound_wallet: {{ chia_max_inbound_wallet }}
   max_inbound_farmer: 10
   max_inbound_timelord: 5
   # Only connect to peers who we have heard about in the last recent_peer_threshold seconds
