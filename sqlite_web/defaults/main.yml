@@ -1,0 +1,6 @@
+---
+user: ubuntu
+
+sqlite_web_port: 8080
+sqlite_web_url_prefix: ''
+sqlite_web_full_path_to_db: /home/{{ user }}/.chia/mainnet/cadt/v1/data.sqlite3

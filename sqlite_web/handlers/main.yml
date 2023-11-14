@@ -1,0 +1,11 @@
+---
+- name: restart-sqlite_web
+  become: true
+  ansible.builtin.service:
+    name: sqlite_web@{{ user }}.service
+    state: restarted
+
+- name: systemd-reload
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: true
