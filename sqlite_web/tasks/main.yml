@@ -1,0 +1,51 @@
+---
+- name: Install Python pip
+  become: true
+  ansible.builtin.apt:
+    name:
+      - python3-pip
+    update_cache: false
+    state: latest
+  retries: 100
+  tags: sqlite_web
+
+- name: Install sqlite_web with pip
+  become: true
+  ansible.builtin.pip:
+    name: sqlite_web
+    state: latest
+  notify: restart-sqlite_web
+  tags: sqlite_web
+
+- name: Copy systemd file for sqlite_web
+  become: true
+  ansible.builtin.copy:
+    src: sqlite_web@.service
+    dest: /etc/systemd/system/sqlite_web@.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: systemd-reload
+  tags: sqlite_web
+
+- name: Copy configuration file for sqlite_web
+  become: true
+  ansible.builtin.template:
+    src: sqlite_web.env
+    dest: /home/{{ user }}/.sqlite_web
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: '0644'
+  notify: restart-sqlite_web
+  tags: sqlite_web
+
+- name: Ensure sqlite_web is running and starts at boot
+  become: true
+  ansible.builtin.systemd:
+    name: "sqlite_web@{{ user }}.service"
+    daemon_reload: true
+    enabled: true
+    state: started
+  tags: sqlite_web
+
+

@@ -1,0 +1,35 @@
+#
+# sqlite-web init file for systemd. To start the service
+# using systemd, execute `systemctl start sqlite-web@<USERNAME>`
+# where <USERNAME> is the Linux user you wish to run
+# sqlite-web as. Normally you'll run this as the same
+# user who owns the sqlite db file you want to access
+# via a browser.
+#
+# For example, if you want to run sqlite as the
+# "ubuntu" user, the command would be:
+#
+# `systemctl start sqlite_web@ubuntu`
+#
+# Use the Environment file ~/.sqlite_web for the
+# user specified in the %i variable to specify
+# which sqlite file to view along with other
+# options.
+#
+
+[Unit]
+Description=SQLite Web GUI
+
+[Service]
+# Environment file is mandatory
+EnvironmentFile=/home/%i/.sqlite_web
+
+# sqlite_web executable
+ExecStart=/usr/local/bin/sqlite_web --no-browser --port $PORT --host $HOST --url-prefix $URL_PREFIX $FULL_PATH_TO_DB
+
+# Start the software with `systemctl start sqlite_web@username`
+User=%i
+Group=%i
+
+[Install]
+WantedBy=multi-user.target
