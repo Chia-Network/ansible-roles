@@ -30,6 +30,7 @@ climate_explorer_block_start: 1500000
 
 climate_explorer_cadt_api_server_host: https://observer.climateactiondata.org/api/
 climate_explorer_cadt_api_key: null
+climate_explorer_scan_all_organizations: false
 
 chia_full_node_rpc_port: 8555
 chia_wallet_rpc_port: 9256

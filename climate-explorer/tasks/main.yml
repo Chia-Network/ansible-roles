@@ -98,6 +98,15 @@
   tags: climate-explorer
   notify: restart-climate-explorer
 
+- name: Set organization scanning flag in existing climate token driver config file
+  become: true
+  ansible.builtin.replace:
+    path: "{{ chia_root }}/climate_token/config/config.yaml"
+    regexp: 'SCAN_ALL_ORGANIZATIONS: .*'
+    replace: "SCAN_ALL_ORGANIZATIONS: {{ climate_explorer_scan_all_organizations }}"
+  tags: climate-explorer
+  notify: restart-climate-explorer
+
 - name: Create Nginx proxy for Climate Explorer
   become: true
   ansible.builtin.template:
