@@ -2,6 +2,7 @@
 user: ubuntu
 
 sqlite_web_port: 8080
-sqlite_web_url_prefix: ''
 sqlite_web_full_path_to_db: /home/{{ user }}/.chia/mainnet/cadt/v1/data.sqlite3
 sqlite_web_host: 127.0.0.1
+# Add any extra flags to include. For example "--url-prefix /sqlite --password 12345"
+sqlite_web_extra_flags: ''

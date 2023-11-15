@@ -25,7 +25,7 @@ Description=SQLite Web GUI
 EnvironmentFile=/home/%i/.sqlite_web
 
 # sqlite_web executable
-ExecStart=/usr/local/bin/sqlite_web --no-browser --port $PORT --host $HOST --url-prefix $URL_PREFIX $FULL_PATH_TO_DB
+ExecStart=/usr/local/bin/sqlite_web --no-browser --port $PORT --host $HOST $EXTRA_FLAGS $FULL_PATH_TO_DB
 
 # Start the software with `systemctl start sqlite_web@username`
 User=%i
