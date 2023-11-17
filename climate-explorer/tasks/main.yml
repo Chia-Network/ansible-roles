@@ -36,7 +36,7 @@
     name: "climate-explorer-chia@{{ user }}.service"
     daemon_reload: true
     enabled: true
-    state: started
+    state: restarted
   tags: climate-explorer
 
 - name: Wait for Climate Explorer config file to be present before continuing

@@ -139,7 +139,7 @@
     name: "core-registry-api@{{ user }}.service"
     daemon_reload: true
     enabled: true
-    state: started
+    state: restarted
   tags: core-registry-api
 
 # TO BE ADDED IN NEAR FUTURE
