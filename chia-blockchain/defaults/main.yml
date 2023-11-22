@@ -210,6 +210,8 @@ chia_hw_vdf_version: latest
 chia_hw_vdf_vdf_threads: 16
 chia_hw_vdf_proof_threads: 14
 chia_hw_vdf_freq: 1100
+# 0 will have the effect of not setting this flag
+chia_hw_vdf_max_freq: 0
 # 0 will have the effect of not enabling it
 chia_hw_vdf_auto_freq_period: 0
 # Mask: Enabled Core(s)
