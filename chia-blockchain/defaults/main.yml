@@ -135,6 +135,10 @@ keys: []
 #  - "my words go here"
 #  - "my second words go here"
 
+chia_enable_profiler: false
+chia_enable_event_log: false
+chia_enable_memory_profiler: false
+
 # Harvester Settings
 plot_directories: []
 recursive_plot_scan: false
