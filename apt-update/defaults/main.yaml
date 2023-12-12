@@ -1,4 +1,3 @@
 ---
 apt_update_hold_items:
   - tailscale
-  - vault
