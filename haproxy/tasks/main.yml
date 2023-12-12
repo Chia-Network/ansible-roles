@@ -1,0 +1,13 @@
+---
+- name: Install HAProxy
+  become: yes
+  apt:
+    name: haproxy
+    state: present
+
+- name: Deploy HAProxy configuration
+  become: yes
+  template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+  notify: restart haproxy
