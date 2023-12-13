@@ -1,0 +1,4 @@
+# inside haproxy_role/defaults/main.yml or vars/main.yml
+haproxy_host_names: []
+
+haproxy_host_ips: []
