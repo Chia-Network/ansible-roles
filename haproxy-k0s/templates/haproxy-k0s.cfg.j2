@@ -46,9 +46,10 @@ frontend controllerJoinAPI
     mode tcp
     default_backend controllerJoinAPI_backend
 
-{% for i in range(haproxy_host_names | length) %}
+
 backend kubeAPI_backend
     mode tcp
+{% for i in range(haproxy_host_names | length) %}
     server {{ haproxy_host_names[i] }} {{ haproxy_host_ips[i] }}:6443 check check-ssl verify none
 {% endfor %}
 
