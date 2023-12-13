@@ -48,19 +48,19 @@ frontend controllerJoinAPI
 
 backend kubeAPI_backend
     mode tcp
-    server {{ haproxy-host-name-1 }} {{ haproxy-host-ip-1 }}:6443 check check-ssl verify none
-    server {{ haproxy-host-name-2 }} {{ haproxy-host-ip-2 }}:6443 check check-ssl verify none
-    server {{ haproxy-host-name-3 }} {{ haproxy-host-ip-3 }}:6443 check check-ssl verify none
+{% for host_name, host_ip in zip(haproxy_host_names, haproxy_host_ips) %}
+    server {{ host_name }} {{ host_ip }}:6443 check check-ssl verify none
+{% endfor %}
 backend konnectivity_backend
     mode tcp
-    server {{ haproxy-host-name-1 }} {{ haproxy-host-ip-1 }}:8132 check check-ssl verify none
-    server {{ haproxy-host-name-2 }} {{ haproxy-host-ip-2 }}:8132 check check-ssl verify none
-    server {{ haproxy-host-name-3 }} {{ haproxy-host-ip-3 }}:8132 check check-ssl verify none
+{% for host_name, host_ip in zip(haproxy_host_names, haproxy_host_ips) %}
+    server {{ host_name }} {{ host_ip }}:8132 check check-ssl verify none
+{% endfor %}
 backend controllerJoinAPI_backend
     mode tcp
-    server {{ haproxy-host-name-1 }} {{ haproxy-host-ip-1 }}:9443 check check-ssl verify none
-    server {{ haproxy-host-name-2 }} {{ haproxy-host-ip-2 }}:9443 check check-ssl verify none
-    server {{ haproxy-host-name-3 }} {{ haproxy-host-ip-3 }}:9443 check check-ssl verify none
+{% for host_name, host_ip in zip(haproxy_host_names, haproxy_host_ips) %}
+    server {{ host_name }} {{ host_ip }}:9443 check check-ssl verify none
+{% endfor %}
 
 listen stats
    bind *:9000

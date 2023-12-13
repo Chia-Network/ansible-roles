@@ -1,7 +1,4 @@
-haproxy-host-name-1: ""
-haproxy-host-name-2: ""
-haproxy-host-name-3: ""
+# inside haproxy_role/defaults/main.yml or vars/main.yml
+haproxy_host_names: []
 
-haproxy-host-ip-1: ""
-haproxy-host-ip-2: ""
-haproxy-host-ip-3: ""
+haproxy_host_ips: []
