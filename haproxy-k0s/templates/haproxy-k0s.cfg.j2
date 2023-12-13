@@ -46,20 +46,22 @@ frontend controllerJoinAPI
     mode tcp
     default_backend controllerJoinAPI_backend
 
+{% for i in range(haproxy_host_names | length) %}
 backend kubeAPI_backend
     mode tcp
-{% for host_name, host_ip in zip(haproxy_host_names, haproxy_host_ips) %}
-    server {{ host_name }} {{ host_ip }}:6443 check check-ssl verify none
+    server {{ haproxy_host_names[i] }} {{ haproxy_host_ips[i] }}:6443 check check-ssl verify none
 {% endfor %}
+
 backend konnectivity_backend
     mode tcp
-{% for host_name, host_ip in zip(haproxy_host_names, haproxy_host_ips) %}
-    server {{ host_name }} {{ host_ip }}:8132 check check-ssl verify none
+{% for i in range(haproxy_host_names | length) %}
+    server {{ haproxy_host_names[i] }} {{ haproxy_host_ips[i] }}:8132 check check-ssl verify none
 {% endfor %}
+
 backend controllerJoinAPI_backend
     mode tcp
-{% for host_name, host_ip in zip(haproxy_host_names, haproxy_host_ips) %}
-    server {{ host_name }} {{ host_ip }}:9443 check check-ssl verify none
+{% for i in range(haproxy_host_names | length) %}
+    server {{ haproxy_host_names[i] }} {{ haproxy_host_ips[i] }}:9443 check check-ssl verify none
 {% endfor %}
 
 listen stats
