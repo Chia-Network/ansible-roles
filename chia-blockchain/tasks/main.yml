@@ -166,6 +166,18 @@
     mode: "0644"
   notify: restart-chia
 
+# Since chia might have already been updated (via apt) from another user on this machine in some setups
+# We track the version as of the last time this role ran, and if it changes, we restart chia
+- name: Reference Version
+  become: true
+  ansible.builtin.template:
+    src: version.j2
+    dest: "{{ chia_root }}/.last-version"
+    owner: "{{ user }}"
+    group: "{{ group }}"
+    mode: "0644"
+  notify: restart-chia
+
 - name: Add Keys
   become: true
   become_user: "{{ user }}"
