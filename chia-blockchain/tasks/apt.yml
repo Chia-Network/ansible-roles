@@ -26,3 +26,18 @@
   environment:
     CHIA_ROOT: "{{ chia_root }}"
   when: chia_install.changed or chia_force_init
+
+# Since chia might have already been updated (via apt) from another user on this machine in some setups
+# We track the version as of the last time this role ran, and if it changes, we restart chia
+# Set the CHIA_DETECTED_VERSION var here for use in the template in main.yaml
+- name: Get installed chia version
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.shell: |
+    chia version
+  environment:
+    CHIA_ROOT: "{{ chia_root }}"
+  register: chia_version_output
+
+- set_fact:
+    CHIA_DETECTED_VERSION: "{{ chia_version_output.stdout }}"
