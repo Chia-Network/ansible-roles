@@ -1,0 +1,28 @@
+---
+climate_explorer_ui_version: "latest"
+
+# If true, use a custom-built Climate Explorer UI found in the /files
+# directory of this role. If false, download the web build
+# from Github with no custom flags.
+climate_explorer_ui_use_custom_build: false
+
+# Where to host the UI - options are "local" or "s3"
+climate_explorer_ui_hosting: local
+
+# Use the same user and group variables as the chia-blockchain and cadt roles
+user: ubuntu
+group: ubuntu
+
+# No https:// or path - just domain.
+climate_explorer_ui_hosts:
+  - www.example.com
+  - site2.example.com
+
+# True or false
+climate_explorer_ui_use_nginx: true
+
+# True or false
+basic_authentication: false
+
+# True or false if Nginx will be proxying the CADT API
+climate_explorer_api_proxy: true

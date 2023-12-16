@@ -1,0 +1,96 @@
+---
+- name: Create directory for Climate Explorer UI files
+  become: true
+  ansible.builtin.file:
+    path: /var/www/{{ climate_explorer_ui_hosts | first }}/explorer-ui
+    state: directory
+    mode: '0755'
+    owner: "{{ user }}"
+    group: "{{ group }}"
+  when: climate_explorer_ui_hosting == "local"
+  tags: climate-explorer-ui
+
+# Create this directory to be used for the Climate Explorer API proxy files.  If Climate Explorer isn't
+# proxying, this directory is empty and won't do anything.  The Climate Explorer ansible role
+# will manage adding files to this directory and reloading Nginx.
+- name: Create directory for Climate Explorer API include
+  become: true
+  ansible.builtin.file:
+    path: /etc/nginx/{{ climate_explorer_api_hosts | first }}_proxy_includes
+    state: directory
+    mode: '0755'
+    owner: "root"
+    group: "root"
+  when:
+    - climate_explorer_api_proxy == true
+  tags: climate-explorer-ui
+
+- name: Copy and uncompress Climate Explorer UI files from Github
+  become: true
+  ansible.builtin.unarchive:
+    src: https://github.com/Chia-Network/climate-explorer-ui/releases/{{ (climate_explorer_api_version == 'latest') | ternary('latest/download', 'download/' +  climate_explorer_ui_version )}}/climate-explorer-ui-web-build.tar.gz
+    dest: /var/www/{{ climate_explorer_ui_hosts | first }}/explorer-ui
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    remote_src: true
+  when: climate_explorer_ui_hosting == "local" and climate_explorer_ui_use_custom_build == false
+  tags: climate-explorer-ui
+
+- name: Upload custom Climate Explorer UI web build
+  become: true
+  ansible.builtin.copy:
+    src: climate-explorer-ui-web-build.tar.gz
+    dest: /tmp/climate-explorer-ui-web-build.tar.gz
+    owner: "{{ user }}"
+    group: "{{ user }}"
+  when: climate_explorer_ui_hosting == "local" and climate_explorer_ui_use_custom_build == true
+  tags: climate-explorer-ui
+
+- name: Uncompress custom Climate Explorer UI tar.gz
+  become: true
+  ansible.builtin.unarchive:
+    src: /tmp/climate-explorer-ui-web-build.tar.gz
+    dest: /var/www/{{ climate_explorer_ui_hosts | first }}/explorer-ui
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    remote_src: true
+  when: climate_explorer_ui_hosting == "local" and climate_explorer_ui_use_custom_build == true
+  tags: climate-explorer-ui
+
+- name: Install htpasswd prerequisites for ansible
+  become: true
+  ansible.builtin.apt:
+    pkg:
+      - python3-passlib
+    state: present
+    update_cache: true
+    cache_valid_time: 300
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+  when: basic_authentication
+  tags: climate-explorer-ui
+
+- name: Create htpasswd file for basic authentication
+  become: true
+  community.general.htpasswd:
+    path: /etc/nginx/.htpasswd
+    name: "{{ basic_authentication_user }}"
+    password: "{{ basic_authentication_password }}"
+    owner: root
+    group: www-data
+    mode: '0640'
+  when: basic_authentication
+  tags: climate-explorer-ui
+
+- name: Template Nginx config for Climate Explorer
+  become: true
+  ansible.builtin.template:
+    src: climate-explorer-ui.local.conf.j2
+    dest: /etc/nginx/conf.d/{{ climate_explorer_ui_hosts | first }}.conf
+    owner: root
+    group: root
+    mode: '0644'
+  when: climate_explorer_ui_hosting == "local"
+  tags: climate-explorer-ui
+  notify: Reload-nginx

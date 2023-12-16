@@ -1,0 +1,12 @@
+---
+- name: Template base Nginx config for climate apps
+  become: true
+  ansible.builtin.template:
+    src: climate-explorer-ui.local.conf.j2
+    dest: /etc/nginx/conf.d/{{ climate_explorer_ui_hosts | first }}.conf
+    owner: root
+    group: root
+    mode: '0644'
+  when: climate_explorer_ui_hosting == "local" or cadt_ui_hosting == "local"
+  tags: climate-explorer-ui
+  notify: Reload-nginx
