@@ -77,3 +77,11 @@
     name: monit
     state: started
   when: chia_exporter_add_monit_config and monit_start_now
+
+- name: Add logrotate script for validation time log files
+  become: yes
+  template:
+    src: block-times-logrotate.j2
+    dest: "/etc/logrotate.d/block-times-logrotate"
+    mode: '0644'
+  when: chia_exporter_log_block_times

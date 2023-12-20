@@ -8,7 +8,7 @@ Environment=CHIA_EXPORTER_METRICS_PORT={{ chia_exporter_port }}
 {% if download_maxmind_db == true %}
 Environment=CHIA_EXPORTER_MAXMIND_DB_PATH=/home/{{ user }}/bin/{{ maxmind_db_name }}
 {% endif %}
-ExecStart=/usr/local/bin/chia-exporter serve
+ExecStart=/usr/local/bin/chia-exporter serve {{ ' --log-block-times' if chia_exporter_log_block_times else '' }}
 User={{ user }}
 Group={{ group }}
 
