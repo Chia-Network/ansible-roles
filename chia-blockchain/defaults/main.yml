@@ -139,6 +139,7 @@ keys: []
 chia_enable_profiler: false
 chia_enable_event_log: false
 chia_enable_memory_profiler: false
+chia_db_sync: "auto"
 
 # Harvester Settings
 plot_directories: []
