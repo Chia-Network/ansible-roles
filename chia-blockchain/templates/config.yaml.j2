@@ -252,7 +252,7 @@ full_node:
   #         kernel panics
   # "auto"  on/off is decided based on a heuristic of how likely a failure is on
   #         the particular system we're running on. Defaults to "full".
-  db_sync: "auto"
+  db_sync: "{{ chia_db_sync }}"
 
   # the number of threads used to read from the blockchain database
   # concurrently. There's always only 1 writer, but the number of readers is
