@@ -1,0 +1,55 @@
+---
+- name: Create directory for Climate Explorer UI files
+  become: true
+  ansible.builtin.file:
+    path: /var/www/{{ climate_apps_domains | first }}/explorer-ui
+    state: directory
+    mode: '0755'
+    owner: "{{ user }}"
+    group: "{{ group }}"
+  when: climate_explorer_ui_hosting == "local"
+  tags: climate-explorer-ui
+
+- name: Copy and uncompress Climate Explorer UI files from Github
+  become: true
+  ansible.builtin.unarchive:
+    src: https://github.com/Chia-Network/climate-explorer-ui/releases/{{ (climate_explorer_api_version == 'latest') | ternary('latest/download', 'download/' +  climate_explorer_ui_version )}}/climate-explorer-ui-web-build.tar.gz
+    dest: /var/www/{{ climate_apps_domains | first }}/explorer-ui
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    remote_src: true
+  when: climate_explorer_ui_hosting == "local" and climate_explorer_ui_use_custom_build == false
+  tags: climate-explorer-ui
+
+- name: Upload custom Climate Explorer UI web build
+  become: true
+  ansible.builtin.copy:
+    src: climate-explorer-ui-web-build.tar.gz
+    dest: /tmp/climate-explorer-ui-web-build.tar.gz
+    owner: "{{ user }}"
+    group: "{{ user }}"
+  when: climate_explorer_ui_hosting == "local" and climate_explorer_ui_use_custom_build == true
+  tags: climate-explorer-ui
+
+- name: Uncompress custom Climate Explorer UI tar.gz
+  become: true
+  ansible.builtin.unarchive:
+    src: /tmp/climate-explorer-ui-web-build.tar.gz
+    dest: /var/www/{{ climate_apps_domains | first }}/explorer-ui
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    remote_src: true
+  when: climate_explorer_ui_hosting == "local" and climate_explorer_ui_use_custom_build == true
+  tags: climate-explorer-ui
+
+- name: Template Nginx config for Climate Explorer
+  become: true
+  ansible.builtin.template:
+    src: explorer_ui.inc.j2
+    dest: /etc/nginx/{{ climate_apps_domains | first }}_ui_includes/explorer_ui.inc
+    owner: root
+    group: root
+    mode: '0644'
+  when: climate_explorer_ui_hosting == "local"
+  tags: climate-explorer-ui
+  notify: Reload-nginx

@@ -14,7 +14,7 @@ user: ubuntu
 group: ubuntu
 
 # No https:// or path - just domain.
-cadt_ui_hosts:
+climate_apps_domains:
   - www.example.com
   - site2.example.com
 

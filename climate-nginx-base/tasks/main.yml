@@ -1,0 +1,62 @@
+---
+- name: Template base Nginx config for climate apps
+  become: true
+  ansible.builtin.template:
+    src: climate-apps.conf.j2
+    dest: /etc/nginx/conf.d/{{ climate_apps_domains | first }}.conf
+    owner: root
+    group: root
+    mode: '0644'
+  tags: climate-nginx-base
+  notify: Reload-nginx
+
+- name: Install htpasswd prerequisites for ansible
+  become: true
+  ansible.builtin.apt:
+    pkg:
+      - python3-passlib
+    state: present
+    update_cache: true
+    cache_valid_time: 300
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+  when: basic_authentication
+  tags: climate-nginx-base
+
+- name: Create htpasswd file for basic authentication
+  become: true
+  community.general.htpasswd:
+    path: /etc/nginx/.htpasswd
+    name: "{{ basic_authentication_user }}"
+    password: "{{ basic_authentication_password }}"
+    owner: root
+    group: www-data
+    mode: '0640'
+  when: basic_authentication
+  tags: climate-nginx-base
+  notify: Reload-nginx
+
+# Create this directory to be used for the Climate API proxy files.  If we aren't
+# proxying the APIs, this directory is empty and won't do anything.  The individual climate
+# app ansible roles will manage adding files to this directory and reloading Nginx.
+- name: Create directory for Climate Apps API include
+  become: true
+  ansible.builtin.file:
+    path: /etc/nginx/{{ climate_apps_domains | first }}_proxy_includes
+    state: directory
+    mode: '0755'
+    owner: "root"
+    group: "root"
+  tags: climate-nginx-base
+
+# Same as the API directory, but for Climate UI files
+- name: Create directory for Climate App UI files
+  become: true
+  ansible.builtin.file:
+    path: /etc/nginx/{{ climate_apps_domains | first }}_ui_includes
+    state: directory
+    mode: '0755'
+    owner: "root"
+    group: "root"
+  tags: climate-nginx-base

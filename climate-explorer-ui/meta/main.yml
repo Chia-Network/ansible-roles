@@ -1,0 +1,4 @@
+---
+dependencies:
+  - role: climate-nginx-base
+    when: climate_explorer_ui_hosting == "local"
