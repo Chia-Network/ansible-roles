@@ -46,7 +46,7 @@
   become: true
   ansible.builtin.template:
     src: cadt-ui.inc.j2
-    dest: /etc/nginx/{{ cclimate_apps_domains | first }}_ui_includes/cadt_ui.inc
+    dest: /etc/nginx/{{ climate_apps_domains | first }}_ui_includes/cadt_ui.inc
     owner: root
     group: root
     mode: '0644'
