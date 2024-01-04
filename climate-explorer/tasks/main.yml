@@ -107,53 +107,16 @@
   tags: climate-explorer
   notify: restart-climate-explorer
 
-- name: Create Nginx proxy for Climate Explorer
-  become: true
-  ansible.builtin.template:
-    src: climate-explorer.conf.j2
-    dest: /etc/nginx/conf.d/{{ climate_explorer_api_hosts | first }}.conf
-    owner: root
-    group: root
-    mode: '0644'
-  when: climate_explorer_api_proxy == true and ((climate_explorer_api_hosts | difference(cadt_ui_hosts)) | length>0)
-  tags: climate-explorer
-  notify: Reload-nginx
-
-- name: Create directory for Climate Explorer API include
-  become: true
-  ansible.builtin.file:
-    path: /etc/nginx/{{ climate_explorer_api_hosts | first }}_proxy_includes
-    state: directory
-    mode: '0755'
-    owner: "root"
-    group: "root"
-  when:
-    - climate_explorer_api_proxy == true
-  tags: climate-explorer
-
 - name: Template Nginx config for Climate Explorer API proxy
   become: true
   ansible.builtin.template:
     src: climate-explorer-proxy.inc.j2
-    dest: /etc/nginx/{{ climate_explorer_api_hosts | first }}_proxy_includes/climate-explorer-api-proxy-{{ climate_explorer_port }}.inc
+    dest: /etc/nginx/{{ climate_apps_domains | first }}_proxy_includes/climate-explorer-api-proxy-{{ climate_explorer_port }}.inc
     owner: root
     group: root
     mode: '0644'
   when:
     - climate_explorer_api_proxy == true
-  tags: climate-explorer
-  notify: Reload-nginx
-
-# If Climate Explorer domains are the same as the CADT-UI domains, use the existing CADT-UI Nginx file.
-# (this like should already exist in the UI .conf file, but just in case)
-- name: Add Climate Explorer proxy include into existing CADT-UI Nginx config (if hosted on the same domain)
-  become: true
-  ansible.builtin.lineinfile:
-    path: /etc/nginx/conf.d/{{ cadt_ui_hosts | first }}.conf
-    state: present
-    insertafter: '    index index.html;'
-    line: "    include /etc/nginx/{{ climate_explorer_api_hosts | first }}_proxy_includes/*.inc;"
-  when: ((climate_explorer_api_hosts | difference(cadt_ui_hosts)) | length==0) and ((cadt_ui_hosts | difference(climate_explorer_api_hosts)) | length==0)
   tags: climate-explorer
   notify: Reload-nginx
 

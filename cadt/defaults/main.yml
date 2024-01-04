@@ -13,11 +13,6 @@ cadt_api_proxy_path: "/api/"
 # should have an api key set
 cadt_api_key: null
 
-# Set cadt_ui_hosts to a blank array so we can compare it with cadt_api_hosts.
-# If the UI is configured with the same playbook, this variable will be set to a value.
-# If the UI and API are hosted at the same domain, we need to setup Nginx differently.
-cadt_ui_hosts: []
-
 user: ubuntu
 
 # Connection to MySQL database (optional)
@@ -52,7 +47,7 @@ chia_data_layer_rpc_port: 8562
 chia_wallet_rpc_port: 9256
 
 # Datalayer HTTP location, including schema (http:// or https://).
-datalayer_http_location: "http://{{ cadt_api_hosts | first }}:8575"
+datalayer_http_location: "http://{{ climate_apps_domains | first }}:8575"
 
 # Chia network
 cadt_network: "mainnet"
