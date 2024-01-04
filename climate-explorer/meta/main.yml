@@ -2,7 +2,5 @@
 dependencies:
   - role: monit
   - role: sqlite3
-  - role: cadt-ui
-    when: ((cadt_api_hosts | difference(cadt_ui_hosts)) | length==0) and ((cadt_ui_hosts | difference(cadt_api_hosts)) | length==0)
-  - role: nginx
-    when: ((cadt_api_hosts | difference(cadt_ui_hosts)) | length>0) or ((cadt_ui_hosts | difference(cadt_api_hosts)) | length>0)
+  - role: climate-nginx-base
+    when: climate_explorer_api_proxy

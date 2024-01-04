@@ -41,11 +41,6 @@ cadt_api_proxy_path: "/api/"
 # should have an api key set
 cadt_api_key: null
 
-# Set cadt_ui_hosts to a blank array so we can compare it with cadt_api_hosts.
-# If the UI is configured with the same playbook, this variable will be set to a value.
-# If the UI and API are hosted at the same domain, we need to setup Nginx differently.
-cadt_ui_hosts: []
-
 # Connection to MySQL database (optional)
 cadt_db_username: null
 cadt_db_password: null
