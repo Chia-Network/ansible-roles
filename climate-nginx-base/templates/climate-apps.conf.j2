@@ -2,7 +2,7 @@ server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
 
-    root /var/www/{{ climate_apps_domain | first }};
+    root /var/www/{{ climate_apps_domains | first }};
 
     server_name {{ climate_apps_domains | join( " " ) }};
 
