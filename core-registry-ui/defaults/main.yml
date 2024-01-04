@@ -9,9 +9,9 @@ user: ubuntu
 group: ubuntu
 
 # No https:// or path - just domain.
-core_registry_ui_hosts:
-  - www.example.com
-  - site2.example.com
+climate_apps_domains:
+  - climateapps.example.com
+  - secondary-apps.example.com
 
 # True or false
 core_registry_ui_use_nginx: true

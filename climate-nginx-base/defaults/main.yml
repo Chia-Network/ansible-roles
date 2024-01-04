@@ -1,0 +1,8 @@
+---
+climate_apps_domains:
+  - climateapps.example.com
+  - secondary-apps.example.com
+
+# True or false
+basic_authentication: false
+

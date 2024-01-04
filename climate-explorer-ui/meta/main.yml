@@ -1,4 +1,4 @@
 ---
 dependencies:
-  - role: nginx
-    when: cadt_ui_hosting == "local"
+  - role: climate-nginx-base
+    when: climate_explorer_ui_hosting == "local"

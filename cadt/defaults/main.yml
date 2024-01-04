@@ -1,6 +1,6 @@
 ---
 # This should be set as a host or group variable
-cadt_api_hosts:
+climate_apps_domains:
   - api1.example.com
   - api2.example.com
 cadt_api_proxy: true

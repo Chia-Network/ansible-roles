@@ -50,53 +50,16 @@
     - restart-cadt
   tags: cadt
 
-- name: Create Nginx proxy for CADT
-  become: true
-  ansible.builtin.template:
-    src: cadt.conf.j2
-    dest: /etc/nginx/conf.d/{{ cadt_api_hosts | first }}.conf
-    owner: root
-    group: root
-    mode: '0644'
-  when: cadt_api_proxy == true and ((cadt_api_hosts | difference(cadt_ui_hosts)) | length>0)
-  tags: cadt
-  notify: Reload-nginx
-
-- name: Create directory for CADT API include
-  become: true
-  ansible.builtin.file:
-    path: /etc/nginx/{{ cadt_api_hosts | first }}_proxy_includes
-    state: directory
-    mode: '0755'
-    owner: "root"
-    group: "root"
-  when:
-    - cadt_api_proxy == true
-  tags: cadt
-
 - name: Template Nginx config for CADT API proxy
   become: true
   ansible.builtin.template:
     src: cadt-proxy.inc.j2
-    dest: /etc/nginx/{{ cadt_api_hosts | first }}_proxy_includes/cadt-api-proxy-{{ cadt_port }}.inc
+    dest: /etc/nginx/{{ climate_apps_domains | first }}_proxy_includes/cadt-api-proxy-{{ cadt_port }}.inc
     owner: root
     group: root
     mode: '0644'
   when:
     - cadt_api_proxy == true
-  tags: cadt
-  notify: Reload-nginx
-
-# If CADT domains are the same as the CADT-UI domains, use the existing CADT-UI Nginx file.
-# (this like should already exist in the UI .conf file, but just in case)
-- name: Add CADT proxy include into existing CADT-UI Nginx config (if hosted on the same domain)
-  become: true
-  ansible.builtin.lineinfile:
-    path: /etc/nginx/conf.d/{{ cadt_ui_hosts | first }}.conf
-    state: present
-    insertafter: '    index index.html;'
-    line: "    include /etc/nginx/{{ cadt_api_hosts | first }}_proxy_includes/*.inc;"
-  when: ((cadt_api_hosts | difference(cadt_ui_hosts)) | length==0) and ((cadt_ui_hosts | difference(cadt_api_hosts)) | length==0)
   tags: cadt
   notify: Reload-nginx
 

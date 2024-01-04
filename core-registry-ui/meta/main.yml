@@ -1,4 +1,4 @@
 ---
 dependencies:
-  - role: nginx
+  - role: climate-nginx-base
     when: core_registry_ui_hosting == "local"

@@ -2,7 +2,7 @@
 - name: Create directory for CADT UI files
   become: true
   ansible.builtin.file:
-    path: /var/www/{{ cadt_ui_hosts | first }}
+    path: /var/www/{{ climate_apps_domains | first }}/cadt-ui
     state: directory
     mode: '0755'
     owner: "{{ user }}"
@@ -10,26 +10,11 @@
   when: cadt_ui_hosting == "local"
   tags: cadt-ui
 
-# Create this directory to be used for the CADT API proxy files.  If CADT isn't
-# proxying, this directory is empty and won't do anything.  The cadt ansible role
-# will manage adding files to this directory and reloading Nginx.
-- name: Create directory for CADT API include
-  become: true
-  ansible.builtin.file:
-    path: /etc/nginx/{{ cadt_api_hosts | first }}_proxy_includes
-    state: directory
-    mode: '0755'
-    owner: "root"
-    group: "root"
-  when:
-    - cadt_api_proxy == true
-  tags: cadt-ui
-
 - name: Copy and uncompress CADT UI files from Github
   become: true
   ansible.builtin.unarchive:
     src: https://github.com/Chia-Network/cadt-ui/releases/{{ (cadt_api_version == 'latest') | ternary('latest/download', 'download/' +  cadt_ui_version )}}/cadt-ui-web-build.tar.gz
-    dest: /var/www/{{ cadt_ui_hosts | first }}
+    dest: /var/www/{{ climate_apps_domains | first }}/cadt-ui
     owner: "{{ user }}"
     group: "{{ user }}"
     remote_src: true
@@ -50,44 +35,18 @@
   become: true
   ansible.builtin.unarchive:
     src: /tmp/cadt-ui-web-build.tar.gz
-    dest: /var/www/{{ cadt_ui_hosts | first }}
+    dest: /var/www/{{ climate_apps_domains | first }}/cadt-ui
     owner: "{{ user }}"
     group: "{{ user }}"
     remote_src: true
   when: cadt_ui_hosting == "local" and cadt_ui_use_custom_build == true
   tags: cadt-ui
 
-- name: Install htpasswd prerequisites for ansible
-  become: true
-  ansible.builtin.apt:
-    pkg:
-      - python3-passlib
-    state: present
-    update_cache: true
-    cache_valid_time: 300
-  register: apt_action
-  retries: 100
-  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
-  when: basic_authentication
-  tags: cadt-ui
-
-- name: Create htpasswd file for basic authentication
-  become: true
-  community.general.htpasswd:
-    path: /etc/nginx/.htpasswd
-    name: "{{ basic_authentication_user }}"
-    password: "{{ basic_authentication_password }}"
-    owner: root
-    group: www-data
-    mode: '0640'
-  when: basic_authentication
-  tags: cadt-ui
-
 - name: Template Nginx config for CADT
   become: true
   ansible.builtin.template:
-    src: cadt-ui.local.conf.j2
-    dest: /etc/nginx/conf.d/{{ cadt_ui_hosts | first }}.conf
+    src: cadt-ui.inc.j2
+    dest: /etc/nginx/{{ cclimate_apps_domains | first }}_ui_includes/cadt_ui.inc
     owner: root
     group: root
     mode: '0644'
