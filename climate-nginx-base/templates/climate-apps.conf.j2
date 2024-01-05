@@ -6,8 +6,8 @@ server {
 
     server_name {{ climate_apps_domains | join( " " ) }};
 
-    ssl_certificate /etc/letsencrypt/live/{{ climate_apps_domains | first }}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/{{ climate_apps_domains | first }}/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/{{ certbot_domains | first }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ certbot_domains | first }}/privkey.pem;
 
     # SSL configurations from letsencrypt
     include /etc/nginx/snippets/options-ssl-nginx.conf;
