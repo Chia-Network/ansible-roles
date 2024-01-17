@@ -1,4 +1,5 @@
-# inside haproxy_role/defaults/main.yml or vars/main.yml
 haproxy_host_names: []
-
-haproxy_host_ips: []
+#  - name: examplename
+#    ip: 1.2.3.4
+#  - name: anothername
+#    ip: 6.7.8.9
