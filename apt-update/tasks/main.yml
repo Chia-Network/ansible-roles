@@ -9,6 +9,12 @@
   register: apt_action
   retries: 100
   until: apt_action is success or ('locked by another process' not in apt_action.msg)
+  # This PR https://github.com/ansible/ansible/pull/81406
+  # Made this step fail if a package was unknown. We have a list of packages that may not necessarily be on all hosts
+  # and we want this to not fail just because a package doesn't exist for a particular host
+  failed_when:
+    - apt_action.failed
+    - '"Failed to find package" not in apt_action.msg'
 
 - name: Ensure apt packages are all up to date
   become: true
@@ -30,3 +36,9 @@
   register: apt_action
   retries: 100
   until: apt_action is success or ('locked by another process' not in apt_action.msg)
+  # This PR https://github.com/ansible/ansible/pull/81406
+  # Made this step fail if a package was unknown. We have a list of packages that may not necessarily be on all hosts
+  # and we want this to not fail just because a package doesn't exist for a particular host
+  failed_when:
+    - apt_action.failed
+    - '"Failed to find package" not in apt_action.msg'
