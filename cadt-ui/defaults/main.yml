@@ -18,6 +18,9 @@ climate_apps_domains:
   - www.example.com
   - site2.example.com
 
+# Include leading and trailing slashes
+cadt_ui_subdir: "/"
+
 # True or false
 cadt_ui_use_nginx: true
 

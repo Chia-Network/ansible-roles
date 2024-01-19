@@ -18,6 +18,9 @@ climate_apps_domains:
   - climateapps.example.com
   - secondary-apps.example.com
 
+# Include leading and trailing slashes
+climate_explorer_ui_subdir: "/explorer-ui/"
+
 # True or false
 climate_explorer_ui_use_nginx: true
 
