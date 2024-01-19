@@ -30,11 +30,13 @@ cadt_governance_body_id: 23f6498e015ebcd7190c97df30c032de8deb5c8934fc1caa928bc31
 
 cadt_auto_subscribe_filestore: false
 
-cadt_audit_sync_task_interval: 30
-cadt_datamodel_sync_task_interval: 60
-cadt_governance_sync_task_interval: 180
-cadt_organization_meta_sync_task_interval: 300
-cadt_picklist_sync_task_interval: 30
+# Tasks time staggered to avoid simultaneous RPC calls
+cadt_audit_sync_task_interval: 30  # kept for legacy installs - no longer used in latest
+cadt_datamodel_sync_task_interval: 60 # kept for legacy installs - no longer used in latest
+cadt_governance_sync_task_interval: 3600
+cadt_organization_meta_sync_task_interval: 61
+cadt_picklist_sync_task_interval: 3611
+cadt_mirror_check_task_interval: 10803
 cadt_default_fee: 300000000 # mojos
 cadt_default_coin_amount: 300000000 # mojos
 
