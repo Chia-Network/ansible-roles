@@ -6,7 +6,7 @@
 # In the sentinelone folder should be all the installers
 # with the default names as provided from SentinelOne
 sentinelone_bucket: "SENTINELONE-INSTALLER-BUCKET-NAME"
-sentinelone_version: "23_3_2_11"
+sentinelone_version: "22_3_3_11"
 sentinelone_token: "SECRET_SENTINEL_ONE_SERVICE_TOKEN"
 sentinelone_type: "server" # Enter "server" or "desktop"
 
