@@ -18,7 +18,7 @@
 #   sentinelone_version
 # The sentinelone_arch variable is set automatically in the task above.
 - name: Download SentinelOne installer from private S3 bucket
-  ansible.builtin.shell: "aws --no-progress s3 cp s3://{{ sentinelone_bucket }}/sentinelone/SentinelAgent{{ sentinelone_arch }}_linux_v{{ sentinelone_version }}.deb /tmp/SentinelAgent_linux_v{{ sentinelone_version }}.deb"
+  ansible.builtin.shell: "aws --no-progress s3 cp s3://{{ sentinelone_bucket }}/SentinelAgent{{ sentinelone_arch }}_linux_v{{ sentinelone_version }}.deb /tmp/SentinelAgent_linux_v{{ sentinelone_version }}.deb"
   args:
     creates: /tmp/SentinelAgent_linux_v{{ sentinelone_version }}.deb
   become: true
