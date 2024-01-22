@@ -1,12 +1,15 @@
 ---
-- name: Create directory for Climate Explorer UI files
+- name: Create directories for Climate Explorer UI files
   become: true
   ansible.builtin.file:
-    path: /var/www/{{ climate_apps_domains | first }}/explorer-ui
+    path: "{{ item }}"
     state: directory
     mode: '0755'
     owner: "{{ user }}"
     group: "{{ group }}"
+  loop:
+    - "/var/www/{{ climate_apps_domains | first }}/explorer-ui"
+    - "/tmp/explorer-ui"
   when: climate_explorer_ui_hosting == "local"
   tags: climate-explorer-ui
 
@@ -14,7 +17,18 @@
   become: true
   ansible.builtin.unarchive:
     src: https://github.com/Chia-Network/climate-explorer-ui/releases/{{ (climate_explorer_api_version == 'latest') | ternary('latest/download', 'download/' +  climate_explorer_ui_version )}}/climate-explorer-ui-web-build.tar.gz
-    dest: /var/www/{{ climate_apps_domains | first }}/explorer-ui
+    dest: /tmp/explorer-ui
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    remote_src: true
+  when: climate_explorer_ui_hosting == "local" and climate_explorer_ui_use_custom_build == false
+  tags: climate-explorer-ui
+
+- name: Move Climate Explorer UI files to final location
+  become: true
+  ansible.builtin.unarchive:
+    src: /tmp/explorer-ui/build/
+    dest: /var/www/{{ climate_apps_domains | first }}/explorer-ui/
     owner: "{{ user }}"
     group: "{{ user }}"
     remote_src: true
