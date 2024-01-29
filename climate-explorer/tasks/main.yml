@@ -98,6 +98,15 @@
   tags: climate-explorer
   notify: restart-climate-explorer
 
+- name: Configure port climate explorer listens on
+  become: true
+  ansible.builtin.replace:
+    path: "{{ chia_root }}/climate_token/config/config.yaml"
+    regexp: 'CLIMATE_EXPLORER_PORT: \d+'
+    replace: "CLIMATE_EXPLORER_PORT: {{ climate_explorer_port }}"
+  tags: climate-explorer
+  notify: restart-climate-explorer
+
 - name: Set organization scanning flag in existing climate token driver config file
   become: true
   ansible.builtin.replace:
