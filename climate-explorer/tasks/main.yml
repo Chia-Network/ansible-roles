@@ -139,3 +139,12 @@
     mode: '0644'
   notify: restart-monit
   tags: climate-explorer
+
+- name: Always restart Climate Explorer to ensure latest config changes are captured
+  become: true
+  ansible.builtin.systemd:
+    name: "climate-explorer-chia@{{ user }}.service"
+    daemon_reload: true
+    enabled: true
+    state: restarted
+  tags: climate-explorer
