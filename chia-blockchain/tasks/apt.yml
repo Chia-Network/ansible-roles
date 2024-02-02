@@ -5,7 +5,7 @@
     update_cache: true
   when: not chia_apt_prerelease
 
-- name: Chia Beta Repository
+- name: Chia Prerelease Repository
   become: true
   ansible.builtin.apt_repository:
     repo: deb [arch={{ chia_repo_arch }} signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/prerelease/debian/ prerelease main
