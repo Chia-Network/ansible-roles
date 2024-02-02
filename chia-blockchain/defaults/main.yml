@@ -3,6 +3,8 @@
 chia_installation_method: source
 # Install CLI only by default
 chia_apt_package: chia-blockchain-cli
+# Install from Chia beta repo (true or false)
+chia_apt_beta: false
 
 # chia_service_base will be used to make systemd files unique, in case multiple instances of chia run on the same host
 # <chia_service_base>-daemon.service
