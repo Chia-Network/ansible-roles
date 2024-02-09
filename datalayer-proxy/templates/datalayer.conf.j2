@@ -23,6 +23,10 @@ server {
 
     index index.html;
 
+    expires {{ datalayer_proxy_cache_expires }};
+    add_header Pragma "public";
+    add_header Cache-Control "public";
+
     location / {
         try_files $uri $uri/ =404;
     }
