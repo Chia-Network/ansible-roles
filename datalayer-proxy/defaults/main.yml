@@ -4,3 +4,4 @@ datalayer_public_path: "/data/" # Path of the datalayer proxy (include leading a
 datalayer_host: "127.0.0.1" # Host where the datalayer files are served
 
 chia_data_layer_host_port: 8575 # Port for datalayer http server, set in chia-blockchain role
+datalayer_proxy_cache_expires: "365d" # Expires header in Nginx for CDN and Browser caching of datalayer files
