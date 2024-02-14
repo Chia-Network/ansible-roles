@@ -8,6 +8,8 @@ runner_registration_token: ""
 runner_github_group: ""
 runner_tags: ""
 
+runner_has_docker: true
+
 # Arch Specific Vars - These are set in vars/$arch.yml
 runner_download_arch: ""
 
