@@ -17,6 +17,7 @@
     name: "{{ runner_user }}"
     groups: docker
     append: yes
+  when: runner_has_docker
 
 - name: Make action-runner directory
   ansible.builtin.file:
