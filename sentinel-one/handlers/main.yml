@@ -1,3 +1,7 @@
 - name: Enable-SentinelOne
   become: true
   ansible.builtin.command: "/opt/sentinelone/bin/sentinelctl control enable"
+
+- name: Start-SentinelOne
+  become: true
+  ansible.builtin.command: "/opt/sentinelone/bin/sentinelctl control start"
