@@ -41,7 +41,7 @@
   environment:
     S1_AGENT_INSTALL_CONFIG_PATH: "/tmp/s1-config.cfg"
   when: ansible_distribution == 'Ubuntu' or ansible_distribution == 'Debian'
-  notify: 
+  notify:
     - Enable-SentinelOne
     - Start-SentinelOne
 
