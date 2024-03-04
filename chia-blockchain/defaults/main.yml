@@ -58,7 +58,7 @@ chia_private_ca_crt: ""
 chia_private_ca_key: ""
 
 # The name of the bucket that blockchain backups can be found in
-blockchain_backup_bucket: "blockchain-backup-bucket-name"
+blockchain_backup_bucket: ""
 download_blockchain_db: true
 download_crawler_db: false
 crawler_segment: "default" # Only used for the crawler DB backup right now
