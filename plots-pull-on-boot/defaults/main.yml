@@ -1,6 +1,6 @@
 ---
 # Bucket to pull plots from
-plots_pull_bucket: "chia.network.plots"
+plots_pull_bucket: ""
 # Subdir in the bucket to pull plots from. Must have trailing slash if used
 plots_pull_bucket_dir: "farmer1-beta1.8/"
 # The destination on the host to pull the plots to
