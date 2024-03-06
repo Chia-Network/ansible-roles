@@ -8,7 +8,8 @@ chia_exporter_log_block_times: false
 
 download_maxmind_db: false
 maxmind_db_backup_bucket: ""
-maxmind_db_name: "GeoLite2-Country.mmdb"
+maxmind_country_db_name: "GeoLite2-Country.mmdb"
+maxmind_asn_db_name: "GeoLite2-ASN.mmdb"
 
 user: ubuntu
 group: ubuntu
