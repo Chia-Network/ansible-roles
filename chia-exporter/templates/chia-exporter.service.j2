@@ -6,7 +6,9 @@ Type=simple
 Environment=CHIA_ROOT={{ chia_root }}
 Environment=CHIA_EXPORTER_METRICS_PORT={{ chia_exporter_port }}
 {% if download_maxmind_db == true %}
-Environment=CHIA_EXPORTER_MAXMIND_DB_PATH=/home/{{ user }}/bin/{{ maxmind_db_name }}
+Environment=CHIA_EXPORTER_MAXMIND_DB_PATH=/home/{{ user }}/bin/{{ maxmind_country_db_name }}
+Environment=CHIA_EXPORTER_MAXMIND_COUNTRY_DB_PATH=/home/{{ user }}/bin/{{ maxmind_country_db_name }}
+Environment=CHIA_EXPORTER_MAXMIND_ASN_DB_PATH=/home/{{ user }}/bin/{{ maxmind_asn_db_name }}
 {% endif %}
 ExecStart=/usr/local/bin/chia-exporter serve {{ ' --log-block-times' if chia_exporter_log_block_times else '' }}
 User={{ user }}

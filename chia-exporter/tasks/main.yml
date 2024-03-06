@@ -36,13 +36,23 @@
   retries: 100
   until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
-- name: Copy maxmind DB from S3
+- name: Copy maxmind Country DB from S3
   become: true
   become_user: "{{ user }}"
   shell: |
-    aws --no-progress s3 cp "s3://{{ maxmind_db_backup_bucket }}/{{ maxmind_db_name }}" "/home/{{ user }}/bin/{{ maxmind_db_name }}"
+    aws --no-progress s3 cp "s3://{{ maxmind_db_backup_bucket }}/{{ maxmind_country_db_name }}" "/home/{{ user }}/bin/{{ maxmind_country_db_name }}"
   args:
-    creates: "/home/{{ user }}/bin/{{ maxmind_db_name }}"
+    creates: "/home/{{ user }}/bin/{{ maxmind_country_db_name }}"
+  notify: restart-chia-exporter
+  when: download_maxmind_db
+
+- name: Copy maxmind ASN DB from S3
+  become: true
+  become_user: "{{ user }}"
+  shell: |
+    aws --no-progress s3 cp "s3://{{ maxmind_db_backup_bucket }}/{{ maxmind_asn_db_name }}" "/home/{{ user }}/bin/{{ maxmind_asn_db_name }}"
+  args:
+    creates: "/home/{{ user }}/bin/{{ maxmind_asn_db_name }}"
   notify: restart-chia-exporter
   when: download_maxmind_db
 
