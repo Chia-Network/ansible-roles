@@ -2,20 +2,20 @@
 - name: Add vector key
   become: yes
   ansible.builtin.apt_key:
-    url: https://repositories.timber.io/public/vector/gpg.3543DB2D0A2BC4B8.key
+    url: https://keys.datadoghq.com/DATADOG_APT_KEY_CURRENT.public
     state: present
+    keyring: /usr/share/keyrings/datadog-archive-keyring.gpg
 
 - name: Add vector repository
   become: yes
-  ansible.builtin.template:
-    src: timber-vector.list
-    dest: /etc/apt/sources.list.d/timber-vector.list
+  ansible.builtin.apt_repository:
+    repo: deb [signed-by=/usr/share/keyrings/datadog-archive-keyring.gpg] https://apt.vector.dev/ stable vector-0
+    update_cache: true
 
 - name: Install vector
   become: yes
   ansible.builtin.apt:
     name: vector
-    update_cache: yes
     state: present
   notify: restart-vector
   register: apt_action
