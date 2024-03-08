@@ -65,6 +65,15 @@
     group: root
   notify: restart-chia-exporter
 
+- name: Copy chia-exporter config file
+  become: true
+  ansible.builtin.template:
+    src: "chia-exporter.yml.j2"
+    dest: "/home/{{ user }}/.chia-exporter.yml"
+    owner: "{{ user }}"
+    group: "{{ group }}"
+  notify: restart-chia-exporter
+
 - name: Ensure chia-exporter service is in desired boot and current state
   become: true
   ansible.builtin.systemd:
