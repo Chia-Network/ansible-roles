@@ -1,0 +1,16 @@
+metrics-port: {{ chia_exporter_port }}
+
+{% if download_maxmind_db == true %}
+maxmind-db-path: /home/{{ user }}/bin/{{ maxmind_country_db_name }}
+maxmind-country-db-path: /home/{{ user }}/bin/{{ maxmind_country_db_name }}
+maxmind-asn-db-path: /home/{{ user }}/bin/{{ maxmind_asn_db_name }}
+{% endif %}
+
+{% if chia_exporter_use_mysql == true %}
+mysql-host: {{ chia_exporter_mysql_host }}
+mysql-port: {{ chia_exporter_mysql_port }}
+mysql-user: {{ chia_exporter_mysql_user }}
+mysql-password: {{ chia_exporter_mysql_password }}
+mysql-db-name: {{ chia_exporter_mysql_db_name }}
+mysql-batch-size: {{ chia_exporter_mysql_batch_size }}
+{% endif %}

@@ -11,6 +11,15 @@ maxmind_db_backup_bucket: ""
 maxmind_country_db_name: "GeoLite2-Country.mmdb"
 maxmind_asn_db_name: "GeoLite2-ASN.mmdb"
 
+# MySQL is optional, and currently only used for storing ASN data
+chia_exporter_use_mysql: false
+chia_exporter_mysql_host: "127.0.0.1"
+chia_exporter_mysql_port: 3306
+chia_exporter_mysql_user: "chia-exporter"
+chia_exporter_mysql_password: "password"
+chia_exporter_mysql_db_name: "chia-exporter"
+chia_exporter_mysql_batch_size: 250
+
 user: ubuntu
 group: ubuntu
 
