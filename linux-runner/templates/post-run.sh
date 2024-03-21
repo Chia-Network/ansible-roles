@@ -18,3 +18,5 @@ if [ -n "${GITHUB_WORKSPACE}" ]; then
 	parent=$(dirname "$GITHUB_WORKSPACE")
 	sudo rm -rf "$parent"
 fi
+
+sudo rm -rf "/home/{{ runner_user }}/actions-runner/_work" || true
