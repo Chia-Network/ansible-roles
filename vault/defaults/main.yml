@@ -2,7 +2,7 @@
 vault_start_on_boot: yes
 vault_start_now: yes
 
-vault_version: 1.16.0-1
+vault_version: 1.16.1-1
 
 vault_api_addr: "https://vault.example.com:8200"
 vault_cluster_addr: "http://10.11.12.13:8201"
