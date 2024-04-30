@@ -13,9 +13,9 @@
 - name: Check if SentinelOne service is active
   ansible.builtin.shell: |
     if [ "$(ps aux | grep -c s1)" -ge 2 ]; then
-      exit 1
+      echo "false"
     else
-      exit 0
+      echo "true"
     fi
   register: install_sentinelone
   ignore_errors: true
@@ -41,7 +41,7 @@
   args:
     creates: /tmp/SentinelAgent_linux_v{{ sentinelone_version }}.deb
   become: true
-  when: ansible_distribution in ['Ubuntu', 'Debian'] and install_sentinelone
+  when: ansible_distribution in ['Ubuntu', 'Debian'] and install_sentinelone.stdout
 
 
 - name: Transfer SentinelOne configuration file that will be used during installation only
@@ -52,7 +52,7 @@
     group: root
     mode: '0700'
   become: true
-  when: install_sentinelone
+  when: install_sentinelone.stdout
 
 - name: Install SentinelOne package
   ansible.builtin.apt:
@@ -61,7 +61,7 @@
   become: true
   environment:
     S1_AGENT_INSTALL_CONFIG_PATH: "/tmp/s1-config.cfg"
-  when: ansible_distribution in ['Ubuntu', 'Debian'] and install_sentinelone
+  when: ansible_distribution in ['Ubuntu', 'Debian'] and install_sentinelone.stdout
   notify:
     - Enable-SentinelOne
     - Start-SentinelOne
@@ -72,4 +72,4 @@
     path: /tmp/s1-config.cfg
     state: absent
   become: true
-  when: install_sentinelone
+  when: install_sentinelone.stdout
