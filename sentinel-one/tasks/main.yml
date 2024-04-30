@@ -12,10 +12,10 @@
 # Preliminary check to see if SentinelOne service is already running
 - name: Check if SentinelOne service is active
   ansible.builtin.shell: |
-    if [ "$(ps aux | grep -c s1)" -ge 2 ]; then
-      echo "false"
-    else
+    if [ "$(ps aux | grep -c s1)" -le 1 ]; then
       echo "true"
+    else
+      echo "false"
     fi
   register: install_sentinelone
   ignore_errors: true
