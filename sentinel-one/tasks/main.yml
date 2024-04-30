@@ -18,6 +18,7 @@
       exit 0
     fi
   register: install_sentinelone
+  ignore_errors: true
 
 # Preliminary check to see if SentinelOne service is already running
 # - name: Check if SentinelOne service is active
