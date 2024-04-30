@@ -40,7 +40,7 @@
   args:
     creates: /tmp/SentinelAgent_linux_v{{ sentinelone_version }}.deb
   become: true
-  when: ansible_distribution in ['Ubuntu', 'Debian'] and install_sentinelone
+  when: ansible_distribution in ['Ubuntu', 'Debian'] and sentinelone_status.status.ActiveState != 'active'
 
 
 - name: Transfer SentinelOne configuration file that will be used during installation only
@@ -51,7 +51,7 @@
     group: root
     mode: '0700'
   become: true
-  when: install_sentinelone
+  when: sentinelone_status.status.ActiveState != 'active'
 
 - name: Install SentinelOne package
   ansible.builtin.apt:
@@ -60,7 +60,7 @@
   become: true
   environment:
     S1_AGENT_INSTALL_CONFIG_PATH: "/tmp/s1-config.cfg"
-  when: ansible_distribution in ['Ubuntu', 'Debian'] and install_sentinelone
+  when: ansible_distribution in ['Ubuntu', 'Debian'] and sentinelone_status.status.ActiveState != 'active'
   notify:
     - Enable-SentinelOne
     - Start-SentinelOne
@@ -71,4 +71,4 @@
     path: /tmp/s1-config.cfg
     state: absent
   become: true
-  when: install_sentinelone
+  when: sentinelone_status.status.ActiveState != 'active'
