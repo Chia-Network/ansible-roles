@@ -16,7 +16,7 @@
     ps aux | grep s1
     echo ""
     echo ""
-    if [ "$(ps aux | grep -c s1)" -le 1 ]; then
+    if [ "$(ps aux | grep -c s1)" -le 2 ]; then
       echo "true"
     else
       echo "false"
