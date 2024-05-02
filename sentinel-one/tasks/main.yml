@@ -15,6 +15,7 @@
     name: sentinelone.service
     state: started
   register: sentinelone_status
+  ignore_errors: true
 
 # Use ephemeral AWS credentials provided in the CI/CD actions. Make sure the
 # following variables are set:
@@ -29,7 +30,7 @@
   args:
     creates: /tmp/SentinelAgent_linux_v{{ sentinelone_version }}.deb
   become: true
-  when: ansible_distribution in ['Ubuntu', 'Debian'] and sentinelone_status.status.ActiveState != 'active'
+  when: ansible_distribution in ['Ubuntu', 'Debian'] and sentinelone_status is not defined or sentinelone_status.failed
 
 
 - name: Transfer SentinelOne configuration file that will be used during installation only
@@ -40,7 +41,7 @@
     group: root
     mode: '0700'
   become: true
-  when: sentinelone_status.status.ActiveState != 'active'
+  when: sentinelone_status is not defined or sentinelone_status.failed
 
 - name: Install SentinelOne package
   ansible.builtin.apt:
@@ -49,7 +50,7 @@
   become: true
   environment:
     S1_AGENT_INSTALL_CONFIG_PATH: "/tmp/s1-config.cfg"
-  when: ansible_distribution in ['Ubuntu', 'Debian'] and sentinelone_status.status.ActiveState != 'active'
+  when: ansible_distribution in ['Ubuntu', 'Debian'] and sentinelone_status is not defined or sentinelone_status.failed
   notify:
     - Enable-SentinelOne
     - Start-SentinelOne
@@ -60,4 +61,4 @@
     path: /tmp/s1-config.cfg
     state: absent
   become: true
-  when: sentinelone_status.status.ActiveState != 'active'
+  when: sentinelone_status is not defined or sentinelone_status.failed
