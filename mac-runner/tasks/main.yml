@@ -41,8 +41,8 @@
 - name: Insert the proper path for cargo in .zshenv.
   lineinfile:
     path: "~/.zshenv"
-    line: export PATH=/Users/chia/.cargo/bin:$PATH
-    regexp: '^export.PATH=/Users/chia/.cargo'
+    line: export PATH=/Users/{{ runner_user }}/.cargo/bin:$PATH
+    regexp: '^export.PATH=/Users/{{ runner_user }}/.cargo'
     insertbefore: EOF
 
 - name: Make action-runner directory
@@ -88,6 +88,15 @@
   register: install
 - debug:
     msg: "{{ install.stdout }}"
+
+- name: Add the post-run.sh script
+  become: yes
+  ansible.builtin.template:
+    src: post-run.sh
+    dest: "/Users/{{ runner_user }}/post-run.sh"
+    owner: "{{ runner_user }}"
+    group: "{{ runner_group }}"
+    mode: "0755"
 
 - name: Move .path and .env to actions-runner directory
   template:
