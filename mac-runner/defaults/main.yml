@@ -21,7 +21,9 @@ runner_post_run_exclusions:
   - actions-runner
   - .bash_logout
   - .bashrc
+  - .cargo
   - .profile
+  - .Trash
   - .zprofile
   - .zshenv
   - Desktop
