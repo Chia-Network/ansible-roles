@@ -2,7 +2,7 @@
 
 shopt -s dotglob # Enable matching hidden files
 
-directory="/home/{{ runner_user }}"
+directory="/Users/{{ runner_user }}"
 exclusions=({% for item in runner_post_run_exclusions %}
 	"{{ item }}"{% if not loop.last %} {% endif %}
 	{% endfor %}) # Any file/directory that matches this list will not be touched
@@ -19,7 +19,7 @@ if [ -n "${GITHUB_WORKSPACE}" ]; then
 	sudo rm -rf "$parent"
 fi
 
-sudo rm -rf "/home/{{ runner_user }}/actions-runner/_work" || true
+sudo rm -rf "/Users/{{ runner_user }}/actions-runner/_work" || true
 
 # relevant to https://github.com/Apple-Actions/import-codesign-certs
 security delete-keychain signing_temp.keychain || true
