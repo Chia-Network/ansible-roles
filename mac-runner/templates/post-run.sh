@@ -20,3 +20,6 @@ if [ -n "${GITHUB_WORKSPACE}" ]; then
 fi
 
 sudo rm -rf "/home/{{ runner_user }}/actions-runner/_work" || true
+
+# relevant to https://github.com/Apple-Actions/import-codesign-certs
+security delete-keychain signing_temp.keychain || true
