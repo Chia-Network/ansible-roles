@@ -1,4 +1,7 @@
 ---
+runner_user: "chia"
+runner_group: "staff"
+
 runner_release_version: "2.307.1"
 runner_directory_path: ""
 runner_registration_token: ""
@@ -11,3 +14,21 @@ runner_download_arch: ""
 runner_additional_path: ""
 homebrew_bin_path: ""
 homebrew_sbin_path: ""
+
+# A list of files/directories that should not be cleaned up after a job
+runner_post_run_exclusions:
+  - post-run.sh
+  - actions-runner
+  - .bash_logout
+  - .bashrc
+  - .profile
+  - .zprofile
+  - .zshenv
+  - Desktop
+  - Documents
+  - Downloads
+  - Library
+  - Movies
+  - Music
+  - Pictures
+  - Public
