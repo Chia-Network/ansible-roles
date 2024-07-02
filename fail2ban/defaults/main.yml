@@ -1,4 +1,6 @@
 ---
+start_on_boot: yes
+
 ignoreip: 127.0.0.1/8 ::1
 bantime: 10m
 findtime: 10m
