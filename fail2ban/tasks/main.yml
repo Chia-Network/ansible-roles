@@ -1,0 +1,19 @@
+---
+- name: Install Fail2Ban
+  become: true
+  ansible.builtin.apt:
+    name:
+      - fail2ban
+    state: present
+    update_cache: true
+    cache_valid_time: 300
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
+- name: Add jail.local config
+  become: true
+  ansible.builtin.template:
+    src: jail.local.j2
+    dest: "/etc/fail2ban/jail.local"
+    mode: '0644'
