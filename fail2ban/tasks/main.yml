@@ -11,6 +11,13 @@
   retries: 100
   until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
+- name: Ensure service is in desired boot state
+  become: true
+  ansible.builtin.systemd:
+    name: fail2ban
+    daemon_reload: true
+    enabled: "{{ fail2ban_start_on_boot }}"
+
 - name: Add jail.local config
   become: true
   ansible.builtin.template:
