@@ -16,7 +16,7 @@
   ansible.builtin.systemd:
     name: fail2ban
     daemon_reload: true
-    enabled: "{{ start_on_boot }}"
+    enabled: "{{ fail2ban_start_on_boot }}"
 
 - name: Add jail.local config
   become: true
