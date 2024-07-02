@@ -17,6 +17,7 @@
     name: fail2ban
     daemon_reload: true
     enabled: "{{ fail2ban_start_on_boot }}"
+    state: "{{ fail2ban_start_now | ternary('started', 'stopped') }}"
 
 - name: Add jail.local config
   become: true

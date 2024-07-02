@@ -1,5 +1,6 @@
 ---
 fail2ban_start_on_boot: yes
+fail2ban_start_now: yes
 
 fail2ban_ignoreip: 127.0.0.1/8 ::1
 fail2ban_bantime: 10m
