@@ -1,7 +1,14 @@
 ---
+# Two options to serve datalayer files
+#    proxy: nginx will proxy requests to the datalayer_http service
+#    direct: nginx will serve datalayer .dat files directly from disk
+datalayer_serving_type: proxy
+
 datalayer_public_host: data.example.com # URL that the public will use
-datalayer_public_path: "/data/" # Path of the datalayer proxy (include leading and trailing slash)
+datalayer_public_path: "data" # Path of the datalayer proxy (do not include leading and trailing slash)
 datalayer_host: "127.0.0.1" # Host where the datalayer files are served
 
 chia_data_layer_host_port: 8575 # Port for datalayer http server, set in chia-blockchain role
 datalayer_proxy_cache_expires: "365d" # Expires header in Nginx for CDN and Browser caching of datalayer files
+
+datalayer_direct_webroot: /var/www/{{ datalayer_public_host }}/{{ datalayer_public_path }}

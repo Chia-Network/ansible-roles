@@ -10,21 +10,38 @@
   tags: datalayer-proxy
   notify: Reload-nginx
 
-- name: Create directory for Datalayer proxy includes
+- name: Create directory for Datalayer includes
   become: true
   ansible.builtin.file:
-    path: /etc/nginx/datalayer_proxy_includes
+    path: /etc/nginx/datalayer_includes
     state: directory
     mode: '0755'
     owner: "root"
     group: "root"
   tags: datalayer-proxy
 
+- name: Create webroot for datalayer .dat files when direct serve
+  become: true
+  ansible.builtin.file:
+    path: "{{ datalayer_direct_webroot }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ user }}"
+    group: "{{ group }}"
+  tags: datalayer-proxy
+  when: datalayer_serving_type == 'direct'
+
+- name: Check if the default Chia datalayer file path is a symlink
+  ansible.builtin.stat: 
+    path: "{{chia_root}}/
+  register: mylinks
+
+
 - name: Nginx include file for datalayer HTTP proxy
   become: true
   ansible.builtin.template:
-    src: datalayer-proxy.inc.j2
-    dest: /etc/nginx/datalayer_proxy_includes/datalayer-proxy-{{ chia_data_layer_host_port }}.inc
+    src: datalayer-{{ datalayer_serving_type }}.inc.j2
+    dest: /etc/nginx/datalayer_includes/datalayer-{{ datalayer_public_host }}.{{ datalayer_public_path }}.inc
     owner: root
     group: root
     mode: '0644'
