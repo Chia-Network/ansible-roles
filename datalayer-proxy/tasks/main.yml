@@ -32,12 +32,39 @@
   when: datalayer_serving_type == 'direct'
 
 - name: Check if the default Chia datalayer file path is a symlink
-  ansible.builtin.stat: 
-    path: "{{chia_root}}/
+  ansible.builtin.stat:
+    path: "{{ chia_root }}/data_layer/db/server_files_location_{{ network }}"
   register: mylinks
 
+- name: If datalayer file path exists but is not a symlink, copy all files to the new directory
+  ansible.builtin.copy:
+    remote_src: true
+    src: "{{ chia_root }}/data_layer/db/server_files_location_{{ network }}/"
+    dest: "{{ datalayer_direct_webroot }}"
+    owner: "{{ user }}"
+    group: "{{ group }}"
+    mode: '0644'
+  tags: datalayer-proxy
+  when: datalayer_serving_type == 'direct' and mylinks.stat.exists and (mylinks.stat.islnk is not defined or mylinks.stat.islnk is false)
 
-- name: Nginx include file for datalayer HTTP proxy
+- name: If datalayer file path exists but is not a symlink, delete directory
+  ansible.builtin.file:
+    file: "{{ chia_root }}/data_layer/db/server_files_location_{{ network }}/"
+    state: absent
+  tags: datalayer-proxy
+  when: datalayer_serving_type == 'direct' and mylinks.stat.exists and (mylinks.stat.islnk is not defined or mylinks.stat.islnk is false)
+
+- name: Create symlink to new datalayer file location
+  ansible.builtin.file:
+    src: "{{ datalayer_direct_webroot }}"
+    dest: "{{ chia_root }}/data_layer/db/server_files_location_{{ network }}"
+    state: link
+    owner: "{{ user }}"
+    group: "{{ group }}"
+  tags: datalayer-proxy
+  when: datalayer_serving_type == 'direct'
+
+- name: Nginx include file for datalayer HTTP proxy or direct file serve
   become: true
   ansible.builtin.template:
     src: datalayer-{{ datalayer_serving_type }}.inc.j2
