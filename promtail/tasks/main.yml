@@ -1,0 +1,52 @@
+---
+- name: Install Deps
+  become: true
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - curl
+      - gnupg
+      - python3-apt
+    state: present
+    update_cache: true
+    cache_valid_time: 300
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
+- name: Install promtail
+  become: yes
+  ansible.builtin.apt:
+    name: promtail
+    state: present
+  notify: restart-promtail
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
+- name: Template promtail config
+  become: yes
+  template:
+    src: promtail.yml.j2
+    dest: /etc/promtail/config.yml
+
+- name: Add the promtail user and adm to the ubuntu group so it can read log files
+  become: yes
+  ansible.builtin.user:
+    name: promtail
+    groups: ubuntu,adm
+    append: yes
+
+- name: Set desired boot state
+  become: yes
+  ansible.builtin.systemd:
+    name: promtail
+    daemon_reload: true
+    enabled: "{{ promtail_start_on_boot }}"
+
+- name: Set desired current state
+  become: yes
+  ansible.builtin.systemd:
+    name: promtail
+    state: "{{ promtail_start_now | ternary('started','stopped') }}"
+  ignore_errors: yes # In case we have a bad config and we need to finish the playbook to continue

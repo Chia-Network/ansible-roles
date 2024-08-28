@@ -1,0 +1,3 @@
+---
+promtail_start_on_boot: yes
+promtail_start_now: yes
