@@ -23,16 +23,10 @@
 
 - name: Download Grafana GPG key
   become: true
-  ansible.builtin.get_url:
+  ansible.builtin.apt_key:
     url: https://apt.grafana.com/gpg.key
-    dest: /usr/share/keyrings/grafana.gpg
-    mode: '0644'
-
-- name: Convert GPG key to the required format
-  become: true
-  ansible.builtin.command: gpg --dearmor -o /usr/share/keyrings/grafana.gpg /usr/share/keyrings/grafana.gpg
-  args:
-    creates: /usr/share/keyrings/grafana.gpg
+    state: present
+    keyring: /usr/share/keyrings/grafana.gpg
 
 - name: Add Grafana apt repository
   become: true
