@@ -25,19 +25,19 @@
   become: true
   ansible.builtin.get_url:
     url: https://apt.grafana.com/gpg.key
-    dest: /etc/apt/keyrings/grafana.gpg
+    dest: /usr/share/keyrings/grafana.gpg
     mode: '0644'
 
 - name: Convert GPG key to the required format
   become: true
-  ansible.builtin.command: gpg --dearmor -o /etc/apt/keyrings/grafana.gpg /etc/apt/keyrings/grafana.gpg
+  ansible.builtin.command: gpg --dearmor -o /usr/share/keyrings/grafana.gpg /usr/share/keyrings/grafana.gpg
   args:
-    creates: /etc/apt/keyrings/grafana.gpg
+    creates: /usr/share/keyrings/grafana.gpg
 
 - name: Add Grafana apt repository
   become: true
   ansible.builtin.apt_repository:
-    repo: "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main"
+    repo: "deb [signed-by=/usr/share/keyrings/grafana.gpg] https://apt.grafana.com stable main"
     filename: grafana
 
 - name: Install promtail
