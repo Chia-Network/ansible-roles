@@ -21,7 +21,6 @@ scrape_configs:
           host: {{ ansible_hostname | default('localhost') }}
           __path__: /var/log/syslog
 
-{% if lookup('file', '/var/log/fail2ban.log') %}
   - job_name: fail2ban
     static_configs:
       - targets:
@@ -30,9 +29,7 @@ scrape_configs:
           job: fail2ban
           host: {{ ansible_hostname | default('localhost') }}
           __path__: /var/log/fail2ban.log
-{% endif %}
 
-{% if lookup('file', '{{ chia_root }}/log/debug.log') %}
   - job_name: chia
     static_configs:
       - targets:
@@ -61,4 +58,3 @@ scrape_configs:
             year: year
             month: month
             day: day
-{% endif %}
