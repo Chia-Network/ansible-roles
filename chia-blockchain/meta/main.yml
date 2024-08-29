@@ -4,8 +4,8 @@ dependencies:
   - role: logrotate
   - role: disable-resolvd
     when: '"crawler" in chia_enabled_services or "seeder" in chia_enabled_services'
-  - role: vector
-    when: add_vector_config
+  - role: promtail
+    when: add_promtail_config
   - role: monit
     when: add_monit_config
   - role: chia-apt-key

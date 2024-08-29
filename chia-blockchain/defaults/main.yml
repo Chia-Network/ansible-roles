@@ -122,8 +122,8 @@ introducer_peer:
   enable_private_networks: false
 
 application: chia-blockchain
-# Currently only used for a vector label
-# @TODO should likely update this in the future to generate this vector label (if actually used) with the enabled services
+# Currently only used for a promtail label
+# @TODO should likely update this in the future to generate this promtail label (if actually used) with the enabled services
 component: node
 
 # Group Tag is used to add context to the installation, metrics, etc when the application, network, component, and ref
@@ -263,13 +263,13 @@ nameserver: chia.net.
 ttl: 300
 soa_rname: "hostmaster.chia.net."
 
-# Vector/Loki Related
-add_vector_config: false
+# promtail/Loki Related
+add_promtail_config: false
 loki_endpoint: http://localhost:3100
 loki_basic_auth: false
 loki_basic_auth_username: ""
 loki_basic_auth_password: ""
-vector_start_now: true
+promtail_start_now: true
 
 # monit service related
 chia_add_healthcheck_service: true
