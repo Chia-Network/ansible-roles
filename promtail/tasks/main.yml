@@ -26,6 +26,7 @@
   ansible.builtin.file:
     path: /var/log/promtail
     state: directory
+    group: adm
     mode: '0755'
 
 - name: Download Grafana GPG key
