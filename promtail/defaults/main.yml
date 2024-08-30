@@ -1,3 +1,14 @@
 ---
 promtail_start_on_boot: yes
 promtail_start_now: yes
+
+loki_endpoint: ""
+loki_basic_auth_username: ""
+loki_basic_auth_password: ""
+
+application: ""
+component: ""
+network: ""
+group_tag: ""
+repo_ref: ""
+chia_root: "/home/ubuntu/.chia/"

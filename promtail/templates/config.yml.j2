@@ -1,26 +1,25 @@
 server:
-http_listen_port: 9080
-grpc_listen_port: 0
+  http_listen_port: 9080
+  grpc_listen_port: 0
 
 positions:
   filename: /var/log/promtail/positions.yaml
 
 clients:
-  - url: "{{ LOKI_ENDPOINT }}"
+  - url: "{{ loki_endpoint }}"
     basic_auth:
-      username: "{{ LOKI_USERNAME }}"
-      password: "{{ LOKI_PASSWORD }}"
+      username: "{{ loki_basic_auth_username }}"
+      password: "{{ loki_basic_auth_password }}"
 
 scrape_configs:
   - job_name: syslog
     static_configs:
-    - targets:
-        - localhost
-      labels:
-        job: syslog
-        host: {{ ansible_hostname | default('localhost') }}
-        __path__: /var/log/syslog
-
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          host: {{ ansible_hostname | default('localhost') }}
+          __path__: /var/log/syslog
 
   - job_name: fail2ban
     static_configs:
@@ -30,8 +29,32 @@ scrape_configs:
           job: fail2ban
           host: {{ ansible_hostname | default('localhost') }}
           __path__: /var/log/fail2ban.log
-        relabel_configs:
-          - source_labels: [__path__]
-            regex: /var/log/fail2ban.log
-            action: keep
-            if: "fileExists('/var/log/fail2ban.log')"
+
+  - job_name: chia
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: chia
+          application: "{{ application }}"
+          component: "{{ component }}"
+          network: "{{ network }}"
+          group: "{{ group_tag }}"
+          ref: "{{ repo_ref }}"
+          host: "{{ ansible_hostname | default('localhost') }}"
+          __path__: "{{ chia_root }}/log/debug.log"
+
+    pipeline_stages:
+      - multiline:
+          firstline: ".*"
+          separator: "\n"
+          max_wait_time: 15s
+          condition:
+            regex:
+              pattern: "^(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-(?P<day>[0-9]{2})T|^VDF.Client:"
+
+      - json:
+          expressions:
+            year: year
+            month: month
+            day: day

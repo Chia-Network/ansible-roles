@@ -21,6 +21,14 @@
     state: directory
     mode: '0755'
 
+- name: Create the promtail log directory
+  become: true
+  ansible.builtin.file:
+    path: /var/log/promtail
+    state: directory
+    group: adm
+    mode: '0755'
+
 - name: Download Grafana GPG key
   become: true
   ansible.builtin.apt_key:
