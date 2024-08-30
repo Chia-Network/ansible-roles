@@ -57,18 +57,24 @@
   template:
     src: chia_targets.yml.j2
     dest: /etc/promtail/chia_targets.yml
+  notify:
+    - restart-promtail
 
 - name: Template fail2ban target file
   become: yes
   template:
     src: fail2ban_targets.yml
     dest: /etc/promtail/fail2ban_targets.yml
+  notify:
+    - restart-promtail
 
 - name: Template promtail config
   become: yes
   template:
     src: config.yml.j2
     dest: /etc/promtail/config.yml
+  notify:
+    - restart-promtail
 
 - name: Add the promtail user and adm to the ubuntu group so it can read log files
   become: yes
@@ -90,3 +96,6 @@
     name: promtail
     state: "{{ promtail_start_now | ternary('started','stopped') }}"
   ignore_errors: yes # In case we have a bad config and we need to finish the playbook to continue
+
+- name: Flush handlers at the end
+  meta: flush_handlers
