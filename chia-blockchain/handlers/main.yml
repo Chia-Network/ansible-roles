@@ -13,16 +13,6 @@
   retries: 10
   until: systemd_action is success
 
-- name: restart-promtail
-  become: true
-  ansible.builtin.service:
-    name: promtail
-    state: restarted
-  when: promtail_start_now
-  register: systemd_action
-  retries: 10
-  until: systemd_action is success
-
 - name: restart-monit
   become: true
   ansible.builtin.service:
