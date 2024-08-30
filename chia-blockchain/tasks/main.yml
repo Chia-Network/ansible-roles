@@ -246,15 +246,6 @@
   retries: 10
   until: systemd_action is success
 
-- name: Add vector config
-  become: true
-  ansible.builtin.template:
-    src: chia-blockchain.vector.toml
-    dest: /etc/vector/chia-blockchain.vector.toml
-    mode: "0644"
-  when: add_vector_config
-  notify: restart-vector
-
 - name: Add custom monit config to conf.d
   become: true
   ansible.builtin.template:

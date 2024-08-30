@@ -13,16 +13,6 @@
   retries: 10
   until: systemd_action is success
 
-- name: restart-vector
-  become: true
-  ansible.builtin.service:
-    name: vector
-    state: restarted
-  when: add_vector_config and vector_start_now
-  register: systemd_action
-  retries: 10
-  until: systemd_action is success
-
 - name: restart-monit
   become: true
   ansible.builtin.service:
