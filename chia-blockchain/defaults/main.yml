@@ -123,7 +123,6 @@ introducer_peer:
 
 application: chia-blockchain
 # Currently only used for a promtail label
-# @TODO should likely update this in the future to generate this promtail label (if actually used) with the enabled services
 component: node
 
 # Group Tag is used to add context to the installation, metrics, etc when the application, network, component, and ref

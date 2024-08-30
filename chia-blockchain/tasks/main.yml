@@ -246,15 +246,6 @@
   retries: 10
   until: systemd_action is success
 
-- name: Add promtail config
-  become: true
-  ansible.builtin.template:
-    src: promtail_config.yaml.j2
-    dest: /etc/promtail/promtail_config.yaml
-    mode: "0644"
-  when: add_promtail_config
-  notify: restart-promtail
-
 - name: Add custom monit config to conf.d
   become: true
   ansible.builtin.template:
