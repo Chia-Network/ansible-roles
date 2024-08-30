@@ -21,7 +21,7 @@ scrape_configs:
           host: {{ ansible_hostname | default('localhost') }}
           __path__: /var/log/syslog
 
-{% if fail2ban_exists %}
+{% if fail2ban_log_exists %}
   - job_name: fail2ban
     static_configs:
       - targets:

@@ -59,7 +59,7 @@
 
 - name: Check if fail2ban exists
   stat:
-    path: "{{ chia_root }}/log/debug.log"
+    path: "/var/logs/fail2ban.log"
   register: fail2ban_log
 
 - name: Template promtail config
