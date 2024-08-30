@@ -6,10 +6,10 @@ positions:
   filename: /var/log/promtail/positions.yaml
 
 clients:
-  - url: "{{ LOKI_ENDPOINT }}"
+  - url: "{{ loki_endpoint }}"
     basic_auth:
-      username: "{{ LOKI_USERNAME }}"
-      password: "{{ LOKI_PASSWORD }}"
+      username: "{{ loki_basic_auth_username }}"
+      password: "{{ loki_basic_auth_password }}"
 
 scrape_configs:
   - job_name: syslog
