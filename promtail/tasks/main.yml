@@ -96,6 +96,3 @@
     name: promtail
     state: "{{ promtail_start_now | ternary('started','stopped') }}"
   ignore_errors: yes # In case we have a bad config and we need to finish the playbook to continue
-
-- name: Flush handlers at the end
-  meta: flush_handlers
