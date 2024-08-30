@@ -49,7 +49,7 @@
 
 - name: If datalayer file path exists but is not a symlink, delete directory
   ansible.builtin.file:
-    file: "{{ chia_root }}/data_layer/db/server_files_location_{{ network }}/"
+    path: "{{ chia_root }}/data_layer/db/server_files_location_{{ network }}/"
     state: absent
   tags: datalayer-proxy
   when: datalayer_serving_type == 'direct' and mylinks.stat.exists and (mylinks.stat.islnk is not defined or mylinks.stat.islnk is false)
