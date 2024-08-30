@@ -2,4 +2,5 @@
     - localhost
   labels:
     job: chia
+    host: {{ ansible_hostname | default('localhost') }}
     __path__: "{{ chia_root }}/log/debug.log"
