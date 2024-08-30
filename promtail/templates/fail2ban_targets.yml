@@ -1,0 +1,5 @@
+- targets:
+    - localhost
+  labels:
+    job: fail2ban
+    __path__: "/var/log/fail2ban.log"

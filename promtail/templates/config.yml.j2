@@ -6,10 +6,7 @@ positions:
   filename: /var/log/promtail/positions.yaml
 
 clients:
-  - url: "{{ loki_endpoint }}"
-    basic_auth:
-      username: "{{ loki_basic_auth_username }}"
-      password: "{{ loki_basic_auth_password }}"
+  - url: "http://localhost:3100/loki/api/v1/push"
 
 scrape_configs:
   - job_name: syslog
@@ -18,35 +15,19 @@ scrape_configs:
           - localhost
         labels:
           job: syslog
-          host: {{ ansible_hostname | default('localhost') }}
           __path__: /var/log/syslog
 
-{% if fail2ban_log_exists %}
   - job_name: fail2ban
-    static_configs:
-      - targets:
-          - localhost
-        labels:
-          job: fail2ban
-          host: {{ ansible_hostname | default('localhost') }}
-          __path__: /var/log/fail2ban.log
-{% endif %}
+    file_sd_configs:
+      - files:
+          - /etc/promtail/fail2ban_targets.yml
+        refresh_interval: 1m
 
-{% if chia_log_exists %}
   - job_name: chia
-    static_configs:
-      - targets:
-          - localhost
-        labels:
-          job: chia
-          application: "{{ application }}"
-          component: "{{ component }}"
-          network: "{{ network }}"
-          group: "{{ group_tag }}"
-          ref: "{{ repo_ref }}"
-          host: "{{ ansible_hostname | default('localhost') }}"
-          __path__: "{{ chia_root }}/log/debug.log"
-{% endif %}
+    file_sd_configs:
+      - files:
+          - /etc/promtail/chia_targets.yml
+        refresh_interval: 1m
 
     pipeline_stages:
       - multiline:
