@@ -52,11 +52,24 @@
   retries: 100
   until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
+- name: Check if Chia's debug.log exists
+  stat:
+    path: "{{ chia_root }}/log/debug.log"
+  register: chia_log
+
+- name: Check if fail2ban exists
+  stat:
+    path: "{{ chia_root }}/log/debug.log"
+  register: fail2ban_log
+
 - name: Template promtail config
   become: yes
   template:
     src: config.yml.j2
     dest: /etc/promtail/config.yml
+  vars:
+    chia_log_exists: "{{ chia_log.stat.exists }}"
+    fail2ban_exists: "{{ fail2ban_log.stat.exists }}"
 
 - name: Add the promtail user and adm to the ubuntu group so it can read log files
   become: yes

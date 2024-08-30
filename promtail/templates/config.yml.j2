@@ -21,6 +21,7 @@ scrape_configs:
           host: {{ ansible_hostname | default('localhost') }}
           __path__: /var/log/syslog
 
+{% if fail2ban_exists %}
   - job_name: fail2ban
     static_configs:
       - targets:
@@ -29,7 +30,9 @@ scrape_configs:
           job: fail2ban
           host: {{ ansible_hostname | default('localhost') }}
           __path__: /var/log/fail2ban.log
+{% endif %}
 
+{% if chia_log_exists %}
   - job_name: chia
     static_configs:
       - targets:
@@ -43,6 +46,7 @@ scrape_configs:
           ref: "{{ repo_ref }}"
           host: "{{ ansible_hostname | default('localhost') }}"
           __path__: "{{ chia_root }}/log/debug.log"
+{% endif %}
 
     pipeline_stages:
       - multiline:
