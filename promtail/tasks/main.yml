@@ -52,6 +52,18 @@
   retries: 100
   until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
+- name: Template chia target file
+  become: yes
+  template:
+    src: chia_targets.yml.j2
+    dest: /etc/promtail/chia_targets.yml
+
+- name: Template fail2ban target file
+  become: yes
+  template:
+    src: fail2ban_targets.yml
+    dest: /etc/promtail/fail2ban_targets.yml
+
 - name: Template promtail config
   become: yes
   template:

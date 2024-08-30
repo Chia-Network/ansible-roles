@@ -1,0 +1,6 @@
+- targets:
+    - localhost
+  labels:
+    job: fail2ban
+    host: {{ ansible_hostname | default('localhost') }}
+    __path__: "/var/log/fail2ban.log"
