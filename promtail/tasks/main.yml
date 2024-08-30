@@ -69,7 +69,7 @@
     dest: /etc/promtail/config.yml
   vars:
     chia_log_exists: "{{ chia_log.stat.exists }}"
-    fail2ban_exists: "{{ fail2ban_log.stat.exists }}"
+    fail2ban_log_exists: "{{ fail2ban_log.stat.exists }}"
 
 - name: Add the promtail user and adm to the ubuntu group so it can read log files
   become: yes
