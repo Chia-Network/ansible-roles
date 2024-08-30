@@ -2,9 +2,9 @@
 promtail_start_on_boot: yes
 promtail_start_now: yes
 
-LOKI_ENDPOINT: ""
-LOKI_USERNAME: ""
-LOKI_PASSWORD: ""
+loki_endpoint: ""
+loki_basic_auth_username: ""
+loki_basic_auth_password: ""
 
 application: ""
 component: ""
