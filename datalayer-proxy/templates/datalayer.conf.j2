@@ -31,7 +31,6 @@ server {
         try_files $uri $uri/ =404;
     }
 
-
-    include /etc/nginx/datalayer_proxy_includes/*.inc;
+    include /etc/nginx/datalayer_includes/*.inc;
 
 }
