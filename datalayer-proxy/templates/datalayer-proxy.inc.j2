@@ -1,4 +1,4 @@
-    location {{ datalayer_public_path }} {
+    location /{{ datalayer_public_path }}/ {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_pass http://{{ datalayer_host }}:{{ chia_data_layer_host_port }}/;
     }
