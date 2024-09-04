@@ -29,3 +29,7 @@ basic_authentication: false
 
 # True or false if Nginx will be proxying the CADT API
 cadt_api_proxy: true
+
+# Default to blank which will set CADT-UI to not autoconnect.
+# Override in playbook with full URL including path and scheme.
+cadt_api_url: ""

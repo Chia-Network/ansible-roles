@@ -53,3 +53,25 @@
   when: cadt_ui_hosting == "local"
   tags: cadt-ui
   notify: Reload-nginx
+
+- name: Upload CADT-UI config for auto connect to API
+  become: true
+  ansible.builtin.template:
+    src: config.json.j2
+    dest: /var/www/{{ climate_apps_domains | first }}/cadt-ui/build/config.json
+    mode: '0644'
+    owner: "{{ user }}"
+    group: "{{ group }}"
+  when: cadt_ui_hosting == "local" and cadt_api_url != ""
+  tags: cadt-ui
+
+- name: Upload CADT-UI config for custom colors
+  become: true
+  ansible.builtin.template:
+    src: config.json.j2
+    dest: /var/www/{{ climate_apps_domains | first }}/cadt-ui/build/config.json
+    mode: '0644'
+    owner: "{{ user }}"
+    group: "{{ group }}"
+  when: cadt_ui_hosting == "local"
+  tags: cadt-ui
