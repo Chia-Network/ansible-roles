@@ -33,3 +33,9 @@ cadt_api_proxy: true
 # Default to blank which will set CADT-UI to not autoconnect.
 # Override in playbook with full URL including path and scheme.
 cadt_api_url: ""
+
+# Set to "true" to use the colors.json custom color configuration
+cadt_ui_custom_colors: false
+cadt_ui_leftNavBg: "rgb(0, 242, 245)"
+cadt_ui_leftNavText: "#ff0005"
+cadt_ui_leftNavItemActive: "blue"

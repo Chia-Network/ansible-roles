@@ -68,10 +68,10 @@
 - name: Upload CADT-UI config for custom colors
   become: true
   ansible.builtin.template:
-    src: config.json.j2
-    dest: /var/www/{{ climate_apps_domains | first }}/cadt-ui/build/config.json
+    src: colors.json.j2
+    dest: /var/www/{{ climate_apps_domains | first }}/cadt-ui/build/colors.json
     mode: '0644'
     owner: "{{ user }}"
     group: "{{ group }}"
-  when: cadt_ui_hosting == "local"
+  when: cadt_ui_hosting == "local" and cadt_ui_custom_colors == "true"
   tags: cadt-ui
