@@ -47,13 +47,13 @@ if [ -n "${GITHUB_WORKSPACE}" ]; then
 	delete_with_backoff "$parent"
 fi
 
-delete_with_backoff "/Users/{{ runner_user }}/actions-runner/_work" || true
+rm -rf "/Users/{{ runner_user }}/actions-runner/_work" || true
 
 # relevant to https://github.com/Apple-Actions/import-codesign-certs
 security delete-keychain signing_temp.keychain || true
 
 # Clean up old globally installed node_modules that might conflict with the current build
-delete_with_backoff /opt/homebrew/lib/node_modules || true
+rm -rf /opt/homebrew/lib/node_modules || true
 
 # Clean up any installed versions of node so we can start fresh
 brew list | grep "^node\@\|^node$" | xargs -L1 brew uninstall || true
