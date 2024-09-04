@@ -47,7 +47,7 @@ if [ -n "${GITHUB_WORKSPACE}" ]; then
 	delete_with_backoff "$parent"
 fi
 
-rm -rf "/Users/{{ runner_user }}/actions-runner/_work" || true
+sudo rm -rf "/Users/{{ runner_user }}/actions-runner/_work" || true
 
 # relevant to https://github.com/Apple-Actions/import-codesign-certs
 security delete-keychain signing_temp.keychain || true

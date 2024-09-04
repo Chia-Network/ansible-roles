@@ -47,7 +47,7 @@ if [ -n "${GITHUB_WORKSPACE}" ]; then
 	delete_with_backoff "$parent"
 fi
 
-rm -rf "/home/{{ runner_user }}/actions-runner/_work" || true
+sudo rm -rf "/home/{{ runner_user }}/actions-runner/_work" || true
 
 # Check if any delete operations failed, and exit with code 1 if so
 if $delete_failed; then
