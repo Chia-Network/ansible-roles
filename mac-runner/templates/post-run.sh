@@ -56,6 +56,7 @@ security delete-keychain signing_temp.keychain || true
 rm -rf /opt/homebrew/lib/node_modules || true
 
 # Clean up any installed versions of node so we can start fresh
+cd $HOME
 brew list | grep "^node\@\|^node$" | xargs -L1 brew uninstall || true
 
 # Check if any delete operations failed, and exit with code 1 if so
