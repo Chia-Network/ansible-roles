@@ -1,4 +1,4 @@
 location {{ cadt_ui_subdir }} {
         alias /var/www/{{ climate_apps_domains | first }}/cadt-ui/build/;
+        try_files $uri /index.html;
 }
-
