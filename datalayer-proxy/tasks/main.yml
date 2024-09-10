@@ -37,17 +37,18 @@
   register: mylinks
 
 - name: If datalayer file path exists but is not a symlink, copy all files to the new directory
+  become: true
   ansible.builtin.copy:
     remote_src: true
     src: "{{ chia_root }}/data_layer/db/server_files_location_{{ network }}/"
-    dest: "{{ datalayer_direct_webroot }}"
+    dest: "{{ datalayer_direct_webroot }}/"
     owner: "{{ user }}"
     group: "{{ group }}"
-    mode: '0644'
   tags: datalayer-proxy
   when: datalayer_serving_type == 'direct' and mylinks.stat.exists and (mylinks.stat.islnk is not defined or mylinks.stat.islnk is false)
 
 - name: If datalayer file path exists but is not a symlink, delete directory
+  become: true
   ansible.builtin.file:
     path: "{{ chia_root }}/data_layer/db/server_files_location_{{ network }}/"
     state: absent
@@ -55,10 +56,12 @@
   when: datalayer_serving_type == 'direct' and mylinks.stat.exists and (mylinks.stat.islnk is not defined or mylinks.stat.islnk is false)
 
 - name: Create symlink to new datalayer file location
+  become: true
   ansible.builtin.file:
     src: "{{ datalayer_direct_webroot }}"
     dest: "{{ chia_root }}/data_layer/db/server_files_location_{{ network }}"
     state: link
+    mode: '0755'
     owner: "{{ user }}"
     group: "{{ group }}"
   tags: datalayer-proxy
