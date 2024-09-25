@@ -3,5 +3,8 @@ check host localhost with address 127.0.0.1
     stop program = "/bin/systemctl stop {{ chia_service_base }}.target"
 {% if chia_add_healthcheck_service %}
     if failed port {{ chia_healthcheck_port }} protocol http request "/full_node" status = 200 for 1 cycles then restart
+    {% if chia_enabled_services == "timelord" %}
+    if failed port {{ chia_healthcheck_port }} protocol http request "/timelord" status = 200 for 1 cycles then restart
+    {% endif %}
 {% endif %}
     if 5 restarts within {{ 5 * chia_monit_failure_threshold }} cycles then timeout
