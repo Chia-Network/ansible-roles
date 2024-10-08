@@ -17,6 +17,7 @@ homebrew_sbin_path: ""
 
 # A list of files/directories that should not be cleaned up after a job
 runner_post_run_exclusions:
+  - pre-run.sh
   - post-run.sh
   - actions-runner
   - .bash_logout
