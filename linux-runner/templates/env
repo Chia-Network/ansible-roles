@@ -1,1 +1,2 @@
+ACTIONS_RUNNER_HOOK_JOB_STARTED=/home/{{ runner_user }}/pre-run.sh
 ACTIONS_RUNNER_HOOK_JOB_COMPLETED=/home/{{ runner_user }}/post-run.sh
