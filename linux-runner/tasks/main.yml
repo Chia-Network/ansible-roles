@@ -72,6 +72,15 @@
 - debug:
     msg: "{{ install.stdout }}"
 
+- name: Add the pre-run.sh script
+  become: yes
+  ansible.builtin.template:
+    src: pre-run.sh
+    dest: "/home/{{ runner_user }}/pre-run.sh"
+    owner: "{{ runner_user }}"
+    group: "{{ runner_group }}"
+    mode: "0755"
+
 - name: Add the post-run.sh script
   become: yes
   ansible.builtin.template:
