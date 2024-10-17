@@ -10,3 +10,4 @@ check host localhost with address 127.0.0.1
     {% endif %}
 {% endif %}
     if 5 restarts within {{ 5 * chia_monit_failure_threshold }} cycles then timeout
+    if 1 restarts within {{ chia_monit_failure_threshold }} cycles then exec "/etc/monit/monit-notify.sh"
