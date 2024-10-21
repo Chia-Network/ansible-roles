@@ -3,7 +3,7 @@
 # Webhook URL where the alert will be sent
 WEBHOOK_URL="https://alert-receiver.chiaops.com/ips-info"
 HOSTNAME=$(/bin/hostname)
-BEARER_TOKEN="{{ chia_alerts_receiver_token | quote }}"
+BEARER_TOKEN="{{ CHIA_ALERTS_RECEIVER_TOKEN | quote }}"
 
 # Get the Tailscale IPv4 address
 TAILSCALE_IPV4=$(tailscale ip | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
