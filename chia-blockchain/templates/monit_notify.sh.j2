@@ -10,15 +10,15 @@ TAILSCALE_IPV4=$(tailscale ip | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n
 PAYLOAD=$(
 	cat <<EOF
 {
-  "alerts": [
-    {
-      "status": "warning",
-      "annotations": {
-        "title": "Monit Alert",
-        "description": "Monit has restarted the Chia services on host $HOSTNAME with Tailscale IP $TAILSCALE_IPV4"
-      }
-    }
-  ]
+	"alerts": [
+		{
+			"status": "warning",
+			"annotations": {
+      	"title": "Monit Alert",
+				"description": "Monit has restarted the Chia services on host $HOSTNAME with Tailscale IP $TAILSCALE_IPV4"
+			}
+		}
+	]
 }
 EOF
 )
