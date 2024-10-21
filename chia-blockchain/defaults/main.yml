@@ -260,7 +260,7 @@ chia_add_healthcheck_service: true
 chia_healthcheck_port: 9950
 add_monit_config: true
 monit_start_now: true
-chia_alerts_receiver_token: "{{ lookup('env', 'CHIA_ALERTS_RECEIVER_TOKEN') }}"
+chia_alerts_receiver_token: ""
 # How many times the port check needs to fail before monit will restart the service
 chia_monit_failure_threshold: 3
 
