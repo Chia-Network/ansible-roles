@@ -1,12 +1,10 @@
 #!/bin/bash
 
 # Webhook URL where the alert will be sent
-WEBHOOK_URL="https://alert-receiver.chiaops.com/ips-info"
+WEBHOOK_URL="{{ chia_monit_alert_webhook_url }}"
 HOSTNAME=$(/bin/hostname)
-BEARER_TOKEN="{{ CHIA_ALERTS_RECEIVER_TOKEN }}"
+BEARER_TOKEN="{{ chia_alerts_receiver_token }}"
 
-# Get the Tailscale IPv4 address
-TAILSCALE_IPV4=$(tailscale ip | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
 PAYLOAD=$(
 	cat <<EOF
 {
@@ -15,7 +13,7 @@ PAYLOAD=$(
 			"status": "warning",
 			"annotations": {
 				"title": "Monit Alert",
-				"description": "Monit has restarted the Chia services on host $HOSTNAME with Tailscale IP $TAILSCALE_IPV4"
+				"description": "Monit has restarted the Chia services on host $HOSTNAME"
 			}
 		}
 	]
