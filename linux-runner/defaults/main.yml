@@ -21,3 +21,4 @@ runner_post_run_exclusions:
   - .bash_logout
   - .bashrc
   - .profile
+  - .fnm

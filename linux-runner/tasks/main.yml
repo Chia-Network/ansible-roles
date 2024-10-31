@@ -100,6 +100,16 @@
     mode: "0644"
   notify: restart-runner
 
+- name: Add the .path file
+  become: yes
+  ansible.builtin.template:
+    src: "path"
+    dest: "{{ runner_directory_path }}/.path"
+    owner: "{{ runner_user }}"
+    group: "{{ runner_group }}"
+    mode: "0644"
+  notify: restart-runner
+
 - name: Ensure the service is in desired boot and current state
   become: true
   ansible.builtin.systemd:
