@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo "Stopping any running docker containers"
+docker stop $(docker ps -a -q) && docker rm $(docker ps -a -q)
+
 shopt -s dotglob # Enable matching hidden files
 
 directory="/home/{{ runner_user }}"
@@ -57,6 +60,3 @@ else
 	echo "All delete operations completed successfully."
 	exit 0
 fi
-
-echo "Stopping any running docker containers"
-docker stop $(docker ps -a -q) && docker rm $(docker ps -a -q)
