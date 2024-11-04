@@ -57,3 +57,6 @@ else
 	echo "All delete operations completed successfully."
 	exit 0
 fi
+
+echo "Stopping any running docker containers"
+docker stop $(docker ps -a -q) && docker rm $(docker ps -a -q)
