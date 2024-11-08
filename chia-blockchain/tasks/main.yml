@@ -264,11 +264,11 @@
   when: add_monit_config
   notify: restart-monit
 
-- name: Start Monit Service
+- name: Start or Restart the Monit Service
   become: true
   ansible.builtin.service:
     name: monit
-    state: started
+    state: restarted
   when: add_monit_config and monit_start_now
   register: systemd_action
   retries: 10
