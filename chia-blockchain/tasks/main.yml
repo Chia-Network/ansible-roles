@@ -260,7 +260,7 @@
   ansible.builtin.template:
     src: monit_notify.sh.j2
     dest: /etc/monit/monit-notify.sh
-    mode: "0644"
+    mode: "0744"
   when: add_monit_config
   notify: restart-monit
 
