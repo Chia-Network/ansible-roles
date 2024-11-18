@@ -38,5 +38,4 @@ server {
     include /etc/nginx/{{ climate_apps_domains | first }}_ui_includes/*.inc;
 
     try_files $uri $uri/ =404;
-
 }

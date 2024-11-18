@@ -47,5 +47,3 @@
     enabled: true
     state: started
   tags: sqlite_web
-
-
