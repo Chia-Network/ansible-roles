@@ -1,3 +1,4 @@
 location / {
         alias /var/www/{{ climate_apps_domains | first }}/core-registry-ui/build/;
+        try_files $uri /index.html;
 }
