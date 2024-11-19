@@ -29,7 +29,7 @@ core_registry_tokenization_api_url: ""
 core_registry_explorer_api_url: ""
 
 # Set to "true" to use the colors.json custom color configuration
-core_registry_custom_colors: false
-core_registry_leftNavBg: "rgb(0, 242, 245)"
-core_registry_leftNavText: "#ff0005"
-core_registry_leftNavItemActive: "blue"
+core_registry_ui_custom_colors: false
+core_registry_ui_leftNavBg: "rgb(0, 242, 245)"
+core_registry_ui_leftNavText: "#ff0005"
+core_registry_ui_leftNavItemActive: "blue"
