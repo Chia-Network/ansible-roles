@@ -21,3 +21,15 @@ basic_authentication: false
 
 # True or false if Nginx will be proxying the CADT API
 core_registry_api_proxy: true
+
+# Default to blank which will set UI to not autopopulate host field.
+# Override in playbook with full URL including path and scheme.
+core_registry_cadt_api_url: ""
+core_registry_tokenization_api_url: ""
+core_registry_explorer_api_url: ""
+
+# Set to "true" to use the colors.json custom color configuration
+core_registry_custom_colors: false
+core_registry_leftNavBg: "rgb(0, 242, 245)"
+core_registry_leftNavText: "#ff0005"
+core_registry_leftNavItemActive: "blue"

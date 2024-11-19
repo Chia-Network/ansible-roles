@@ -7,6 +7,7 @@ map $sent_http_content_type $expires {
     ~image/                    max;
     ~font/                     max;
 }
+
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
@@ -37,5 +38,4 @@ server {
     include /etc/nginx/{{ climate_apps_domains | first }}_ui_includes/*.inc;
 
     try_files $uri $uri/ =404;
-
 }
