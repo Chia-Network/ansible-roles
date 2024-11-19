@@ -1,0 +1,8 @@
+---
+user: ubuntu
+group: ubuntu
+
+fnm_version: v1.38.0
+
+# Optional, will skip installing any version if left empty
+fnm_install_node_version: ""

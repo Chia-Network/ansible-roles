@@ -1,7 +1,0 @@
----
-- name: start-timelord-alerts
-  systemd:
-    name: timelord-alerts.service
-    daemon_reload: true
-    state: restarted
-    enabled: yes

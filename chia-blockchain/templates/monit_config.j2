@@ -2,6 +2,14 @@ check host localhost with address 127.0.0.1
     start program = "/bin/systemctl start {{ chia_service_base }}.target" with timeout 600 seconds
     stop program = "/bin/systemctl stop {{ chia_service_base }}.target"
 {% if chia_add_healthcheck_service %}
+    {% if "full-node" in chia_enabled_services %}
     if failed port {{ chia_healthcheck_port }} protocol http request "/full_node" status = 200 for 1 cycles then restart
-{% endif %}
+    {% endif %}
+    {% if "timelord" in chia_enabled_services %}
+    if failed port {{ chia_healthcheck_port }} protocol http request "/timelord" status = 200 for 1 cycles then restart
+    {% endif %}
     if 5 restarts within {{ 5 * chia_monit_failure_threshold }} cycles then timeout
+    {% if chia_monit_alert_on_restart %}
+    if 1 restarts within {{ chia_monit_failure_threshold }} cycles then exec "/etc/monit/monit-notify.sh"
+    {% endif %}
+{% endif %}

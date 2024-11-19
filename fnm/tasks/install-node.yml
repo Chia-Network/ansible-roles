@@ -1,0 +1,20 @@
+- name: Check if a file exists with a wildcard pattern
+  stat:
+    path: /home/ubuntu/.fnm/node-versions/v{{ fnm_install_node_version }}*
+  register: fnm_version_check
+
+- ansible.builtin.debug:
+    var: fnm_version_check
+
+- name: Install desired version of node
+  become: yes
+  become_user: "{{ user }}"
+  ansible.builtin.command: fnm install {{ fnm_install_node_version }} --fnm-dir /home/{{ user }}/.fnm
+  when: not fnm_version_check.stat.exists
+
+- name: Set default version of node
+  become: yes
+  become_user: "{{ user }}"
+  ansible.builtin.command: fnm default {{ fnm_install_node_version }} --fnm-dir /home/{{ user }}/.fnm
+  args:
+    creates: /home/{{ user }}/.fnm/aliases/default/bin/node

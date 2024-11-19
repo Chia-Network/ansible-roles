@@ -1,8 +1,5 @@
 #!/bin/bash
 
-echo "Stopping any running docker containers"
-docker stop $(docker ps -a -q) && docker rm $(docker ps -a -q)
-
 shopt -s dotglob # Enable matching hidden files
 
 directory="/home/{{ runner_user }}"
@@ -44,13 +41,6 @@ for file in "$directory"/*; do
 		delete_with_backoff "$directory/$filename"
 	fi
 done
-
-if [ -n "${GITHUB_WORKSPACE}" ]; then
-	parent=$(dirname "$GITHUB_WORKSPACE")
-	delete_with_backoff "$parent"
-fi
-
-sudo rm -rf "/home/{{ runner_user }}/actions-runner/_work" || true
 
 # Check if any delete operations failed, and exit with code 1 if so
 if $delete_failed; then

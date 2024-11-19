@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Webhook URL where the alert will be sent
+WEBHOOK_URL="{{ chia_monit_alert_webhook_url }}"
+HOSTNAME=$(/bin/hostname)
+BEARER_TOKEN="{{ chia_alerts_receiver_token }}"
+
+PAYLOAD=$(
+	cat <<EOF
+{
+	"alerts": [
+		{
+			"status": "warning",
+			"annotations": {
+				"title": "Monit Alert",
+				"description": "Monit has restarted the Chia services on host $HOSTNAME"
+			}
+		}
+	]
+}
+EOF
+)
+
+# Send curl request with JSON payload and authentication
+HTTP_RESPONSE=$(curl -v -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" \
+	-H "Authorization: Bearer $BEARER_TOKEN" \
+	-d "$PAYLOAD" "$WEBHOOK_URL")
+
+# Check the HTTP response code
+if [ "$HTTP_RESPONSE" -eq 200 ]; then
+	echo "Webhook alert sent successfully."
+elif [ "$HTTP_RESPONSE" -eq 401 ]; then
+	echo "Failed to send webhook alert. Unauthorized (401)."
+else
+	echo "Failed to send webhook alert. HTTP Status: $HTTP_RESPONSE"
+fi

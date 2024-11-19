@@ -1,11 +1,8 @@
 #!/bin/bash
 
-echo "Stopping any running docker containers"
-docker stop $(docker ps -a -q) && docker rm $(docker ps -a -q)
-
 shopt -s dotglob # Enable matching hidden files
 
-directory="/home/{{ runner_user }}"
+directory="/Users/{{ runner_user }}"
 exclusions=({% for item in runner_post_run_exclusions %}
 	"{{ item }}"{% if not loop.last %} {% endif %}
 	{% endfor %}) # Any file/directory that matches this list will not be touched
@@ -45,12 +42,15 @@ for file in "$directory"/*; do
 	fi
 done
 
-if [ -n "${GITHUB_WORKSPACE}" ]; then
-	parent=$(dirname "$GITHUB_WORKSPACE")
-	delete_with_backoff "$parent"
-fi
+# relevant to https://github.com/Apple-Actions/import-codesign-certs
+security delete-keychain signing_temp.keychain || true
 
-sudo rm -rf "/home/{{ runner_user }}/actions-runner/_work" || true
+# Clean up old globally installed node_modules that might conflict with the current build
+rm -rf /opt/homebrew/lib/node_modules || true
+
+# Clean up any installed versions of node so we can start fresh
+cd $HOME
+brew list | grep "^node\@\|^node$" | xargs -L1 brew uninstall || true
 
 # Check if any delete operations failed, and exit with code 1 if so
 if $delete_failed; then

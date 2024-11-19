@@ -255,11 +255,20 @@
   when: add_monit_config
   notify: restart-monit
 
-- name: Start Monit Service
+- name: Add a notify script that send a webhook to Keybase if monit restarts the chia service
+  become: true
+  ansible.builtin.template:
+    src: monit_notify.sh.j2
+    dest: /etc/monit/monit-notify.sh
+    mode: "0744"
+  when: add_monit_config
+  notify: restart-monit
+
+- name: Start or Restart the Monit Service
   become: true
   ansible.builtin.service:
     name: monit
-    state: started
+    state: restarted
   when: add_monit_config and monit_start_now
   register: systemd_action
   retries: 10

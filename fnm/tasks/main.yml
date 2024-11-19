@@ -1,0 +1,60 @@
+---
+- name: Load architecture specific vars
+  ansible.builtin.include_vars: "{{ lookup('first_found', params) }}"
+  vars:
+    params:
+      files:
+        - '{{ansible_architecture}}.yml'
+      paths:
+        - 'vars'
+
+- name: Install Common Deps
+  become: true
+  ansible.builtin.apt:
+    name:
+      - xz-utils
+    state: present
+    update_cache: true
+    cache_valid_time: 300
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
+- name: Download the FNM release binary
+  become: yes
+  become_user: "{{ user }}"
+  get_url:
+    url: https://github.com/Schniz/fnm/releases/download/{{ fnm_version }}/fnm-{{ fnm_suffix }}.zip
+    dest: "/home/{{ user }}/fnm-{{ fnm_version }}.zip"
+    mode: 0644
+
+- name: Unarchive FNM
+  become: yes
+  become_user: "{{ user }}"
+  ansible.builtin.unarchive:
+    src: "/home/{{ user }}/fnm-{{ fnm_version }}.zip"
+    dest: "/usr/local/bin/"
+    remote_src: yes
+    creates: "/usr/local/bin/fnm"
+
+- name: Ensure FNM has the correct permissions
+  become: yes
+  ansible.builtin.file:
+    path: "/usr/local/bin/fnm"
+    state: file
+    mode: '0755'
+
+- name: Ensure fnm is configured in the shell
+  become: yes
+  become_user: "{{ user }}"
+  ansible.builtin.lineinfile:
+    path: /home/ubuntu/.bashrc
+    search_string: 'fnm env'
+    line: 'eval "$(fnm env --fnm-dir /home/{{ user }}/.fnm)"'
+    owner: ubuntu
+    group: ubuntu
+    mode: '0644'
+
+- name: Install node
+  when: fnm_install_node_version != ""
+  ansible.builtin.include_tasks: "install-node.yml"

@@ -72,6 +72,15 @@
 - debug:
     msg: "{{ install.stdout }}"
 
+- name: Add the pre-run.sh script
+  become: yes
+  ansible.builtin.template:
+    src: pre-run.sh
+    dest: "/home/{{ runner_user }}/pre-run.sh"
+    owner: "{{ runner_user }}"
+    group: "{{ runner_group }}"
+    mode: "0755"
+
 - name: Add the post-run.sh script
   become: yes
   ansible.builtin.template:
@@ -86,6 +95,16 @@
   ansible.builtin.template:
     src: "env"
     dest: "{{ runner_directory_path }}/.env"
+    owner: "{{ runner_user }}"
+    group: "{{ runner_group }}"
+    mode: "0644"
+  notify: restart-runner
+
+- name: Add the .path file
+  become: yes
+  ansible.builtin.template:
+    src: "path"
+    dest: "{{ runner_directory_path }}/.path"
     owner: "{{ runner_user }}"
     group: "{{ runner_group }}"
     mode: "0644"
