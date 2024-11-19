@@ -41,7 +41,7 @@
     mode: '0644'
     owner: "{{ user }}"
     group: "{{ group }}"
-  when: core-registry-ui == "local" and core_registry_cadt_api_url != "" and core_registry_tokenization_api_url != "" and core_registry_explorer_api_url != ""
+  when: core_registry_ui_hosting == "local" and core_registry_cadt_api_url != "" and core_registry_tokenization_api_url != "" and core_registry_explorer_api_url != ""
   tags: core-registry-ui
 
 - name: Upload Core Registry UI config for custom colors
