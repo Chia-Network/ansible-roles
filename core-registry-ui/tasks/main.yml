@@ -52,5 +52,5 @@
     mode: '0644'
     owner: "{{ user }}"
     group: "{{ group }}"
-  when: core_registry_ui_hosting == "local" and core_registry_ui_custom_colors == "true"
+  when: core_registry_ui_hosting == "local" and core_registry_ui_custom_colors == true
   tags: core-registry-ui
