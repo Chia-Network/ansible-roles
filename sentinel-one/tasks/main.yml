@@ -44,10 +44,8 @@
   when: sentinelone_status is not defined or sentinelone_status.failed
 
 - name: Install SentinelOne package
-  ansible.builtin.apt:
-    deb: /tmp/SentinelAgent_linux_v{{ sentinelone_version }}.deb
-    state: present
-    allow_downgrade: true
+  ansible.builtin.command:
+    cmd: dpkg -i /tmp/SentinelAgent_linux_v{{ sentinelone_version }}.deb
   become: true
   environment:
     S1_AGENT_INSTALL_CONFIG_PATH: "/tmp/s1-config.cfg"
