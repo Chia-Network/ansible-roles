@@ -1,0 +1,11 @@
+check file chia-hw-vdf-service with path /etc/systemd/system/chia-hw-vdf.service
+
+check program chia-hw-vdf with path "/bin/systemctl is-active --quiet chia-hw-vdf.service"
+    start program = "/bin/systemctl start chia-hw-vdf.service"
+    stop program = "/bin/systemctl stop chia-hw-vdf.service"
+    if status != 0 then restart
+    depends on chia-hw-vdf-service
+    # Prevent endless restart loops
+    if 5 restarts within 5 cycles then timeout
+    # Optional: notify on restarts
+    if 1 restarts then exec "/etc/monit/monit-notify.sh"
