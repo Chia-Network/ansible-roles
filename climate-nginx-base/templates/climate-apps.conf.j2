@@ -38,4 +38,7 @@ server {
     include /etc/nginx/{{ climate_apps_domains | first }}_ui_includes/*.inc;
 
     try_files $uri $uri/ =404;
+
+    add_header Strict-Transport-Security “max-age=31536000; preload" always;
+
 }
