@@ -17,3 +17,21 @@
   notify: restart-chia
   retries: 100
   until: hwvdf_install is success or ('Failed to lock apt for exclusive operation' not in hwvdf_install.msg and '/var/lib/dpkg/lock' not in hwvdf_install.msg)
+
+- name: Add custom monit hw-vdf config to conf.d
+  become: true
+  ansible.builtin.template:
+    src: monit_hw_vdf.j2
+    dest: /etc/monit/conf.d/chia_hw_vdf
+    mode: "0644"
+  when: add_monit_config
+  notify: restart-monit
+
+- name: Add a notify script that send a webhook to Keybase if monit restarts the chia service
+  become: true
+  ansible.builtin.template:
+    src: monit_notify_hw_vdf.sh.j2
+    dest: /etc/monit/monit-notify-hw-vdf.sh
+    mode: "0744"
+  when: add_monit_config
+  notify: restart-monit

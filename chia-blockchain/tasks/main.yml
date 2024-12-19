@@ -258,8 +258,8 @@
 - name: Add a notify script that send a webhook to Keybase if monit restarts the chia service
   become: true
   ansible.builtin.template:
-    src: monit_notify.sh.j2
-    dest: /etc/monit/monit-notify.sh
+    src: monit_notify_chia.sh.j2
+    dest: /etc/monit/monit-notify-chia.sh
     mode: "0744"
   when: add_monit_config
   notify: restart-monit
