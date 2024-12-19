@@ -31,6 +31,8 @@ server {
         try_files $uri $uri/ =404;
     }
 
+    add_header Strict-Transport-Security “max-age=31536000; preload" always;
+
     include /etc/nginx/datalayer_includes/*.inc;
 
 }
