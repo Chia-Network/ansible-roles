@@ -5,6 +5,7 @@ climate_apps_domains:
   - api2.example.com
 climate_explorer_api_proxy: true
 climate_explorer_api_version: latest
+climate-pre-release: false
 
 # Path to the climate_explorer API in the proxy - include leading and trailing slash
 climate_explorer_api_proxy_path: "/explorer/"
