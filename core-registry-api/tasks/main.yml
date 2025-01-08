@@ -21,7 +21,7 @@
   ansible.builtin.apt_repository:
     repo: deb [arch={{ climate_explorer_repo_arch }} signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/climate-tokenization-test/debian/ stable main
     update_cache: true
-  when: climate-pre-release
+  when: climate_apt_prerelease
   tags: core-registry-api
 
 - name: Install Core Registry

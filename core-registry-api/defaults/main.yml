@@ -3,7 +3,7 @@
 # Core Registy Settings
 #
 core_registry_api_version: latest
-climate-pre-release: false
+climate_apt_prerelease: false
 
 climate_apps_domains:
   - climateapps.example.com
