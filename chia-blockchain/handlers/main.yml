@@ -18,7 +18,7 @@
   ansible.builtin.service:
     name: monit
     state: restarted
-  when: add_monit_config and monit_start_now
+  when: (add_monit_config or chia_add_hw_vdf_monit_config) and monit_start_now
   register: systemd_action
   retries: 10
   until: systemd_action is success
