@@ -259,6 +259,7 @@ soa_rname: "hostmaster.chia.net."
 chia_add_healthcheck_service: true
 chia_healthcheck_port: 9950
 add_monit_config: true
+chia_add_hw_vdf_monit_config: {{ chia_enable_hw_vdf }}
 monit_start_now: true
 chia_alerts_receiver_token: ""
 chia_monit_alert_on_restart: false
