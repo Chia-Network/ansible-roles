@@ -1,0 +1,6 @@
+---
+- name: restart smartctl_exporter
+  systemd:
+    name: smartctl_exporter
+    state: restarted
+  become: true
