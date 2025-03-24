@@ -22,3 +22,4 @@ runner_post_run_exclusions:
   - .bashrc
   - .profile
   - .fnm
+  - .docker
