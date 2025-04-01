@@ -13,7 +13,7 @@ fi
 chia rpc full_node set_log_level '{ "level": "DEBUG" }'
 chia rpc timelord set_log_level '{ "level": "DEBUG" }'
 echo "Log level set to DEBUG. Sleeping for 1 minute...."
-sleep 1
+sleep 60
 chia rpc full_node set_log_level '{ "level": "INFO" }'
 chia rpc timelord set_log_level '{ "level": "INFO" }'
 echo "Log level set back to INFO"
