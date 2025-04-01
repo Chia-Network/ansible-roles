@@ -10,10 +10,10 @@ else
 fi
 
 # Set log level to DEBUG, wait, then revert to INFO
-chia configure --log-level DEBUG
-echo "Log level set to DEBUG. Restarting chia services...."
-sudo systemctl restart chia.target
+chia rpc full_node set_log_level '{ "level": "DEBUG" }'
+chia rpc timelord set_log_level '{ "level": "DEBUG" }'
+echo "Log level set to DEBUG. Sleeping for 1 minute...."
 sleep 1
-chia configure --log-level INFO
-echo "Log level set to INFO. Restarting chia services...."
-sudo systemctl restart chia.target
+chia rpc full_node set_log_level '{ "level": "INFO" }'
+chia rpc timelord set_log_level '{ "level": "INFO" }'
+echo "Log level set back to INFO"
