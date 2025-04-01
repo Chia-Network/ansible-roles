@@ -1,6 +1,6 @@
 #!/bin/bash
 set -o pipefail
-CHIA_PATH="/home/ubuntu/chia-blockchain"
+CHIA_PATH="/home/{{ user }}/chia-blockchain"
 
 if [ -d "$CHIA_PATH" ]; then
     echo "Found $CHIA_PATH — activating environment..."
