@@ -264,6 +264,8 @@ monit_start_now: true
 chia_alerts_receiver_token: ""
 chia_monit_alert_on_restart: false
 chia_monit_alert_webhook_url: ""
+# How many times the port check needs to fail before monit will increase chia logging to DEBUG
+chia_monit_log_debug_threshold: 2
 # How many times the port check needs to fail before monit will restart the service
 chia_monit_failure_threshold: 3
 
