@@ -3,10 +3,10 @@ set -o pipefail
 CHIA_PATH="/home/{{ user }}/chia-blockchain"
 
 if [ -d "$CHIA_PATH" ]; then
-    echo "Found $CHIA_PATH — activating environment..."
-    . "$CHIA_PATH/activate"
+		echo "Found $CHIA_PATH — activating environment..."
+		. "$CHIA_PATH/activate"
 else
-    echo "$CHIA_PATH not found — Chia is installed with apt. Continuing...."
+		echo "$CHIA_PATH not found — Chia is installed with apt. Continuing...."
 fi
 
 # Set log level to DEBUG, wait, then revert to INFO
