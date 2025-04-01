@@ -3,7 +3,8 @@ check host localhost with address 127.0.0.1
     stop program = "/bin/systemctl stop {{ chia_service_base }}.target"
 {% if chia_add_healthcheck_service %}
     {% if "full-node" in chia_enabled_services %}
-    if failed port {{ chia_healthcheck_port }} protocol http request "/full_node" status = 200 for {{ chia_monit_failure_threshold }} cycles then restart
+if failed port {{ chia_healthcheck_port }} protocol http request "/full_node" status = 200 for {{ chia_monit_log_debug_threshold }} cycles then exec "/etc/monit/monit-change-log-level.sh"
+if failed port {{ chia_healthcheck_port }} protocol http request "/full_node" status = 200 for {{ chia_monit_failure_threshold }} cycles then restart
     {% endif %}
     {% if "timelord" in chia_enabled_services %}
     if failed port {{ chia_healthcheck_port }} protocol http request "/timelord" status = 200 for {{ chia_monit_log_debug_threshold }} cycles then exec "/etc/monit/monit-change-log-level.sh"
