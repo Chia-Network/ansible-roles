@@ -264,6 +264,15 @@
   when: add_monit_config
   notify: restart-monit
 
+- name: Add a script to swap the log level prior to a restart
+  become: true
+  ansible.builtin.template:
+    src: monit_change_log_level.sh
+    dest: /etc/monit/monit-change-log-level.sh
+    mode: "0744"
+  when: add_monit_config
+  notify: restart-monit
+
 - name: Start or Restart the Monit Service
   become: true
   ansible.builtin.service:

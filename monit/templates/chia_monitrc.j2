@@ -16,7 +16,7 @@
 ##
 ## Start Monit in the background (run as a daemon):
 #
-set daemon 120            # check services at 2-minute intervals
+set daemon {{ monit_cycle_time }}            # check services at specified intervals
     with start delay {{ monit_start_delay_secs }}    # optional: delay the first check by x-minutes (by
 #                           # default Monit check immediately after Monit start)
 #

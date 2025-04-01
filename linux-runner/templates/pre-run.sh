@@ -44,8 +44,8 @@ done
 
 # Reset the docker auth if we have a template
 if [ -f "${directory}/.docker/config.json.tmpl" ]; then
-  rm "${directory}/.docker/config.json" || true
-  cp "${directory}/.docker/config.json.tmpl" "${directory}/.docker/config.json"
+	rm "${directory}/.docker/config.json" || true
+	cp "${directory}/.docker/config.json.tmpl" "${directory}/.docker/config.json"
 fi
 
 # Check if any delete operations failed, and exit with code 1 if so

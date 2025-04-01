@@ -4,3 +4,4 @@ monit_start_now: yes
 
 #This is the delay time for monit to start checking after a system start
 monit_start_delay_secs: 3600
+monit_cycle_time: 60

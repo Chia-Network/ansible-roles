@@ -8,4 +8,4 @@ check program chia-hw-vdf with path "/bin/systemctl is-active --quiet chia-hw-vd
     # Prevent endless restart loops
     if 5 restarts within {{ 5 * chia_monit_failure_threshold }} cycles then timeout
     # notify keybase on restarts
-    if 1 restarts within {{ chia_monit_failure_threshold }} cycles then exec "/etc/monit/monit-notify-hw-vdf.sh"
+    if 1 restarts within 1 cycles then exec "/etc/monit/monit-notify-hw-vdf.sh"
