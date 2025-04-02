@@ -30,7 +30,7 @@
 - name: Add a notify script that send a webhook to Keybase if monit restarts the chia service
   become: true
   ansible.builtin.template:
-    src: monit_notify_hw_vdf.sh.j2
+    src: monit_restart_hw_vdf_with_alert.sh.j2
     dest: /etc/monit/monit-notify-hw-vdf.sh
     mode: "0744"
   when: chia_add_hw_vdf_monit_config
