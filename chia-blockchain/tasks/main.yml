@@ -249,8 +249,8 @@
 - name: Add custom monit config to conf.d
   become: true
   ansible.builtin.template:
-    src: monit-config.j2
-    dest: /etc/monit/conf.d/chia-monit
+    src: monit_config.j2
+    dest: /etc/monit/conf.d/chia_monit
     mode: "0644"
   when: add_monit_config
   notify: restart-monit

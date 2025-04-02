@@ -21,8 +21,8 @@
 - name: Add custom monit hw-vdf config to conf.d
   become: true
   ansible.builtin.template:
-    src: monit-hw-vdf.j2
-    dest: /etc/monit/conf.d/chia-hw-vdf
+    src: monit_hw_vdf.j2
+    dest: /etc/monit/conf.d/chia_hw_vdf
     mode: "0644"
   when: chia_add_hw_vdf_monit_config
   notify: restart-monit
