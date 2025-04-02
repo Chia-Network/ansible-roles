@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Restart the service
+/bin/systemctl restart chia-hw-vdf.service
+
 # Webhook URL where the alert will be sent
 WEBHOOK_URL="{{ chia_monit_alert_webhook_url }}"
 HOSTNAME=$(/bin/hostname)
