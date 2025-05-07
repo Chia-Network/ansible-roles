@@ -51,6 +51,7 @@ if [ -n "${GITHUB_WORKSPACE}" ]; then
 fi
 
 sudo rm -rf "/home/{{ runner_user }}/actions-runner/_work" || true
+sudo rm -rf /tmp/* || true
 
 # Reset the docker auth if we have a template
 if [ -f "${directory}/.docker/config.json.tmpl" ]; then
