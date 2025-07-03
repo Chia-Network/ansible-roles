@@ -3,5 +3,3 @@ check program chia-hw-vdf with path "/bin/systemctl is-active --quiet chia-hw-vd
     stop program = "/bin/systemctl stop chia-hw-vdf.service"
     restart program = "/etc/monit/monit-hw-vdf-restart-alert.sh"
     if status != 0 then restart
-    # Prevent endless restart loops
-    if 5 restarts within {{ 5 * chia_monit_failure_threshold }} cycles then timeout
