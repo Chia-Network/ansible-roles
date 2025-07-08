@@ -103,7 +103,6 @@
   when: # List is AND
     - git_output.changed
     - '"timelord-launcher" in chia_enabled_services'
-    -
 
 # Since chia might have already been updated (via apt) from another user on this machine in some setups
 # We track the version as of the last time this role ran, and if it changes, we restart chia
