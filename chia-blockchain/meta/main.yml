@@ -7,7 +7,7 @@ dependencies:
   - role: monit
     when: add_monit_config or chia_add_hw_vdf_monit_config
   - role: chia-apt-key
-    when: chia_installation_method == "apt"
+    when: `chia_installation_method == "apt" or chia_enable_hw_vdf`
   - role: git
     when: chia_installation_method == "source"
   - role: chia-healthcheck
