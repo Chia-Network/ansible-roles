@@ -62,7 +62,7 @@
   ansible.builtin.apt:
     name: cmake
     state: present
-  when: chia_enabled_services == "timelord"
+  when: chia_enabled_services == "timelord-launcher"
 
 - name: Stop Monit Service
   become: true
