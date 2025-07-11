@@ -62,6 +62,8 @@
   ansible.builtin.apt:
     name: cmake
     state: present
+    update_cache: true
+    cache_valid_time: 300
   when: chia_enabled_services == "timelord-launcher"
   register: apt_action
   retries: 100
