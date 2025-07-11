@@ -57,6 +57,18 @@
   retries: 100
   until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
+- name: Install cmake for timelords
+  become: true
+  ansible.builtin.apt:
+    name: cmake
+    state: present
+    update_cache: true
+    cache_valid_time: 300
+  when: chia_enabled_services == "timelord-launcher"
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
 - name: Stop Monit Service
   become: true
   ansible.builtin.service:
