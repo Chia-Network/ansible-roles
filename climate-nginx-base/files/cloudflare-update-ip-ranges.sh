@@ -18,14 +18,14 @@ truncate -s 0 $CF_NGINX_TMP
 # Download the files.
 if [ -f /usr/bin/curl ];
 then
-    echo "# IPv4" >> $CF_NGINX_TMP
-    curl --silent $CF_URL_IP4 | sed -e 's/^.\+$/set_real_ip_from \0;/' >> $CF_NGINX_TMP
-    echo "" >> $CF_NGINX_TMP
-    echo "# IPv6" >> $CF_NGINX_TMP
-    curl --silent $CF_URL_IP6 | sed -e 's/^.\+$/set_real_ip_from \0;/' >> $CF_NGINX_TMP
+	echo "# IPv4" >> $CF_NGINX_TMP
+	curl --silent $CF_URL_IP4 | sed -e 's/^.\+$/set_real_ip_from \0;/' >> $CF_NGINX_TMP
+	echo "" >> $CF_NGINX_TMP
+	echo "# IPv6" >> $CF_NGINX_TMP
+	curl --silent $CF_URL_IP6 | sed -e 's/^.\+$/set_real_ip_from \0;/' >> $CF_NGINX_TMP
 else
-    echo "Unable to download CloudFlare files."
-    exit 1
+	echo "Unable to download CloudFlare files."
+	exit 1
 fi
 
 echo "" >> $CF_NGINX_TMP
@@ -39,13 +39,13 @@ mv $CF_NGINX_TMP $CF_NGINX_CONFIG
 
 # Reload Nginx
 if sudo nginx -t &> /dev/null; then
-    echo "Nginx configuration test successful. Restarting Nginx..."
-    # Restart Nginx service
-    sudo systemctl reload nginx
-    echo "Nginx reloaded."
+	echo "Nginx configuration test successful. Restarting Nginx..."
+	# Restart Nginx service
+	sudo systemctl reload nginx
+	echo "Nginx reloaded."
 else
-    echo "Nginx configuration test failed. Nginx will not be restarted."
-    # Optionally, you can add error handling or logging here
-    # For example, print the Nginx test output to stderr for debugging
-    sudo nginx -t
+	echo "Nginx configuration test failed. Nginx will not be restarted."
+	# Optionally, you can add error handling or logging here
+	# For example, print the Nginx test output to stderr for debugging
+	sudo nginx -t
 fi
