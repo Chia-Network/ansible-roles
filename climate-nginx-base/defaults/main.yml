@@ -6,3 +6,5 @@ climate_apps_domains:
 # True or false
 basic_authentication: false
 
+# If proxying through Cloudflare, set to true to get the real IP in Nginx
+cloudflare_proxy: false
