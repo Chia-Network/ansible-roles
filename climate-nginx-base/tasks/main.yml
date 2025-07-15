@@ -84,6 +84,7 @@
   become: true
   ansible.builtin.cron:
     name: "cloudflare-update-ip-ranges"
+    job: "/usr/local/bin/cloudflare-update-ip-ranges.sh"
     minute: "10"
     hour: "5"
     day: "*"
