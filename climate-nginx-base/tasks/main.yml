@@ -92,3 +92,27 @@
     weekday: "1"
   when: cloudflare_proxy
   tags: climate-nginx-base
+
+# Remove blocklist file if nginx_blocklist is empty
+- name: Remove nginx blocklist file when variable is empty
+  become: true
+  ansible.builtin.file:
+    path: /etc/nginx/conf.d/blocklist.conf
+    state: absent
+  when: nginx_blocklist == ""
+  notify: Reload-nginx
+  tags: climate-nginx-base
+
+# Create/update blocklist file if nginx_blocklist is not empty
+- name: Create nginx blocklist file when variable is not empty
+  become: true
+  ansible.builtin.copy:
+    content: "{{ nginx_blocklist }}"
+    dest: /etc/nginx/conf.d/blocklist.conf
+    owner: root
+    group: root
+    mode: '0644'
+  when: nginx_blocklist != ""
+  notify: Reload-nginx
+  tags: climate-nginx-base
+
