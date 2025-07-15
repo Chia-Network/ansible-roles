@@ -60,3 +60,34 @@
     owner: "root"
     group: "root"
   tags: climate-nginx-base
+
+# If we are proxying through Cloudflare, upload the IP address retrieval script
+- name: Upload Cloudflare IP address retrieval script
+  become: true
+  ansible.builtin.copy:
+    src: cloudflare-update-ip-ranges.sh
+    dest: /usr/local/bin/cloudflare-update-ip-ranges.sh
+    mode: '0755'
+  when: cloudflare_proxy
+  tags: climate-nginx-base
+
+# Run Cloudflare IP address retrieval script if proxying through cloudflare
+- name: Run Cloudflare IP address retrieval script
+  become: true
+  ansible.builtin.shell:
+    cmd: /usr/local/bin/cloudflare-update-ip-ranges.sh
+  when: cloudflare_proxy
+  tags: climate-nginx-base
+
+# If proxying through cloudflare, set crontab to run the cloudflare-update-ip-ranges.sh script once a week
+- name: Set crontab to run cloudflare-update-ip-ranges.sh script once a week
+  become: true
+  ansible.builtin.cron:
+    name: "cloudflare-update-ip-ranges"
+    minute: "10"
+    hour: "5"
+    day: "*"
+    month: "*"
+    weekday: "1"
+  when: cloudflare_proxy
+  tags: climate-nginx-base
