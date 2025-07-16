@@ -116,3 +116,35 @@
   notify: Reload-nginx
   tags: climate-nginx-base
 
+# If we have a blocklist configured, upload the UptimeRobot IP address retrieval script
+- name: Upload UptimeRobot IP address retrieval script
+  become: true
+  ansible.builtin.copy:
+    src: uptimerobot-update-ip.sh
+    dest: /usr/local/bin/uptimerobot-update-ip.sh
+    mode: '0755'
+  when: nginx_blocklist != ""
+  tags: climate-nginx-base
+
+# Run UptimeRobot IP address retrieval script if we have a blocklist configured
+- name: Run UptimeRobot IP address retrieval script
+  become: true
+  ansible.builtin.shell:
+    cmd: /usr/local/bin/uptimerobot-update-ip.sh
+  when: nginx_blocklist != ""
+  tags: climate-nginx-base
+
+# If we have a blocklist configured, set crontab to run the uptimerobot-update-ip.sh script once a day
+- name: Set crontab to run uptimerobot-update-ip.sh script once a day
+  become: true
+  ansible.builtin.cron:
+    name: "uptimerobot-update-ip"
+    job: "/usr/local/bin/uptimerobot-update-ip.sh"
+    minute: "{{ range(5, 60) | random }}"
+    hour: "1"
+    day: "*"
+    month: "*"
+    weekday: "*"
+  when: nginx_blocklist != ""
+  tags: climate-nginx-base
+
