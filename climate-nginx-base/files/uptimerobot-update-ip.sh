@@ -30,7 +30,7 @@ else
 	exit 1
 fi
 
-mv $UPTIMEROBOT_NGINX_TMP $UPTIMEROBOT_NGINX_CONFIG
+mv -f $UPTIMEROBOT_NGINX_TMP $UPTIMEROBOT_NGINX_CONFIG
 
 # Reload Nginx
 if sudo nginx -t &>/dev/null; then
