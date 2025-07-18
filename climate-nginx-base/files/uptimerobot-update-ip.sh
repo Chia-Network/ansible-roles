@@ -18,9 +18,6 @@ trap "rm -f $UPTIMEROBOT_NGINX_TMP" EXIT
 # The URL with the actual IP addresses used by UptimeRobot.
 UPTIMEROBOT_URL="https://cdn.uptimerobot.com/api/IPv4andIPv6.txt"
 
-# Start with an empty file (mktemp already creates it empty, but being explicit)
-> $UPTIMEROBOT_NGINX_TMP
-
 # Download the file.
 if [ -f /usr/bin/curl ]; then
 	echo "# UptimeRobot IP addresses for allow list" >>$UPTIMEROBOT_NGINX_TMP
