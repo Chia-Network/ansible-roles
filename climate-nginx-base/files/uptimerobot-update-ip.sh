@@ -8,12 +8,15 @@ set -ex
 
 # Location of the nginx config file that contains the UptimeRobot IP addresses.
 UPTIMEROBOT_NGINX_CONFIG="/etc/nginx/conf.d/0-uptimerobot-ips.conf"
-UPTIMEROBOT_NGINX_TMP="/tmp/uptimerobot_tmp.conf"
+
+# Create a unique temporary file with proper permissions
+UPTIMEROBOT_NGINX_TMP=$(mktemp /tmp/uptimerobot_tmp.XXXXXX)
+
+# Ensure temp file is cleaned up on exit
+trap "rm -f $UPTIMEROBOT_NGINX_TMP" EXIT
 
 # The URL with the actual IP addresses used by UptimeRobot.
 UPTIMEROBOT_URL="https://cdn.uptimerobot.com/api/IPv4andIPv6.txt"
-
-truncate -s 0 $UPTIMEROBOT_NGINX_TMP
 
 # Download the file.
 if [ -f /usr/bin/curl ]; then
