@@ -97,10 +97,22 @@
 - name: Remove nginx blocklist file when variable is empty
   become: true
   ansible.builtin.file:
-    path: /etc/nginx/conf.d/blocklist.conf
+    path: /etc/nginx/blocklist-includes/90-blocklist.conf
     state: absent
   when: nginx_blocklist == ""
   notify: Reload-nginx
+  tags: climate-nginx-base
+
+# Create the blocklist-includes directory
+- name: Create blocklist-includes directory
+  become: true
+  ansible.builtin.file:
+    path: /etc/nginx/blocklist-includes
+    state: directory
+    mode: '0755'
+    owner: "root"
+    group: "root"
+  when: nginx_blocklist != ""
   tags: climate-nginx-base
 
 # Create/update blocklist file if nginx_blocklist is not empty
@@ -108,7 +120,7 @@
   become: true
   ansible.builtin.copy:
     content: "{{ nginx_blocklist }}"
-    dest: /etc/nginx/conf.d/blocklist.conf
+    dest: /etc/nginx/blocklist-includes/90-blocklist.conf
     owner: root
     group: root
     mode: '0644'

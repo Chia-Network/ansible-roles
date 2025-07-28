@@ -38,6 +38,9 @@ server {
     index index.html;
     include /etc/nginx/{{ climate_apps_domains | first }}_proxy_includes/*.inc;
     include /etc/nginx/{{ climate_apps_domains | first }}_ui_includes/*.inc;
+{% if nginx_blocklist %}
+    include /etc/nginx/blocklist-includes/*.conf;
+{% endif %}
 
     try_files $uri $uri/ =404;
 
