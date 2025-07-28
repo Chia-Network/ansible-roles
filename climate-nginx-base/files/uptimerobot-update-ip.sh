@@ -6,8 +6,12 @@
 # Stop if any error occurs
 set -ex
 
+BASE_DIR="/etc/nginx/blocklist-includes"
+
+mkdir -p $BASE_DIR
+
 # Location of the nginx config file that contains the UptimeRobot IP addresses.
-UPTIMEROBOT_NGINX_CONFIG="/etc/nginx/conf.d/0-uptimerobot-ips.conf"
+UPTIMEROBOT_NGINX_CONFIG="$BASE_DIR/0-uptimerobot-ips.conf"
 
 # Create a unique temporary file with proper permissions
 UPTIMEROBOT_NGINX_TMP=$(mktemp /tmp/uptimerobot_tmp.XXXXXX)
