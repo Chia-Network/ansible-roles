@@ -36,6 +36,8 @@ echo "real_ip_recursive on;" >>$CF_NGINX_TMP
 
 mv $CF_NGINX_TMP $CF_NGINX_CONFIG
 
+chmod 644 $CF_NGINX_CONFIG
+
 # Reload Nginx
 if sudo nginx -t &>/dev/null; then
 	echo "Nginx configuration test successful. Restarting Nginx..."
