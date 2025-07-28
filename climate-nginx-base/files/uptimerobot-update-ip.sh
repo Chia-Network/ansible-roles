@@ -35,6 +35,8 @@ fi
 
 mv -f $UPTIMEROBOT_NGINX_TMP $UPTIMEROBOT_NGINX_CONFIG
 
+chmod 644 $UPTIMEROBOT_NGINX_CONFIG
+
 # Reload Nginx
 if sudo nginx -t &>/dev/null; then
 	echo "Nginx configuration test successful. Restarting Nginx..."
