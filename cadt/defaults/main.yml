@@ -24,11 +24,14 @@ cadt_db_host: null
 # Port that the CADT API will listen on
 cadt_port: 31310
 
+cadt_log_level: info
+
 cadt_is_governance_body: false
 cadt_read_only: false
 cadt_governance_body_id: 23f6498e015ebcd7190c97df30c032de8deb5c8934fc1caa928bc310e2b8a57e
 
 cadt_auto_subscribe_filestore: false
+cadt_auto_mirror_external_stores: true
 
 # Tasks time staggered to avoid simultaneous RPC calls
 cadt_audit_sync_task_interval: 30  # kept for legacy installs - no longer used in latest
