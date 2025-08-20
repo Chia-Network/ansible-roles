@@ -13,7 +13,7 @@
 - name: Copy and uncompress CADT UI files from Github
   become: true
   ansible.builtin.unarchive:
-    src: https://github.com/Chia-Network/cadt-ui/releases/{{ (cadt_api_version == 'latest') | ternary('latest/download', 'download/' +  cadt_ui_version )}}/cadt-ui-web-build.tar.gz
+    src: https://github.com/Chia-Network/cadt-ui/releases/{{ (cadt_ui_version == 'latest') | ternary('latest/download', 'download/' +  cadt_ui_version )}}/cadt-ui-web-build.tar.gz
     dest: /var/www/{{ climate_apps_domains | first }}/cadt-ui
     owner: "{{ user }}"
     group: "{{ user }}"
