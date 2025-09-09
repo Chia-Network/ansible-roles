@@ -44,6 +44,8 @@ done
 
 # relevant to https://github.com/Apple-Actions/import-codesign-certs
 security delete-keychain signing_temp.keychain || true
+# https://github.com/Chia-Network/chia-blockchain/blob/d67a7df84cc22179497df037aa5caee65fb14cbb/.github/workflows/test-single.yml#L151
+security delete-keychain chiachain || true
 
 # Clean up old globally installed node_modules that might conflict with the current build
 rm -rf /opt/homebrew/lib/node_modules || true
