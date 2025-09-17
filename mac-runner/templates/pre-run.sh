@@ -53,6 +53,12 @@ rm -rf /opt/homebrew/lib/node_modules || true
 # Clean up any installed versions of node so we can start fresh
 cd $HOME
 brew list | grep "^node\@\|^node$" | xargs -L1 brew uninstall || true
+brew cleanup -s
+brew_directory="/Users/{{ runner_user }}/Library/Caches/Homebrew/downloads"
+for file in "$brew_directory"/*; do
+	filename=$(basename "$file")
+	delete_with_backoff "$brew_directory/$filename"
+done
 
 # Check if any delete operations failed, and exit with code 1 if so
 if $delete_failed; then
