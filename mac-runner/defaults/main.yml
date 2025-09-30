@@ -2,7 +2,7 @@
 runner_user: "chia"
 runner_group: "staff"
 
-runner_release_version: "2.307.1"
+runner_release_version: "2.328.0"
 runner_directory_path: ""
 runner_registration_token: ""
 runner_github_group: ""
