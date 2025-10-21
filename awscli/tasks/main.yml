@@ -1,12 +1,52 @@
 ---
-- name: Install AWSCLI
+- name: Install AWS CLI v2
   become: true
-  ansible.builtin.apt:
-    name:
-      - awscli
-    state: present
-    update_cache: true
-    cache_valid_time: 300
-  register: apt_action
-  retries: 100
-  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+  block:
+    - name: Ensure unzip is available
+      ansible.builtin.apt:
+        name: unzip
+        state: present
+        update_cache: true
+        cache_valid_time: 300
+      register: apt_action
+      retries: 100
+      until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
+
+    - name: Set AWS CLI architecture fact
+      ansible.builtin.set_fact:
+        aws_arch: "{{ 'aarch64' if ansible_architecture == 'aarch64' else 'x86_64' }}"
+
+    - name: Check if AWS CLI is already installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/aws
+      register: awscli_bin
+
+    - name: Download AWS CLI v2 installer
+      ansible.builtin.get_url:
+        url: "https://awscli.amazonaws.com/awscli-exe-linux-{{ aws_arch }}.zip"
+        dest: /tmp/awscliv2.zip
+        mode: '0644'
+        force: true
+      when: not awscli_bin.stat.exists
+
+    - name: Unzip AWS CLI v2 installer
+      ansible.builtin.unarchive:
+        src: /tmp/awscliv2.zip
+        dest: /tmp/
+        remote_src: true
+      when: not awscli_bin.stat.exists
+
+    - name: Install AWS CLI v2
+      ansible.builtin.command:
+        cmd: /tmp/aws/install --update
+      args:
+        creates: /usr/local/bin/aws
+
+    - name: Clean up AWS CLI installer files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/aws
+        - /tmp/awscliv2.zip
+      when: not awscli_bin.stat.exists
