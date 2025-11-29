@@ -5,7 +5,7 @@
     path: "/etc/ssh/sshd_config"
     regexp: '^PasswordAuthentication'
     line: "PasswordAuthentication no"
-  notify: restart-sshd
+  notify: restart-ssh
 
 - name: Disable root login for SSH
   become: true
@@ -13,4 +13,4 @@
     path: "/etc/ssh/sshd_config"
     regexp: '^PermitRootLogin'
     line: "PermitRootLogin no"
-  notify: restart-sshd
+  notify: restart-ssh
