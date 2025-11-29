@@ -6,7 +6,7 @@
     dest: /etc/ssh/trusted-user-ca-keys.pem
     mode: '0644'
   when: ca_url != ""
-  notify: restart-sshd
+  notify: restart-ssh
 
 - name: Copy CA Content to the trusted CA key file
   become: yes
@@ -15,7 +15,7 @@
     dest: /etc/ssh/trusted-user-ca-keys.pem
     mode: '0644'
   when: ca_content != ""
-  notify: restart-sshd
+  notify: restart-ssh
 
 # TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem
 - name: Ensure ssh config has the trusted CA
@@ -25,4 +25,4 @@
     regexp: '^TrustedUserCAKeys'
     line: "TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem"
   when: ca_url != "" or ca_content != ""
-  notify: restart-sshd
+  notify: restart-ssh

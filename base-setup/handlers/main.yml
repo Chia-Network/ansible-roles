@@ -1,7 +1,7 @@
-- name: restart-sshd
+- name: restart-ssh
   become: true
   ansible.builtin.service:
-    name: "sshd"
+    name: "ssh"
     state: restarted
   register: systemd_action
   retries: 10
