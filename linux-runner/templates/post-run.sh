@@ -6,15 +6,15 @@ echo "[INFO] Stopping any running docker containers"
 CONTAINERS=$(docker ps -aq) || CONTAINERS=""
 
 if [ -n "$CONTAINERS" ]; then
-  echo "[INFO] Found containers: $CONTAINERS"
+	echo "[INFO] Found containers: $CONTAINERS"
 
-  # Stop containers, ignore any individual failure
-  docker stop $CONTAINERS || true
+	# Stop containers, ignore any individual failure
+	docker stop $CONTAINERS || true
 
-  # Remove containers, ignore failure (e.g., already removed)
-  docker rm -f $CONTAINERS || true
+	# Remove containers, ignore failure (e.g., already removed)
+	docker rm -f $CONTAINERS || true
 else
-  echo "[INFO] No containers to stop/remove"
+	echo "[INFO] No containers to stop/remove"
 fi
 
 shopt -s dotglob # Enable matching hidden files
