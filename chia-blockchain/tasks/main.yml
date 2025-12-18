@@ -306,7 +306,7 @@
     job: "PATH=/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin CHIA_ROOT={{ chia_root }} chia peer full_node -a {{ item }}:{{ full_node_port }} >> /dev/null 2>&1"
   with_items: "{{ chia_periodic_connect_peers }}"
   when:
-    - chia_periodic_connect_peers | length
+    - chia_periodic_connect_peers | length > 0
 
 - name: Set up script to generate new certs on first boot
   ansible.builtin.include_tasks: "cloudinit-certs.yml"
