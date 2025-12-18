@@ -49,7 +49,7 @@
   become: true
   ansible.builtin.apt:
     name:
-      - netcat # Used by systemd "up" checks
+      - netcat-openbsd # Used by systemd "up" checks
     state: present
     update_cache: true
     cache_valid_time: 300
