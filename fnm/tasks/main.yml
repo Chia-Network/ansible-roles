@@ -30,7 +30,6 @@
 
 - name: Unarchive FNM
   become: yes
-  become_user: "{{ user }}"
   ansible.builtin.unarchive:
     src: "/home/{{ user }}/fnm-{{ fnm_version }}.zip"
     dest: "/usr/local/bin/"
