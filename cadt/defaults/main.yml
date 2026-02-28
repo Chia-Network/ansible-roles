@@ -82,16 +82,16 @@ cadt_v1_db_password: "{{ cadt_db_password }}"
 cadt_v1_db_name: "{{ cadt_db_name }}"
 cadt_v1_db_host: "{{ cadt_db_host }}"
 
-# V2 configuration - disabled by default
+# V2 configuration - disabled by default, must be explicitly configured
 cadt_v2_enable: false
-cadt_v2_read_only: "{{ cadt_read_only }}"
-cadt_v2_api_key: "{{ cadt_api_key }}"
-cadt_v2_is_governance_body: "{{ cadt_is_governance_body }}"
-cadt_v2_governance_body_id: "{{ cadt_governance_body_id }}"
-cadt_v2_db_username: "{{ cadt_db_username }}"
-cadt_v2_db_password: "{{ cadt_db_password }}"
-cadt_v2_db_name: "{{ cadt_db_name }}"
-cadt_v2_db_host: "{{ cadt_db_host }}"
+cadt_v2_read_only: false
+cadt_v2_api_key: null
+cadt_v2_is_governance_body: false
+cadt_v2_governance_body_id: null
+cadt_v2_db_username: null
+cadt_v2_db_password: null
+cadt_v2_db_name: null
+cadt_v2_db_host: null
 
 # Backups
 backup_base_dir: /home/{{ user }}/backup
