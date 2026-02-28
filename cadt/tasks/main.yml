@@ -49,7 +49,7 @@
 - name: Add CADT config file
   ansible.builtin.template:
     src: "{{ (cadt_use_v2_config | bool) | ternary('config-v2.yaml.j2', 'config.yaml.j2') }}"
-    dest: "{{ chia_root }}/cadt/v1/config.yaml"
+    dest: "{{ chia_root }}/cadt/{{ (cadt_use_v2_config | bool) | ternary('', 'v1/') }}config.yaml"
     owner: "{{ user }}"
     group: "{{ user }}"
     mode: '0644'
