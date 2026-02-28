@@ -43,7 +43,7 @@
   ansible.builtin.set_fact:
     cadt_use_v2_config: >-
       {{ cadt_api_version != 'latest' and
-         (cadt_api_version | regex_replace('[-~]rc\d+$', '') is version('1.7.26', '>=')) }}
+      (cadt_api_version | regex_replace('[-~]rc\d+$', '') is version('1.7.26', '>=')) }}
   tags: cadt
 
 - name: Add CADT config file
