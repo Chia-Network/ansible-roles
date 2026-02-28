@@ -39,10 +39,17 @@
     state: restarted
   tags: cadt
 
+- name: Determine CADT config format
+  ansible.builtin.set_fact:
+    cadt_use_v2_config: >-
+      {{ cadt_api_version != 'latest' and
+      (cadt_api_version | regex_replace('[-~]rc\d+$', '') is version('1.7.26', '>=')) }}
+  tags: cadt
+
 - name: Add CADT config file
   ansible.builtin.template:
-    src: "config.yaml.j2"
-    dest: "{{ chia_root }}/cadt/v1/config.yaml"
+    src: "{{ (cadt_use_v2_config | bool) | ternary('config-v2.yaml.j2', 'config.yaml.j2') }}"
+    dest: "{{ chia_root }}/cadt/{{ (cadt_use_v2_config | bool) | ternary('', 'v1/') }}config.yaml"
     owner: "{{ user }}"
     group: "{{ user }}"
     mode: '0644'
