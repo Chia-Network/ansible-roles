@@ -5,6 +5,7 @@ climate_apps_domains:
   - api2.example.com
 cadt_api_proxy: true
 cadt_api_version: latest
+cadt_apt_prerelease: false
 
 # Path to the CADT API in the proxy - include leading and trailing slash
 cadt_api_proxy_path: "/api/"
@@ -56,6 +57,42 @@ datalayer_http_location: "http://{{ climate_apps_domains | first }}:8575"
 
 # Chia network
 cadt_network: "mainnet"
+
+# New config format (>= 1.7.26)
+cadt_certificate_folder_path: null
+cadt_validate_organization_table_task_interval: 1800
+
+cadt_request_content_limits:
+  STAGING:
+    EDIT_DATA_LEN: 200
+  UNITS:
+    INCLUDE_COLUMNS_LEN: 200
+    MARKETPLACE_IDENTIFIERS_LEN: 200
+  PROJECTS:
+    INCLUDE_COLUMNS_LEN: 200
+    PROJECT_IDS_LEN: 200
+
+# V1 configuration - defaults inherit from the single-value variables above
+cadt_v1_enable: true
+cadt_v1_read_only: "{{ cadt_read_only }}"
+cadt_v1_api_key: "{{ cadt_api_key }}"
+cadt_v1_is_governance_body: "{{ cadt_is_governance_body }}"
+cadt_v1_governance_body_id: "{{ cadt_governance_body_id }}"
+cadt_v1_db_username: "{{ cadt_db_username }}"
+cadt_v1_db_password: "{{ cadt_db_password }}"
+cadt_v1_db_name: "{{ cadt_db_name }}"
+cadt_v1_db_host: "{{ cadt_db_host }}"
+
+# V2 configuration - disabled by default, must be explicitly configured
+cadt_v2_enable: false
+cadt_v2_read_only: false
+cadt_v2_api_key: null
+cadt_v2_is_governance_body: false
+cadt_v2_governance_body_id: null
+cadt_v2_db_username: null
+cadt_v2_db_password: null
+cadt_v2_db_name: null
+cadt_v2_db_host: null
 
 # Backups
 backup_base_dir: /home/{{ user }}/backup

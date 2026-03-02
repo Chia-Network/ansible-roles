@@ -4,3 +4,4 @@ playbook.yml
 hosts
 /vars/
 *.swp
+/worktrees/
