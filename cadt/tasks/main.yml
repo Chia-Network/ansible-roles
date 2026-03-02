@@ -9,10 +9,17 @@
         - 'vars'
   tags: cadt
 
+- name: Remove unused CADT repository
+  become: true
+  ansible.builtin.apt_repository:
+    repo: "deb [arch={{ cadt_repo_arch }} signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/{{ (cadt_apt_prerelease | bool) | ternary('cadt', 'cadt-test') }}/debian/ stable main"
+    state: absent
+  tags: cadt
+
 - name: Add CADT Repository
   become: true
   ansible.builtin.apt_repository:
-    repo: deb [arch={{ cadt_repo_arch }} signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/cadt/debian/ stable main
+    repo: "deb [arch={{ cadt_repo_arch }} signed-by=/usr/share/keyrings/chia.gpg] https://repo.chia.net/{{ (cadt_apt_prerelease | bool) | ternary('cadt-test', 'cadt') }}/debian/ stable main"
     update_cache: true
   tags: cadt
 

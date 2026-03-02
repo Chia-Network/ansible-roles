@@ -5,6 +5,7 @@ climate_apps_domains:
   - api2.example.com
 cadt_api_proxy: true
 cadt_api_version: latest
+cadt_apt_prerelease: false
 
 # Path to the CADT API in the proxy - include leading and trailing slash
 cadt_api_proxy_path: "/api/"
