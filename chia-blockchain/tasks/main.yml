@@ -200,7 +200,7 @@
     PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     CHIA_ROOT: "{{ chia_root }}"
   when:
-    - keys | length
+    - keys | length > 0
   with_items: "{{ keys }}"
 
 # @TODO This is specific to source installs. Need to move to source tasks and add the equivalent for apt installs
