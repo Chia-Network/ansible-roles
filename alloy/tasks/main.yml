@@ -1,0 +1,97 @@
+---
+- name: Install deps
+  become: true
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - curl
+      - gnupg
+      - python3-apt
+    state: present
+    update_cache: true
+    cache_valid_time: 300
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg | default('') and '/var/lib/dpkg/lock' not in apt_action.msg | default(''))
+
+- name: Ensure apt keyrings directory exists
+  become: true
+  ansible.builtin.file:
+    path: /usr/share/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download Grafana GPG key
+  become: true
+  ansible.builtin.apt_key:
+    url: https://apt.grafana.com/gpg.key
+    state: present
+    keyring: /usr/share/keyrings/grafana.gpg
+
+- name: Add Grafana apt repository
+  become: true
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/grafana.gpg] https://apt.grafana.com stable main"
+    filename: grafana
+
+- name: Install Grafana Alloy
+  become: true
+  ansible.builtin.apt:
+    name: alloy
+    state: present
+  notify: restart alloy
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg | default('') and '/var/lib/dpkg/lock' not in apt_action.msg | default(''))
+
+- name: Ensure Alloy config directory exists
+  become: true
+  ansible.builtin.file:
+    path: /etc/alloy
+    state: directory
+    mode: '0755'
+
+- name: Add alloy user to groups for log file access
+  become: true
+  ansible.builtin.user:
+    name: alloy
+    groups: "{{ alloy_user_groups | join(',') }}"
+    append: true
+  when: alloy_user_groups | length > 0
+
+- name: Deploy optional Alloy snippet files
+  become: true
+  ansible.builtin.copy:
+    dest: "{{ item.path }}"
+    content: "{{ item.content }}"
+    owner: root
+    group: alloy
+    mode: '0640'
+  loop: "{{ alloy_additional_files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  notify: restart alloy
+
+- name: Template Alloy main config
+  become: true
+  ansible.builtin.template:
+    src: config.alloy.j2
+    dest: /etc/alloy/config.alloy
+    owner: root
+    group: alloy
+    mode: '0640'
+  notify: restart alloy
+
+- name: Set Alloy desired boot state
+  become: true
+  ansible.builtin.systemd:
+    name: alloy
+    daemon_reload: true
+    enabled: "{{ alloy_start_on_boot }}"
+
+- name: Set Alloy desired current state
+  become: true
+  ansible.builtin.systemd:
+    name: alloy
+    state: "{{ alloy_start_now | ternary('started', 'stopped') }}"
+  ignore_errors: true

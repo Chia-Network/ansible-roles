@@ -1,0 +1,23 @@
+---
+# River configuration for Alloy (override in group_vars / host_vars)
+alloy_config: |
+  logging {
+    level  = "info"
+    format = "logfmt"
+  }
+
+# Optional extra snippets on disk; reference them from alloy_config with import.file "/etc/alloy/..."
+alloy_additional_files: []
+# Example:
+# alloy_additional_files:
+#   - path: /etc/alloy/extra.alloy
+#     content: |
+#       // ...
+
+# Supplementary groups so the alloy user can read logs (add host-specific groups as needed)
+alloy_user_groups:
+  - adm
+  - systemd-journal
+
+alloy_start_on_boot: true
+alloy_start_now: true
