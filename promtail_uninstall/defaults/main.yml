@@ -1,0 +1,3 @@
+---
+# Remove promtail log directory (often empty or promtail-owned); set false to leave in place
+promtail_remove_log_dir: true

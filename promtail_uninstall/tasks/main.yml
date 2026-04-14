@@ -1,0 +1,51 @@
+---
+- name: Stop promtail service if present
+  become: true
+  ansible.builtin.systemd:
+    name: promtail
+    state: stopped
+  register: promtail_stop
+  failed_when: false
+  changed_when: promtail_stop is changed
+
+- name: Disable promtail service if present
+  become: true
+  ansible.builtin.systemd:
+    name: promtail
+    enabled: false
+  register: promtail_disable
+  failed_when: false
+  changed_when: promtail_disable is changed
+
+- name: Remove promtail package
+  become: true
+  ansible.builtin.apt:
+    name: promtail
+    state: absent
+    purge: true
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg | default('') and '/var/lib/dpkg/lock' not in apt_action.msg | default(''))
+
+- name: Remove promtail configuration directory
+  become: true
+  ansible.builtin.file:
+    path: /etc/promtail
+    state: absent
+
+- name: Remove promtail log directory
+  become: true
+  ansible.builtin.file:
+    path: /var/log/promtail
+    state: absent
+  when: promtail_remove_log_dir | bool
+
+- name: Remove promtail system user
+  become: true
+  ansible.builtin.user:
+    name: promtail
+    state: absent
+    remove: true
+  register: promtail_user_remove
+  failed_when: false
+  changed_when: promtail_user_remove is changed
