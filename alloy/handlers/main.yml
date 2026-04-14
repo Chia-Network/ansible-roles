@@ -5,3 +5,7 @@
     name: alloy
     state: restarted
     daemon_reload: true
+  when: alloy_start_now
+  register: systemd_action
+  retries: 10
+  until: systemd_action is success

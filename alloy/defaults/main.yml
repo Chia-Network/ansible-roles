@@ -18,6 +18,7 @@ alloy_additional_files: []
 alloy_user_groups:
   - adm
   - systemd-journal
+  - ubuntu
 
 alloy_start_on_boot: true
 alloy_start_now: true
