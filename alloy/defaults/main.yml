@@ -1,24 +1,49 @@
 ---
-# River configuration for Alloy (override in group_vars / host_vars)
-alloy_config: |
-  logging {
-    level  = "info"
-    format = "logfmt"
-  }
-
-# Optional extra snippets on disk; reference them from alloy_config with import.file "/etc/alloy/..."
-alloy_additional_files: []
-# Example:
-# alloy_additional_files:
-#   - path: /etc/alloy/extra.alloy
-#     content: |
-#       // ...
+alloy_log_level: "info"
+alloy_log_format: "logfmt"
 
 # Supplementary groups so the alloy user can read logs (add host-specific groups as needed)
 alloy_user_groups:
   - adm
   - systemd-journal
   - ubuntu
+
+# Loki push endpoint and auth
+loki_endpoint: ""
+loki_basic_auth_username: ""
+loki_basic_auth_password: ""
+
+# Chia log labels
+application: "chia-blockchain"
+component: "node"
+network: "mainnet"
+group_tag: "default"
+repo_ref: ""
+chia_root: "/home/ubuntu/.chia"
+
+# Extra log files to ship to the default Loki sink.
+# Each entry produces its own loki.source.file component.
+#
+# alloy_extra_log_files:
+#   - name: myapp
+#     path: /var/log/myapp.log
+#     job: myapp                   # optional, defaults to name
+#     extra_labels:                # optional
+#       environment: production
+alloy_extra_log_files: []
+
+# Arbitrary River config appended to the end of config.alloy.
+# Use for components not covered by the built-in scrape targets.
+alloy_extra_config: ""
+
+# Optional extra snippet files deployed to /etc/alloy/.
+# Reference them from alloy_extra_config with import.file "/etc/alloy/..."
+alloy_additional_files: []
+# Example:
+# alloy_additional_files:
+#   - path: /etc/alloy/extra.alloy
+#     content: |
+#       // ...
 
 alloy_start_on_boot: true
 alloy_start_now: true
