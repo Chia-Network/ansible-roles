@@ -32,7 +32,7 @@
 - name: Convert to keyring format
   become: true
   ansible.builtin.command:
-    cmd: gpg --dearmor -o /usr/share/keyrings/grafana.gpg /tmp/grafana.key
+    cmd: gpg --batch --yes --dearmor -o /usr/share/keyrings/grafana.gpg /tmp/grafana.key
   when: grafana_key_download.changed
 
 - name: Add Grafana apt repository
