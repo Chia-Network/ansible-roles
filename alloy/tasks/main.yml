@@ -29,11 +29,15 @@
     mode: '0644'
   register: grafana_key_download
 
+- name: Check whether keyring already exists
+  ansible.builtin.stat:
+    path: /usr/share/keyrings/grafana.gpg
+  register: grafana_gpg_keyring
+
 - name: Convert to keyring format
   become: true
   ansible.builtin.command:
     cmd: gpg --batch --yes --dearmor -o /usr/share/keyrings/grafana.gpg /tmp/grafana.key
-    creates: /usr/share/keyrings/grafana.gpg
   when: grafana_key_download.changed or not grafana_gpg_keyring.stat.exists
 
 - name: Add Grafana apt repository
