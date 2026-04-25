@@ -6,3 +6,27 @@ fail2ban_ignoreip: 127.0.0.1/8 ::1
 fail2ban_bantime: 10m
 fail2ban_findtime: 10m
 fail2ban_maxretry: 5
+
+# Arbitrary jail configs dropped into /etc/fail2ban/jail.d/<name>.local.
+# Each top-level key is the jail name (used as both the [section] header and
+# the filename). Values are dicts of option/value pairs rendered as INI.
+#
+# Example:
+#   fail2ban_jails:
+#     sshd:
+#       enabled: true
+#       port: ssh
+#       filter: sshd
+#       logpath: /var/log/auth.log
+#       maxretry: 3
+#     nginx-http-auth:
+#       enabled: true
+#       port: "http,https"
+#       filter: nginx-http-auth
+#       logpath: /var/log/nginx/error.log
+fail2ban_jails: {}
+
+# When true, any *.local file in /etc/fail2ban/jail.d/ that is not declared in
+# fail2ban_jails is removed. Leave false to coexist with files managed
+# elsewhere.
+fail2ban_jails_purge: false

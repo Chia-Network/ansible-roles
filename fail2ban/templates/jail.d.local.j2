@@ -1,0 +1,6 @@
+{# Renders a single jail drop-in. `jail_name` and `jail_options` are passed
+   in via template vars. #}
+[{{ jail_name }}]
+{% for key, value in jail_options.items() %}
+{{ key }} = {{ value }}
+{% endfor %}
