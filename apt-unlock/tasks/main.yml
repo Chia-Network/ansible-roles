@@ -1,0 +1,91 @@
+---
+- name: Detect stale apt lock holders
+  become: true
+  ansible.builtin.shell: |
+    set -u
+    MIN_AGE={{ apt_unlock_min_age_seconds }}
+    ALLOWED_NAMES="{{ apt_unlock_allowed_process_names | join(' ') }}"
+    KILLABLE_STATES="{{ apt_unlock_killable_states | join('') }}"
+    LOCK_FILES="{{ apt_unlock_lock_files | join(' ') }}"
+
+    pids=""
+    for f in $LOCK_FILES; do
+      [ -e "$f" ] || continue
+      holders=$(fuser "$f" 2>/dev/null || true)
+      [ -n "$holders" ] && pids="$pids $holders"
+    done
+    pids=$(printf '%s\n' $pids | sed '/^$/d' | sort -u)
+    [ -z "$pids" ] && exit 0
+
+    for pid in $pids; do
+      [ -r /proc/$pid/status ] || continue
+      name=$(awk '/^Name:/ {print $2; exit}' /proc/$pid/status)
+      state=$(awk '/^State:/ {print $2; exit}' /proc/$pid/status)
+      etime=$(ps -o etimes= -p "$pid" 2>/dev/null | tr -d ' ')
+      [ -n "$name" ] || continue
+      [ -n "$state" ] || continue
+      [ -n "$etime" ] || continue
+
+      name_allowed=0
+      for allowed in $ALLOWED_NAMES; do
+        case "$name" in
+          "$allowed"|"$allowed"*) name_allowed=1; break ;;
+        esac
+      done
+      [ "$name_allowed" = "1" ] || continue
+
+      case "$KILLABLE_STATES" in
+        *"$state"*) ;;
+        *) continue ;;
+      esac
+
+      [ "$etime" -ge "$MIN_AGE" ] || continue
+
+      echo "${pid}:${name}:${state}:${etime}"
+    done
+  args:
+    executable: /bin/bash
+  register: apt_unlock_stale
+  changed_when: false
+
+- name: Report stale apt lock holders to be killed
+  ansible.builtin.debug:
+    msg: "Killing stale apt lock holder: {{ item }}"
+  loop: "{{ apt_unlock_stale.stdout_lines }}"
+  when: apt_unlock_stale.stdout_lines | length > 0
+
+- name: Kill stale apt lock holders
+  become: true
+  ansible.builtin.command: "kill -9 {{ item.split(':')[0] }}"
+  loop: "{{ apt_unlock_stale.stdout_lines }}"
+  when: apt_unlock_stale.stdout_lines | length > 0
+
+- name: Wait for kernel to release apt locks
+  ansible.builtin.pause:
+    seconds: "{{ apt_unlock_post_kill_wait }}"
+  when: apt_unlock_stale.stdout_lines | length > 0
+
+- name: Remove residual apt lock files
+  become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ apt_unlock_lock_files }}"
+  when: apt_unlock_stale.stdout_lines | length > 0
+
+- name: Recover dpkg state after killing stale holders
+  become: true
+  ansible.builtin.command: dpkg --configure -a
+  register: apt_unlock_dpkg_configure
+  changed_when: apt_unlock_dpkg_configure.stdout | trim | length > 0
+  when:
+    - apt_unlock_stale.stdout_lines | length > 0
+    - apt_unlock_run_dpkg_configure | bool
+
+- name: Sanity-check apt after unlock
+  become: true
+  ansible.builtin.command: apt-get check
+  changed_when: false
+  when:
+    - apt_unlock_stale.stdout_lines | length > 0
+    - apt_unlock_run_apt_check | bool
