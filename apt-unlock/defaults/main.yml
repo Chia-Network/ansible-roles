@@ -1,0 +1,31 @@
+---
+# Minimum elapsed wall time (seconds) before an apt-related process is
+# considered stale. 2h is comfortably longer than any legitimate apt run.
+apt_unlock_min_age_seconds: 7200
+
+# Process "Name" (from /proc/<pid>/status) prefixes we are willing to kill.
+# Matched as a prefix so the 15-char-truncated kernel comm still matches
+# (e.g. "unattended-upgr" is the truncated form of "unattended-upgrade").
+apt_unlock_allowed_process_names:
+  - unattended-upgr
+  - unattended-upgrade
+  - apt
+  - apt-get
+  - dpkg
+  - aptitude
+
+# Process states considered stuck. Deliberately excludes R (actively running).
+# S=interruptible sleep, D=uninterruptible sleep, Z=zombie, T=stopped.
+apt_unlock_killable_states: [S, D, Z, T]
+
+apt_unlock_lock_files:
+  - /var/lib/dpkg/lock
+  - /var/lib/dpkg/lock-frontend
+  - /var/cache/apt/archives/lock
+  - /var/lib/apt/lists/lock
+
+apt_unlock_run_dpkg_configure: true
+apt_unlock_run_apt_check: true
+
+# Seconds to wait after SIGKILL for the kernel to release fcntl locks.
+apt_unlock_post_kill_wait: 5
