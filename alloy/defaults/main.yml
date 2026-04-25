@@ -13,7 +13,12 @@ loki_endpoint: ""
 loki_basic_auth_username: ""
 loki_basic_auth_password: ""
 
-# Chia log labels
+# Built-in log sources (opt-out)
+alloy_enable_syslog_source: true
+alloy_enable_fail2ban_source: true
+alloy_enable_chia_source: true
+
+# Chia log labels (only used when alloy_enable_chia_source is true)
 application: "chia-blockchain"
 component: "node"
 network: "mainnet"
