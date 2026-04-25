@@ -19,6 +19,7 @@ loki.write "default" {
   }
 }
 
+{% if alloy_enable_syslog_source %}
 // ── Syslog ───────────────────────────────────────────────────────────────────
 
 loki.source.file "syslog" {
@@ -31,6 +32,8 @@ loki.source.file "syslog" {
   ]
   forward_to = [loki.write.default.receiver]
 }
+{% endif %}
+{% if alloy_enable_fail2ban_source %}
 
 // ── Fail2ban ─────────────────────────────────────────────────────────────────
 
@@ -44,6 +47,8 @@ loki.source.file "fail2ban" {
   ]
   forward_to = [loki.write.default.receiver]
 }
+{% endif %}
+{% if alloy_enable_chia_source %}
 
 // ── Chia ─────────────────────────────────────────────────────────────────────
 
@@ -79,6 +84,7 @@ loki.process "chia" {
 
   forward_to = [loki.write.default.receiver]
 }
+{% endif %}
 
 // ── Extra log files ──────────────────────────────────────────────────────────
 {% for extra in alloy_extra_log_files %}

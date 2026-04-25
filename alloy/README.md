@@ -2,9 +2,10 @@
 
 Installs and configures [Grafana Alloy](https://grafana.com/oss/alloy/) on Debian/Ubuntu hosts to ship logs to a Loki endpoint.
 
-Out of the box the role ships syslog, fail2ban, and Chia logs. You can add
-arbitrary log files, inject raw Alloy config, or deploy extra snippet files for
-full flexibility.
+The role includes opt-out scrape configs for syslog, fail2ban, and Chia logs.
+Disable any of them with the `alloy_enable_*_source` flags below. You can also
+add arbitrary log files, inject raw Alloy config, or deploy extra snippet files
+for full flexibility.
 
 ## Requirements
 
@@ -31,10 +32,21 @@ full flexibility.
 | `loki_basic_auth_username` | `""` | Optional basic-auth username. |
 | `loki_basic_auth_password` | `""` | Optional basic-auth password. |
 
+### Built-in log sources
+
+All built-in sources are opt-out. Set the corresponding flag to `false` to
+exclude the source in the generated config.
+
+| Variable | Default | Description |
+|---|---------|---|
+| `alloy_enable_syslog_source` | `true`  | Ship `/var/log/syslog` to Loki. |
+| `alloy_enable_fail2ban_source` | `true` | Ship `/var/log/fail2ban.log` to Loki. |
+| `alloy_enable_chia_source` | `true` | Ship Chia debug logs (with multiline + JSON processing). |
+
 ### Chia
 
-These are applied to the Chia log source and are only relevant if you're
-running Chia.
+These are applied to the Chia log source and are only relevant when
+`alloy_enable_chia_source` is `true`.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -213,13 +225,14 @@ files change.
 
 ## Built-in Log Sources
 
-The generated config always includes these `loki.source.file` components:
+The role can generate `loki.source.file` components for these log files. Each
+is opt-out (enabled by default) via the corresponding flag.
 
-| Name | Path | Job label |
-|---|---|---|
-| `syslog` | `/var/log/syslog` | `syslog` |
-| `fail2ban` | `/var/log/fail2ban.log` | `fail2ban` |
-| `chia` | `{{ chia_root }}/log/debug.log` | `chia` |
+| Name | Enable flag | Path | Job label |
+|---|---|---|---|
+| `syslog` | `alloy_enable_syslog_source` | `/var/log/syslog` | `syslog` |
+| `fail2ban` | `alloy_enable_fail2ban_source` | `/var/log/fail2ban.log` | `fail2ban` |
+| `chia` | `alloy_enable_chia_source` | `{{ chia_root }}/log/debug.log` | `chia` |
 
 The Chia source passes through a `loki.process` stage that handles multiline
 log entries and JSON field extraction before forwarding to Loki.
