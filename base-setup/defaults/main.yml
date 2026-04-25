@@ -1,0 +1,3 @@
+---
+base_setup_disable_ssh_password_login: true
+base_setup_disable_ssh_root_login: true

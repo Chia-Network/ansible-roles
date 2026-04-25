@@ -6,6 +6,7 @@
     regexp: '^PasswordAuthentication'
     line: "PasswordAuthentication no"
   notify: restart-ssh
+  when: base_setup_disable_ssh_password_login | bool
 
 - name: Disable root login for SSH
   become: true
@@ -14,3 +15,4 @@
     regexp: '^PermitRootLogin'
     line: "PermitRootLogin no"
   notify: restart-ssh
+  when: base_setup_disable_ssh_root_login | bool
