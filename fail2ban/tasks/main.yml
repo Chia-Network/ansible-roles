@@ -25,3 +25,51 @@
     src: jail.local.j2
     dest: "/etc/fail2ban/jail.local"
     mode: '0644'
+  notify: Restart fail2ban
+
+- name: Ensure jail.d directory exists
+  become: true
+  ansible.builtin.file:
+    path: /etc/fail2ban/jail.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Add per-service jail configs
+  become: true
+  ansible.builtin.template:
+    src: jail.d.local.j2
+    dest: "/etc/fail2ban/jail.d/{{ item.key }}.local"
+    owner: root
+    group: root
+    mode: '0644'
+  vars:
+    jail_name: "{{ item.key }}"
+    jail_options: "{{ item.value }}"
+  loop: "{{ fail2ban_jails | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  notify: Restart fail2ban
+
+- name: Find existing jail.d drop-ins
+  become: true
+  ansible.builtin.find:
+    paths: /etc/fail2ban/jail.d
+    patterns: "*.local"
+    file_type: file
+  register: fail2ban_existing_jails
+  when: fail2ban_jails_purge
+
+- name: Remove jail.d drop-ins not declared in fail2ban_jails
+  become: true
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ fail2ban_existing_jails.files | default([]) }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when:
+    - fail2ban_jails_purge
+    - (item.path | basename | splitext | first) not in (fail2ban_jails.keys() | list)
+  notify: Restart fail2ban
