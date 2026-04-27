@@ -1,4 +1,4 @@
 ---
-smartctl_exporter_version: "0.13.0"
+smartctl_exporter_version: "0.14.0"
 smartctl_exporter_port: 9633
 smartctl_exporter_args: ""
