@@ -14,12 +14,31 @@
   retries: 100
   until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg and '/var/lib/dpkg/lock' not in apt_action.msg)
 
-- name: Add vector key
-  become: yes
-  ansible.builtin.apt_key:
+- name: Ensure apt keyrings directory exists
+  become: true
+  ansible.builtin.file:
+    path: /usr/share/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download vector signing key (ASCII)
+  become: true
+  ansible.builtin.get_url:
     url: https://keys.datadoghq.com/DATADOG_APT_KEY_CURRENT.public
-    state: present
-    keyring: /usr/share/keyrings/datadog-archive-keyring.gpg
+    dest: /tmp/datadog-archive-keyring.key
+    mode: '0644'
+  register: vector_key_download
+
+- name: Check whether keyring already exists
+  ansible.builtin.stat:
+    path: /usr/share/keyrings/datadog-archive-keyring.gpg
+  register: vector_gpg_keyring
+
+- name: Convert to keyring format
+  become: true
+  ansible.builtin.command:
+    cmd: gpg --batch --yes --dearmor -o /usr/share/keyrings/datadog-archive-keyring.gpg /tmp/datadog-archive-keyring.key
+  when: vector_key_download.changed or not vector_gpg_keyring.stat.exists
 
 - name: Add vector repository
   become: yes
