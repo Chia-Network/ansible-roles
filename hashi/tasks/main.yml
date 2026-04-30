@@ -4,15 +4,53 @@
   vars:
     params:
       files:
-        - '{{ansible_architecture}}.yml'
+        - '{{ ansible_architecture }}.yml'
       paths:
         - 'vars'
 
-- name: Get hashicorp key
-  ansible.builtin.apt_key:
-    url: https://apt.releases.hashicorp.com/gpg
+- name: Install deps
+  become: true
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - curl
+      - gnupg
+      - python3-apt
     state: present
+    update_cache: true
+    cache_valid_time: 300
+  register: apt_action
+  retries: 100
+  until: apt_action is success or ('Failed to lock apt for exclusive operation' not in apt_action.msg | default('') and '/var/lib/dpkg/lock' not in apt_action.msg | default(''))
 
-- name: Hashicorp repository
+- name: Ensure apt keyrings directory exists
+  become: true
+  ansible.builtin.file:
+    path: /usr/share/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download HashiCorp GPG key (ASCII)
+  become: true
+  ansible.builtin.get_url:
+    url: https://apt.releases.hashicorp.com/gpg
+    dest: /tmp/hashicorp.key
+    mode: '0644'
+  register: hashicorp_key_download
+
+- name: Check whether HashiCorp keyring already exists
+  ansible.builtin.stat:
+    path: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+  register: hashicorp_gpg_keyring
+
+- name: Convert HashiCorp key to keyring format
+  become: true
+  ansible.builtin.command:
+    cmd: gpg --batch --yes --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg /tmp/hashicorp.key
+  when: hashicorp_key_download.changed or not hashicorp_gpg_keyring.stat.exists
+
+- name: Add HashiCorp apt repository
+  become: true
   ansible.builtin.apt_repository:
-    repo: deb [arch={{ hashi_repo_arch }}] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main
+    repo: "deb [arch={{ hashi_repo_arch }} signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com {{ hashi_repo_codename | trim }} main"
+    filename: hashicorp
