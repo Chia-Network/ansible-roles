@@ -1,0 +1,36 @@
+---
+# HashiCorp's apt repo only publishes the upstream Debian/Ubuntu codenames
+# (noble, jammy, bookworm, trixie, ...). Derivatives (Mint, Pop!_OS, Zorin,
+# Proxmox templates with custom VERSION_CODENAME, etc.) and brand-new releases
+# that HashiCorp hasn't packaged for yet report codenames that don't exist at
+# apt.releases.hashicorp.com, e.g. "resolute" (Ubuntu 26.04 LTS).
+#
+# We map well-known families/versions to the upstream codename, and fall back
+# to ansible_distribution_release otherwise. Override per-host if needed:
+#   hashi_repo_codename: noble
+#
+# When HashiCorp publishes a previously-missing codename (verify with e.g.
+# `curl -fsI https://apt.releases.hashicorp.com/dists/resolute/InRelease` —
+# a 200 means it's live), drop the corresponding entry from the map so the
+# fallback picks up ansible_distribution_release on its own.
+hashi_codename_map:
+  Debian:
+    "11": bullseye
+    "12": bookworm
+    "13": trixie
+  Ubuntu:
+    "20": focal
+    "22": jammy
+    "24": noble
+    "25": questing
+    # 26.04 (resolute) has no HashiCorp repo yet; fall back to the latest LTS.
+    # HashiCorp ships static Go binaries, so noble packages run fine on 26.04.
+    "26": noble
+
+hashi_repo_codename: >-
+  {{
+    hashi_codename_map.get(ansible_distribution, {}).get(
+      ansible_distribution_major_version | string,
+      ansible_distribution_release
+    )
+  }}
