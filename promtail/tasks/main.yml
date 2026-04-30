@@ -29,12 +29,24 @@
     group: adm
     mode: '0775'
 
-- name: Download Grafana GPG key
+- name: Download Grafana GPG key (ASCII)
   become: true
-  ansible.builtin.apt_key:
+  ansible.builtin.get_url:
     url: https://apt.grafana.com/gpg.key
-    state: present
-    keyring: /usr/share/keyrings/grafana.gpg
+    dest: /tmp/grafana.key
+    mode: '0644'
+  register: grafana_key_download
+
+- name: Check whether keyring already exists
+  ansible.builtin.stat:
+    path: /usr/share/keyrings/grafana.gpg
+  register: grafana_gpg_keyring
+
+- name: Convert to keyring format
+  become: true
+  ansible.builtin.command:
+    cmd: gpg --batch --yes --dearmor -o /usr/share/keyrings/grafana.gpg /tmp/grafana.key
+  when: grafana_key_download.changed or not grafana_gpg_keyring.stat.exists
 
 - name: Add Grafana apt repository
   become: true
