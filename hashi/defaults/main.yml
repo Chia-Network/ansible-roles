@@ -22,7 +22,6 @@ hashi_codename_map:
     "20": focal
     "22": jammy
     "24": noble
-    "25": questing
     # 26.04 (resolute) has no HashiCorp repo yet; fall back to the latest LTS.
     # HashiCorp ships static Go binaries, so noble packages run fine on 26.04.
     "26": noble
