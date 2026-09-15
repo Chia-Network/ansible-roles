@@ -50,6 +50,7 @@
   ansible.builtin.apt:
     name:
       - netcat-openbsd # Used by systemd "up" checks
+      - iproute2 # Used by monit HW VDF ASIC connection checks (ss)
     state: present
     update_cache: true
     cache_valid_time: 300
@@ -281,6 +282,24 @@
   ansible.builtin.template:
     src: monit-change-log-level.sh
     dest: /etc/monit/monit-change-log-level.sh
+    mode: "0744"
+  when: add_monit_config
+  notify: restart-monit
+
+- name: Add a script to set chia log level to DEBUG
+  become: true
+  ansible.builtin.template:
+    src: monit-set-log-level-debug.sh.j2
+    dest: /etc/monit/monit-set-log-level-debug.sh
+    mode: "0744"
+  when: add_monit_config
+  notify: restart-monit
+
+- name: Add a script to set chia log level to INFO
+  become: true
+  ansible.builtin.template:
+    src: monit-set-log-level-info.sh.j2
+    dest: /etc/monit/monit-set-log-level-info.sh
     mode: "0744"
   when: add_monit_config
   notify: restart-monit

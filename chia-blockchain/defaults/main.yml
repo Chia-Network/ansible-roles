@@ -269,6 +269,16 @@ chia_monit_alert_webhook_url: ""
 chia_monit_log_debug_threshold: 2
 # How many times the port check needs to fail before monit will restart the service
 chia_monit_failure_threshold: 3
+# How many cycles /full_node (height progress) may fail before monit restarts chia.target.
+# Default matches chia_monit_failure_threshold. Raise this (e.g. 25) so height stall
+# waits ~1800s from last height before restart (300s healthcheck threshold + N*60s cycles).
+chia_monit_progress_failure_threshold: 3
+# When true, also monitor /full_node/ports (process liveness) with the fast failure threshold.
+# Useful when chia_monit_progress_failure_threshold is raised so a dead node still restarts quickly.
+chia_monit_check_full_node_ports: false
+# When true, set DEBUG on stall and leave it until /full_node succeeds again (or chia.target restarts).
+# When false, use the existing 60s DEBUG pulse then revert to INFO.
+chia_monit_hold_debug_until_recover: false
 
 # Connect to certain peers on a given interval
 chia_periodic_connect_interval:

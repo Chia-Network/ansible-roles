@@ -3,11 +3,24 @@ check host localhost with address 127.0.0.1
     stop program = "/bin/systemctl stop {{ chia_service_base }}.target"
 {% if chia_add_healthcheck_service %}
     {% if "full-node" in chia_enabled_services %}
+    {% if chia_monit_hold_debug_until_recover %}
+    if failed port {{ chia_healthcheck_port }} protocol http request "/full_node" status = 200 for {{ chia_monit_log_debug_threshold }} cycles then exec "/etc/monit/monit-set-log-level-debug.sh"
+    else if succeeded then exec "/etc/monit/monit-set-log-level-info.sh"
+    {% else %}
     if failed port {{ chia_healthcheck_port }} protocol http request "/full_node" status = 200 for {{ chia_monit_log_debug_threshold }} cycles then exec "/etc/monit/monit-change-log-level.sh"
-    if failed port {{ chia_healthcheck_port }} protocol http request "/full_node" status = 200 for {{ chia_monit_failure_threshold }} cycles then restart
+    {% endif %}
+    if failed port {{ chia_healthcheck_port }} protocol http request "/full_node" status = 200 for {{ chia_monit_progress_failure_threshold }} cycles then restart
+    {% if chia_monit_check_full_node_ports %}
+    if failed port {{ chia_healthcheck_port }} protocol http request "/full_node/ports" status = 200 for {{ chia_monit_log_debug_threshold }} cycles then exec "/etc/monit/monit-change-log-level.sh"
+    if failed port {{ chia_healthcheck_port }} protocol http request "/full_node/ports" status = 200 for {{ chia_monit_failure_threshold }} cycles then restart
+    {% endif %}
     {% endif %}
     {% if "timelord" in chia_enabled_services %}
+    {% if chia_monit_hold_debug_until_recover %}
+    if failed port {{ chia_healthcheck_port }} protocol http request "/timelord" status = 200 for {{ chia_monit_log_debug_threshold }} cycles then exec "/etc/monit/monit-set-log-level-debug.sh"
+    {% else %}
     if failed port {{ chia_healthcheck_port }} protocol http request "/timelord" status = 200 for {{ chia_monit_log_debug_threshold }} cycles then exec "/etc/monit/monit-change-log-level.sh"
+    {% endif %}
     if failed port {{ chia_healthcheck_port }} protocol http request "/timelord" status = 200 for {{ chia_monit_failure_threshold }} cycles then restart
     {% endif %}
     {% if chia_monit_alert_on_restart %}

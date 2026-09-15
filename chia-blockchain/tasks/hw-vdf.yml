@@ -18,6 +18,15 @@
   retries: 100
   until: hwvdf_install is success or ('Failed to lock apt for exclusive operation' not in hwvdf_install.msg and '/var/lib/dpkg/lock' not in hwvdf_install.msg)
 
+- name: Add HW VDF ASIC connection check script for monit
+  become: true
+  ansible.builtin.template:
+    src: check-hw-vdf-asics.sh.j2
+    dest: /etc/monit/check-hw-vdf-asics.sh
+    mode: "0744"
+  when: chia_add_hw_vdf_monit_config
+  notify: restart-monit
+
 - name: Add custom monit hw-vdf config to conf.d
   become: true
   ansible.builtin.template:

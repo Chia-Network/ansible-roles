@@ -1,0 +1,14 @@
+#!/bin/bash
+set -o pipefail
+CHIA_PATH="/home/{{ user }}/chia-blockchain"
+
+if [ -d "$CHIA_PATH" ]; then
+	echo "Found $CHIA_PATH — activating environment..."
+	. "$CHIA_PATH/activate"
+else
+	echo "$CHIA_PATH not found — Chia is installed with apt. Continuing...."
+fi
+
+chia rpc full_node set_log_level '{ "level": "INFO" }'
+chia rpc timelord set_log_level '{ "level": "INFO" }'
+echo "Log level set to INFO"

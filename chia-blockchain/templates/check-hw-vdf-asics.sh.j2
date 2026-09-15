@@ -1,0 +1,21 @@
+#!/bin/bash
+# Verify chia-hw-vdf is active and all expected ASIC VDF sessions are connected
+# to the timelord launcher port.
+set -o pipefail
+
+if ! /bin/systemctl is-active --quiet chia-hw-vdf.service; then
+	echo "chia-hw-vdf.service is not active"
+	exit 1
+fi
+
+EXPECTED={{ chia_hw_num_vdfs }}
+PORT={{ chia_timelord_launcher_port }}
+
+COUNT=$(ss -Htan state established "( dport = :${PORT} )" | wc -l | tr -d ' ')
+
+if [ "${COUNT}" -ne "${EXPECTED}" ]; then
+	echo "Expected ${EXPECTED} ESTABLISHED connections to :${PORT}, found ${COUNT}"
+	exit 1
+fi
+
+exit 0

@@ -1,5 +1,5 @@
-check program chia-hw-vdf with path "/bin/systemctl is-active --quiet chia-hw-vdf.service"
+check program chia-hw-vdf with path "/etc/monit/check-hw-vdf-asics.sh"
     start program = "/bin/systemctl start chia-hw-vdf.service"
     stop program = "/bin/systemctl stop chia-hw-vdf.service"
     restart program = "/etc/monit/monit-hw-vdf-restart-alert.sh"
-    if status != 0 then restart
+    if status != 0 for 3 cycles then restart
