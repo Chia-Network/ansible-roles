@@ -3,8 +3,10 @@
 # to the timelord launcher port.
 set -o pipefail
 
-if ! /bin/systemctl is-active --quiet chia-hw-vdf.service; then
-	echo "chia-hw-vdf.service is not active"
+SERVICE="{{ chia_service_base }}-hw-vdf.service"
+
+if ! /bin/systemctl is-active --quiet "${SERVICE}"; then
+	echo "${SERVICE} is not active"
 	exit 1
 fi
 
