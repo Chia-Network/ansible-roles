@@ -259,6 +259,10 @@ soa_rname: "hostmaster.chia.net."
 # monit service related
 chia_add_healthcheck_service: true
 chia_healthcheck_port: 9950
+# Must match chia-healthcheck's --healthcheck-threshold (default 5m).
+chia_healthcheck_threshold_seconds: 300
+# Must match the monit role's monit_cycle_time.
+chia_monit_cycle_seconds: 60
 add_monit_config: true
 chia_add_hw_vdf_monit_config: "{{ chia_enable_hw_vdf }}"
 monit_start_now: true
@@ -269,6 +273,13 @@ chia_monit_alert_webhook_url: ""
 chia_monit_log_debug_threshold: 2
 # How many times the port check needs to fail before monit will restart the service
 chia_monit_failure_threshold: 3
+# Wall-clock seconds after last new height before monit restarts chia.target for /full_node.
+# Cycles = max(1, (this - chia_healthcheck_threshold_seconds) / chia_monit_cycle_seconds).
+# Default 480 = 300s healthcheck + 3 cycles, matching prior behavior.
+chia_monit_progress_restart_seconds: 480
+# When true, also monitor /full_node/ports (process liveness) with the fast failure threshold.
+# Useful when chia_monit_progress_restart_seconds is raised so a dead node still restarts quickly.
+chia_monit_check_full_node_ports: false
 
 # Connect to certain peers on a given interval
 chia_periodic_connect_interval:

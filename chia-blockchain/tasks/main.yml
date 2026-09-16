@@ -276,12 +276,24 @@
   when: add_monit_config
   notify: restart-monit
 
-- name: Add a script to swap the log level prior to a restart
+- name: Add a script to set chia log level from monit
   become: true
   ansible.builtin.template:
-    src: monit-change-log-level.sh
-    dest: /etc/monit/monit-change-log-level.sh
+    src: monit-set-log-level.sh.j2
+    dest: /etc/monit/monit-set-log-level.sh
     mode: "0744"
+  when: add_monit_config
+  notify: restart-monit
+
+- name: Remove obsolete monit log-level scripts
+  become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/monit/monit-change-log-level.sh
+    - /etc/monit/monit-set-log-level-debug.sh
+    - /etc/monit/monit-set-log-level-info.sh
   when: add_monit_config
   notify: restart-monit
 
