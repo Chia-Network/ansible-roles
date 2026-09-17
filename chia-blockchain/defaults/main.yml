@@ -215,6 +215,10 @@ network_overrides:
 # extending the chain.
 bluebox_mode: "False"
 
+# Seconds of no finished SP/IP/EOS before the timelord resets all VDF chains.
+# Matches chia-blockchain default. 0 disables the inactivity reset.
+chia_timelord_max_allowed_inactivity_time: 60
+
 # Number of VDF client processes to keep alive in the local machine.
 timelord_launcher_host: localhost
 process_count: 3
