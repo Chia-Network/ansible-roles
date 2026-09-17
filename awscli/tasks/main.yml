@@ -14,7 +14,7 @@
 
     - name: Set AWS CLI architecture fact
       ansible.builtin.set_fact:
-        aws_arch: "{{ 'aarch64' if ansible_architecture == 'aarch64' else 'x86_64' }}"
+        aws_arch: "{{ 'aarch64' if ansible_facts.architecture == 'aarch64' else 'x86_64' }}"
 
     - name: Check if AWS CLI is already installed
       ansible.builtin.stat:
