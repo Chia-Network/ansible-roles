@@ -27,7 +27,7 @@ loki.source.file "syslog" {
     {
       __path__ = "/var/log/syslog",
       job      = "syslog",
-      host     = "{{ ansible_hostname | default('localhost') }}",
+      host     = "{{ ansible_facts.hostname | default('localhost') }}",
     },
   ]
   forward_to = [loki.write.default.receiver]
@@ -42,7 +42,7 @@ loki.source.file "fail2ban" {
     {
       __path__ = "/var/log/fail2ban.log",
       job      = "fail2ban",
-      host     = "{{ ansible_hostname | default('localhost') }}",
+      host     = "{{ ansible_facts.hostname | default('localhost') }}",
     },
   ]
   forward_to = [loki.write.default.receiver]
@@ -62,7 +62,7 @@ loki.source.file "chia" {
       network     = "{{ network }}",
       group       = "{{ group_tag }}",
       ref         = "{{ repo_ref }}",
-      host        = "{{ ansible_hostname | default('localhost') }}",
+      host        = "{{ ansible_facts.hostname | default('localhost') }}",
     },
   ]
   forward_to = [loki.process.chia.receiver]
@@ -94,7 +94,7 @@ loki.source.file "{{ extra.name }}" {
     {
       __path__ = "{{ extra.path }}",
       job      = "{{ extra.job | default(extra.name) }}",
-      host     = "{{ ansible_hostname | default('localhost') }}",
+      host     = "{{ ansible_facts.hostname | default('localhost') }}",
 {% for key, value in (extra.extra_labels | default({})).items() %}
       {{ key }} = "{{ value }}",
 {% endfor %}
