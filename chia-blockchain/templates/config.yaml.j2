@@ -232,6 +232,12 @@ timelord:
   # If `slow_bluebox` is True, launches `slow_bluebox_process_count` processes.
   slow_bluebox_process_count: 1
 
+  # Seconds of no finished SP/IP/EOS before the timelord resets all VDF chains.
+  # Signage points are normally ~9s. 0 disables this inactivity reset
+  # (VDF-client failure handling is unchanged). After each reset the timeout
+  # doubles up to 1800s; a new peak restores this configured value.
+  max_allowed_inactivity_time: {{ chia_timelord_max_allowed_inactivity_time }}
+
   ssl:
     private_crt:  "config/ssl/timelord/private_timelord.crt"
     private_key:  "config/ssl/timelord/private_timelord.key"
