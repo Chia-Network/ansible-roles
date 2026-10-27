@@ -1,5 +1,5 @@
 ---
-# For choosing correct installation file and compatability with installer naming pattern
+# For choosing correct installation file and compatibility with installer naming pattern
 - name: Load architecture specific vars
   ansible.builtin.include_vars: "{{ lookup('first_found', params) }}"
   vars:

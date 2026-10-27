@@ -1,6 +1,6 @@
 ---
 #
-# Core Registy Settings
+# Core Registry Settings
 #
 core_registry_api_version: latest
 climate_apt_prerelease: false
