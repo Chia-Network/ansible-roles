@@ -5,9 +5,9 @@
   vars:
     params:
       files:
-        - '{{ansible_architecture}}.yml'
+        - "{{ansible_architecture}}.yml"
       paths:
-        - 'vars'
+        - "vars"
 
 # Preliminary check to see if SentinelOne service is already running
 - name: Check if SentinelOne service is active
@@ -32,14 +32,13 @@
   become: true
   when: ansible_distribution in ['Ubuntu', 'Debian'] and sentinelone_status is not defined or sentinelone_status.failed
 
-
 - name: Transfer SentinelOne configuration file that will be used during installation only
   ansible.builtin.template:
     src: s1-config.cfg
     dest: /tmp/s1-config.cfg
     owner: root
     group: root
-    mode: '0700'
+    mode: "0700"
   become: true
   when: sentinelone_status is not defined or sentinelone_status.failed
 

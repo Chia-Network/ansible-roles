@@ -4,9 +4,9 @@
   vars:
     params:
       files:
-        - '{{ansible_architecture}}.yml'
+        - "{{ansible_architecture}}.yml"
       paths:
-        - 'vars'
+        - "vars"
   tags: climate-explorer
 
 - name: Add Climate Repository
@@ -65,7 +65,7 @@
   become: true
   ansible.builtin.replace:
     path: "{{ chia_root }}/climate_token/config/config.yaml"
-    regexp: 'BLOCK_START: .*'
+    regexp: "BLOCK_START: .*"
     replace: "BLOCK_START: {{ climate_explorer_block_start }}"
   tags: climate-explorer
   notify: restart-climate-explorer
@@ -74,7 +74,7 @@
   become: true
   ansible.builtin.replace:
     path: "{{ chia_root }}/climate_token/config/config.yaml"
-    regexp: 'CADT_API_SERVER_HOST: .*'
+    regexp: "CADT_API_SERVER_HOST: .*"
     replace: "CADT_API_SERVER_HOST: {{ climate_explorer_cadt_api_server_host }}"
   tags: climate-explorer
   notify: restart-climate-explorer
@@ -83,7 +83,7 @@
   become: true
   ansible.builtin.replace:
     path: "{{ chia_root }}/climate_token/config/config.yaml"
-    regexp: 'CADT_API_KEY.*'
+    regexp: "CADT_API_KEY.*"
     replace: "CADT_API_KEY: {{ climate_explorer_cadt_api_key }}"
   tags: climate-explorer
   notify: restart-climate-explorer
@@ -119,7 +119,7 @@
   become: true
   ansible.builtin.replace:
     path: "{{ chia_root }}/climate_token/config/config.yaml"
-    regexp: 'SCAN_ALL_ORGANIZATIONS: .*'
+    regexp: "SCAN_ALL_ORGANIZATIONS: .*"
     replace: "SCAN_ALL_ORGANIZATIONS: {{ climate_explorer_scan_all_organizations }}"
   tags: climate-explorer
   notify: restart-climate-explorer
@@ -131,7 +131,7 @@
     dest: /etc/nginx/{{ climate_apps_domains | first }}_proxy_includes/climate-explorer-api-proxy-{{ climate_explorer_port }}.inc
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   when:
     - climate_explorer_api_proxy == true
   tags: climate-explorer
@@ -144,7 +144,7 @@
     dest: /etc/monit/conf.d/climate_explorer_monit_{{ user }}
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   notify: restart-monit
   tags: climate-explorer
 

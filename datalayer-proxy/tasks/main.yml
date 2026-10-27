@@ -6,7 +6,7 @@
     dest: /etc/nginx/conf.d/{{ datalayer_public_host }}.conf
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   tags: datalayer-proxy
   notify: Reload-nginx
 
@@ -15,7 +15,7 @@
   ansible.builtin.file:
     path: /etc/nginx/datalayer_includes
     state: directory
-    mode: '0755'
+    mode: "0755"
     owner: "root"
     group: "root"
   tags: datalayer-proxy
@@ -25,7 +25,7 @@
   ansible.builtin.file:
     path: "{{ datalayer_direct_webroot }}"
     state: directory
-    mode: '0755'
+    mode: "0755"
     owner: "{{ user }}"
     group: "{{ group }}"
   tags: datalayer-proxy
@@ -63,7 +63,7 @@
     src: "{{ datalayer_direct_webroot }}"
     dest: "{{ chia_root }}/data_layer/db/server_files_location_{{ network }}"
     state: link
-    mode: '0755'
+    mode: "0755"
     owner: "{{ user }}"
     group: "{{ group }}"
   tags: datalayer-proxy
@@ -77,6 +77,6 @@
     dest: /etc/nginx/datalayer_includes/datalayer-{{ datalayer_public_host }}.{{ datalayer_public_path }}.inc
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   tags: datalayer-proxy
   notify: Reload-nginx

@@ -4,9 +4,9 @@
   vars:
     params:
       files:
-        - '{{ansible_architecture}}.yml'
+        - "{{ansible_architecture}}.yml"
       paths:
-        - 'vars'
+        - "vars"
 
 - name: Load multi-user vars
   when: chia_multi_user_number is defined
@@ -14,9 +14,9 @@
   vars:
     params:
       files:
-        - 'multi-user.yml'
+        - "multi-user.yml"
       paths:
-        - 'vars'
+        - "vars"
 
 - name:
   when: chia_multi_user_number is defined
@@ -96,7 +96,7 @@
   become_user: "{{ user }}"
   ansible.builtin.lineinfile:
     path: "/home/{{ user }}/.bashrc"
-    regexp: '^export CHIA_ROOT='
+    regexp: "^export CHIA_ROOT="
     line: "export CHIA_ROOT={{ chia_root }}"
   when: chia_root_to_env
 
@@ -232,7 +232,7 @@
     state: "stopped"
   # get the difference of 2 lists (items in chia_all_services that don’t exist in chia_enabled_services)
   # also specifically excludes daemon, since that will never be listed in enabled_services, but is in all_services, but it shouldn't be touched by this step
-  with_items: "{{ chia_all_services | difference(chia_enabled_services) | difference([\"daemon\"]) }}"
+  with_items: '{{ chia_all_services | difference(chia_enabled_services) | difference(["daemon"]) }}'
   register: systemd_action
   retries: 10
   until: systemd_action is success

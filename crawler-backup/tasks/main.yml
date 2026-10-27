@@ -4,7 +4,7 @@
   template:
     src: crawler-backup.sh.j2
     dest: "/home/{{ user }}/crawler-backup.sh"
-    mode: '0755'
+    mode: "0755"
     owner: "{{ user }}"
     group: "{{ group }}"
 
@@ -31,4 +31,4 @@
   template:
     src: crawler-backup-script-logrotate.j2
     dest: "/etc/logrotate.d/crawler-backup-script-logrotate"
-    mode: '0644'
+    mode: "0644"

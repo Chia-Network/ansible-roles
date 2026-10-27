@@ -4,9 +4,9 @@
   vars:
     params:
       files:
-        - '{{ansible_architecture}}.yml'
+        - "{{ansible_architecture}}.yml"
       paths:
-        - 'vars'
+        - "vars"
   tags: cadt
 
 - name: Remove unused CADT repository
@@ -59,7 +59,7 @@
     dest: "{{ chia_root }}/cadt/{{ (cadt_use_v2_config | bool) | ternary('', 'v1/') }}config.yaml"
     owner: "{{ user }}"
     group: "{{ user }}"
-    mode: '0644'
+    mode: "0644"
   notify:
     - restart-cadt
   tags: cadt
@@ -71,7 +71,7 @@
     dest: /etc/nginx/{{ climate_apps_domains | first }}_proxy_includes/cadt-api-proxy-{{ cadt_port }}.inc
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   when:
     - cadt_api_proxy == true
   tags: cadt
@@ -84,7 +84,7 @@
     dest: /etc/monit/conf.d/cadt_monit_{{ user }}
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   notify: restart-monit
   tags: cadt
 
@@ -94,7 +94,7 @@
     state: directory
     owner: "{{ user }}"
     group: "{{ user }}"
-    mode: '0755'
+    mode: "0755"
   tags: cadt
 
 - name: Copy backup script
@@ -104,7 +104,7 @@
     dest: /home/{{ user }}/backups.sh
     owner: "{{ user }}"
     group: "{{ user }}"
-    mode: '0755'
+    mode: "0755"
   tags: cadt
 
 - name: Create cron job for backups

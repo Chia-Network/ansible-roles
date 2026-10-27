@@ -15,7 +15,7 @@
   template:
     src: backup.sh.j2
     dest: "/home/{{ user }}/backup-vault.sh"
-    mode: '0755'
+    mode: "0755"
 
 - name: Add cron to backup every 12 hours
   become: yes

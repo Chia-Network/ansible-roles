@@ -19,14 +19,14 @@
   ansible.builtin.file:
     path: /usr/share/keyrings
     state: directory
-    mode: '0755'
+    mode: "0755"
 
 - name: Download vector signing key (ASCII)
   become: true
   ansible.builtin.get_url:
     url: https://keys.datadoghq.com/DATADOG_APT_KEY_CURRENT.public
     dest: /tmp/datadog-archive-keyring.key
-    mode: '0644'
+    mode: "0644"
   register: vector_key_download
 
 - name: Check whether keyring already exists
