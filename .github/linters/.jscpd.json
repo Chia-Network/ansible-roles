@@ -1,0 +1,33 @@
+{
+	"threshold": 0,
+	"reporters": ["consoleFull"],
+	"ignore": [
+		"**/__snapshots__/**",
+		"**/node_modules/**",
+		"**/alloy/tasks/main.yml",
+		"**/blockchain-backup/tasks/main.yml",
+		"**/cat-backup/tasks/main.yml",
+		"**/cat-backup/templates/backup.sh.j2",
+		"**/chia-apt-key/tasks/main.yml",
+		"**/chia-blockchain/templates/monit-hw-vdf-restart-alert.sh.j2",
+		"**/chia-blockchain/templates/monit-notify-chia.sh.j2",
+		"**/climate-explorer-ui/tasks/main.yml",
+		"**/climate-explorer/tasks/main.yml",
+		"**/core-registry-api/tasks/main.yml",
+		"**/crawler-backup/templates/crawler-backup.sh.j2",
+		"**/crawler-db-pull-on-boot/templates/crawler-db-pull.sh.j2",
+		"**/db-pull-on-boot/templates/db-pull.sh.j2",
+		"**/hashi/tasks/main.yml",
+		"**/linux-runner/tasks/main.yml",
+		"**/linux-runner/templates/post-run.sh",
+		"**/linux-runner/templates/pre-run.sh",
+		"**/mac-runner/tasks/main.yml",
+		"**/mac-runner/templates/post-run.sh",
+		"**/mac-runner/templates/pre-run.sh",
+		"**/nginx/tasks/main.yml",
+		"**/prometheus-node-exporter/tasks/debian.yml",
+		"**/promtail/tasks/main.yml",
+		"**/vector/tasks/main.yml"
+	],
+	"absolute": true
+}
