@@ -1,0 +1,12 @@
+---
+# .github/workflows/dependency-review.yml is managed by repo-content-updater
+# (see the header of that file) and its upstream template uses tag references
+# and default checkout credentials. Local edits would be reverted by the next
+# managed-files PR, so zizmor ignores these findings for that file only.
+rules:
+  unpinned-uses:
+    ignore:
+      - dependency-review.yml
+  artipacked:
+    ignore:
+      - dependency-review.yml
