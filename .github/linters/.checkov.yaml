@@ -2,11 +2,6 @@
 # Don't report passed checks in output
 quiet: true
 
-# vault/templates/vault.hcl is a Jinja2 template (contains {{ }}), not valid
-# HCL, so checkov's Terraform framework cannot parse it.
-skip-path:
-  - '^(.*/)?vault/templates/vault\.hcl$'
-
 # CKV2_ANSIBLE_3 only fires on the become-only block in awscli/tasks/main.yml.
 # Checkov 3.3.19 cannot honour inline skips for Ansible blocks (its context ID
 # has an extra dot), and adding a rescue would change Ansible behaviour.
