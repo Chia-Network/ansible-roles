@@ -1,0 +1,4 @@
+[codespell]
+check-hidden =
+# `hashi` is a real Ansible role name (see vault/meta/main.yml), not a typo.
+ignore-words-list = hashi

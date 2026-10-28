@@ -25,7 +25,7 @@
       ansible.builtin.get_url:
         url: "https://awscli.amazonaws.com/awscli-exe-linux-{{ aws_arch }}.zip"
         dest: /tmp/awscliv2.zip
-        mode: '0644'
+        mode: "0644"
         force: true
       when: not awscli_bin.stat.exists
 

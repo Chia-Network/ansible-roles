@@ -24,7 +24,7 @@
     dest: /etc/systemd/system/sqlite_web@.service
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   notify: systemd-reload
   tags: sqlite_web
 
@@ -35,7 +35,7 @@
     dest: /home/{{ user }}/.sqlite_web
     owner: "{{ user }}"
     group: "{{ user }}"
-    mode: '0644'
+    mode: "0644"
   notify: restart-sqlite_web
   tags: sqlite_web
 

@@ -7,6 +7,7 @@
 # with the default names as provided from SentinelOne
 sentinelone_bucket: ""
 sentinelone_version: "25_1_2_17"
+# checkov:skip=CKV_SECRET_6: Documented placeholder default; the real token is supplied via group_vars/host_vars.
 sentinelone_token: "SECRET_SENTINEL_ONE_SERVICE_TOKEN"
 sentinelone_type: "server" # Enter "server" or "desktop"
 
