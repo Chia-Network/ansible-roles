@@ -1,5 +1,10 @@
+{% set hw_vdf_cycles = [chia_monit_hw_vdf_failure_threshold | int, 1] | max %}
 check program chia-hw-vdf with path "/etc/monit/check-hw-vdf-asics.sh"
     start program = "/bin/systemctl start {{ chia_service_base }}-hw-vdf.service"
     stop program = "/bin/systemctl stop {{ chia_service_base }}-hw-vdf.service"
-    restart program = "/etc/monit/monit-hw-vdf-restart-alert.sh"
-    if status != 0 for {{ chia_monit_failure_threshold }} cycles then restart
+    restart program = "/etc/monit/monit-chia-restart.sh hw-vdf" with timeout 600 seconds
+{% if add_monit_config %}
+    depends on localhost
+{% endif %}
+    if status != 0 for {{ hw_vdf_cycles }} cycles then restart
+    else if succeeded then exec "/etc/monit/monit-chia-restart.sh reset-hw-vdf"

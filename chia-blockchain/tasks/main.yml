@@ -285,6 +285,27 @@
   when: add_monit_config
   notify: restart-monit
 
+- name: Ensure chia monit restart state directory exists
+  become: true
+  ansible.builtin.file:
+    path: "/var/lib/chia-monit/{{ chia_service_base }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  when: add_monit_config or chia_add_hw_vdf_monit_config
+
+- name: Add monit restart backoff wrapper
+  become: true
+  ansible.builtin.template:
+    src: monit-chia-restart.sh.j2
+    dest: /etc/monit/monit-chia-restart.sh
+    owner: root
+    group: root
+    mode: "0750"
+  when: add_monit_config or chia_add_hw_vdf_monit_config
+  notify: restart-monit
+
 - name: Remove obsolete monit log-level scripts
   become: true
   ansible.builtin.file:
