@@ -41,10 +41,10 @@ HW_RESTART="/etc/monit/monit-hw-vdf-restart-alert.sh"
 HW_CHECK="/etc/monit/check-hw-vdf-asics.sh"
 
 MANAGED_UNITS=(
-  "${SERVICE_BASE}.target"
-{% for service in chia_all_services %}
-  "${SERVICE_BASE}-{{ service }}.service"
-{% endfor %}
+	"${SERVICE_BASE}.target"
+	{% for service in chia_all_services %}
+	"${SERVICE_BASE}-{{ service }}.service"
+	{% endfor %}
 )
 
 target_restarts=0
@@ -55,745 +55,757 @@ state_malformed=0
 CHIA_UID=""
 
 log() {
-  printf '%s\n' "chia-monit-restart: $*"
-  if command -v logger >/dev/null 2>&1; then
-    logger -t chia-monit-restart -- "$*" || true
-  fi
+	printf '%s\n' "chia-monit-restart: $*"
+	if command -v logger >/dev/null 2>&1; then
+		logger -t chia-monit-restart -- "$*" || true
+	fi
 }
 
 apply_sandbox() {
-  # Honored together so a stray CHIA_MONIT_NOW in production is ignored.
-  if [ -z "${CHIA_MONIT_STATE_DIR:-}" ]; then
-    return 0
-  fi
-  STATE_DIR=$CHIA_MONIT_STATE_DIR
-  STATE_FILE="${STATE_DIR}/state"
-  LOCK_FILE="${STATE_DIR}/lock"
-  if [ -n "${CHIA_MONIT_SYSTEMCTL:-}" ]; then
-    SYSTEMCTL=$CHIA_MONIT_SYSTEMCTL
-  fi
-  if [ -n "${CHIA_MONIT_NOTIFY:-}" ]; then
-    NOTIFY=$CHIA_MONIT_NOTIFY
-  fi
-  if [ -n "${CHIA_MONIT_HW_RESTART:-}" ]; then
-    HW_RESTART=$CHIA_MONIT_HW_RESTART
-  fi
-  if [ -n "${CHIA_MONIT_HW_CHECK:-}" ]; then
-    HW_CHECK=$CHIA_MONIT_HW_CHECK
-  fi
+	# Honored together so a stray CHIA_MONIT_NOW in production is ignored.
+	if [ -z "${CHIA_MONIT_STATE_DIR:-}" ]; then
+		return 0
+	fi
+	STATE_DIR=$CHIA_MONIT_STATE_DIR
+	STATE_FILE="${STATE_DIR}/state"
+	LOCK_FILE="${STATE_DIR}/lock"
+	if [ -n "${CHIA_MONIT_SYSTEMCTL:-}" ]; then
+		SYSTEMCTL=$CHIA_MONIT_SYSTEMCTL
+	fi
+	if [ -n "${CHIA_MONIT_NOTIFY:-}" ]; then
+		NOTIFY=$CHIA_MONIT_NOTIFY
+	fi
+	if [ -n "${CHIA_MONIT_HW_RESTART:-}" ]; then
+		HW_RESTART=$CHIA_MONIT_HW_RESTART
+	fi
+	if [ -n "${CHIA_MONIT_HW_CHECK:-}" ]; then
+		HW_CHECK=$CHIA_MONIT_HW_CHECK
+	fi
 }
 
 now_epoch() {
-  if [ -n "${CHIA_MONIT_STATE_DIR:-}" ] && [[ "${CHIA_MONIT_NOW:-}" =~ ^[0-9]+$ ]]; then
-    printf '%s\n' "$CHIA_MONIT_NOW"
-    return 0
-  fi
-  date +%s
+	if [ -n "${CHIA_MONIT_STATE_DIR:-}" ] && [[ "${CHIA_MONIT_NOW:-}" =~ ^[0-9]+$ ]]; then
+		printf '%s\n' "$CHIA_MONIT_NOW"
+		return 0
+	fi
+	date +%s
 }
 
 is_uint() {
-  [[ "${1:-}" =~ ^[0-9]+$ ]]
+	[[ "${1:-}" =~ ^[0-9]+$ ]]
 }
 
 normalize_intervals() {
-  if ! is_uint "$MIN_SECONDS" || [ "$MIN_SECONDS" -lt 1 ] || [ "$MIN_SECONDS" -gt 604800 ]; then
-    log "ignoring min interval '${MIN_SECONDS}'; using 600"
-    MIN_SECONDS=600
-  fi
-  if ! is_uint "$FACTOR" || [ "$FACTOR" -lt 2 ] || [ "$FACTOR" -gt 8 ]; then
-    log "ignoring backoff factor '${FACTOR}'; using 2"
-    FACTOR=2
-  fi
-  if ! is_uint "$MAX_SECONDS" || [ "$MAX_SECONDS" -lt 1 ] || [ "$MAX_SECONDS" -gt 604800 ]; then
-    log "ignoring max interval '${MAX_SECONDS}'; using 3600"
-    MAX_SECONDS=3600
-  fi
-  MIN_SECONDS=$((10#$MIN_SECONDS))
-  FACTOR=$((10#$FACTOR))
-  MAX_SECONDS=$((10#$MAX_SECONDS))
-  if [ "$MAX_SECONDS" -lt "$MIN_SECONDS" ]; then
-    log "max interval ${MAX_SECONDS}s is below min ${MIN_SECONDS}s; using the min"
-    MAX_SECONDS=$MIN_SECONDS
-  fi
-  if ! is_uint "$VERIFY_SECONDS" || [ "$VERIFY_SECONDS" -lt 1 ] || [ "$VERIFY_SECONDS" -gt 300 ]; then
-    log "ignoring verify window '${VERIFY_SECONDS}'; using 90"
-    VERIFY_SECONDS=90
-  fi
-  VERIFY_SECONDS=$((10#$VERIFY_SECONDS))
+	if ! is_uint "$MIN_SECONDS" || [ "$MIN_SECONDS" -lt 1 ] || [ "$MIN_SECONDS" -gt 604800 ]; then
+		log "ignoring min interval '${MIN_SECONDS}'; using 600"
+		MIN_SECONDS=600
+	fi
+	if ! is_uint "$FACTOR" || [ "$FACTOR" -lt 2 ] || [ "$FACTOR" -gt 8 ]; then
+		log "ignoring backoff factor '${FACTOR}'; using 2"
+		FACTOR=2
+	fi
+	if ! is_uint "$MAX_SECONDS" || [ "$MAX_SECONDS" -lt 1 ] || [ "$MAX_SECONDS" -gt 604800 ]; then
+		log "ignoring max interval '${MAX_SECONDS}'; using 3600"
+		MAX_SECONDS=3600
+	fi
+	MIN_SECONDS=$((10#$MIN_SECONDS))
+	FACTOR=$((10#$FACTOR))
+	MAX_SECONDS=$((10#$MAX_SECONDS))
+	if [ "$MAX_SECONDS" -lt "$MIN_SECONDS" ]; then
+		log "max interval ${MAX_SECONDS}s is below min ${MIN_SECONDS}s; using the min"
+		MAX_SECONDS=$MIN_SECONDS
+	fi
+	if ! is_uint "$VERIFY_SECONDS" || [ "$VERIFY_SECONDS" -lt 1 ] || [ "$VERIFY_SECONDS" -gt 300 ]; then
+		log "ignoring verify window '${VERIFY_SECONDS}'; using 90"
+		VERIFY_SECONDS=90
+	fi
+	VERIFY_SECONDS=$((10#$VERIFY_SECONDS))
 }
 
 # wait(n) = min(MAX, MIN * FACTOR^n). n is restarts already performed.
 wait_for_restarts() {
-  local n=$1 i=0 wait
-  if ! is_uint "$n"; then
-    printf '%s\n' "$MAX_SECONDS"
-    return 0
-  fi
-  n=$((10#$n))
-  if [ "$n" -gt 32 ]; then
-    n=32
-  fi
-  wait=$MIN_SECONDS
-  while [ "$i" -lt "$n" ]; do
-    if [ "$wait" -ge "$MAX_SECONDS" ] || [ "$wait" -gt $((MAX_SECONDS / FACTOR)) ]; then
-      printf '%s\n' "$MAX_SECONDS"
-      return 0
-    fi
-    wait=$((wait * FACTOR))
-    i=$((i + 1))
-  done
-  if [ "$wait" -gt "$MAX_SECONDS" ]; then
-    wait=$MAX_SECONDS
-  fi
-  printf '%s\n' "$wait"
+	local n=$1 i=0 wait
+	if ! is_uint "$n"; then
+		printf '%s\n' "$MAX_SECONDS"
+		return 0
+	fi
+	n=$((10#$n))
+	if [ "$n" -gt 32 ]; then
+		n=32
+	fi
+	wait=$MIN_SECONDS
+	while [ "$i" -lt "$n" ]; do
+		if [ "$wait" -ge "$MAX_SECONDS" ] || [ "$wait" -gt $((MAX_SECONDS / FACTOR)) ]; then
+			printf '%s\n' "$MAX_SECONDS"
+			return 0
+		fi
+		wait=$((wait * FACTOR))
+		i=$((i + 1))
+	done
+	if [ "$wait" -gt "$MAX_SECONDS" ]; then
+		wait=$MAX_SECONDS
+	fi
+	printf '%s\n' "$wait"
 }
 
 max_epoch() {
-  local a=$1 b=$2
-  if [ "$a" -ge "$b" ]; then
-    printf '%s\n' "$a"
-  else
-    printf '%s\n' "$b"
-  fi
+	local a=$1 b=$2
+	if [ "$a" -ge "$b" ]; then
+		printf '%s\n' "$a"
+	else
+		printf '%s\n' "$b"
+	fi
 }
 
 # 0 when a restart is allowed. anchor 0 means "no start on record".
 slot_due() {
-  local restarts=$1 anchor=$2 now=$3 wait elapsed
-  wait=$(wait_for_restarts "$restarts")
-  if [ "$anchor" -le 0 ]; then
-    return 0
-  fi
-  if [ "$now" -lt "$anchor" ]; then
-    return 1
-  fi
-  elapsed=$((now - anchor))
-  [ "$elapsed" -ge "$wait" ]
+	local restarts=$1 anchor=$2 now=$3 wait elapsed
+	wait=$(wait_for_restarts "$restarts")
+	if [ "$anchor" -le 0 ]; then
+		return 0
+	fi
+	if [ "$now" -lt "$anchor" ]; then
+		return 1
+	fi
+	elapsed=$((now - anchor))
+	[ "$elapsed" -ge "$wait" ]
 }
 
 unit_started_epoch() {
-  local unit=$1 raw epoch now
-  raw=$("$SYSTEMCTL" show -p ActiveEnterTimestamp --value "$unit" 2>/dev/null || true)
-  raw=${raw%%$'\n'*}
-  case "$raw" in
-    ""|n/a|N/A|0)
-      printf '0\n'
-      return 0
-      ;;
-  esac
-  epoch=$(date -d "$raw" +%s 2>/dev/null || true)
-  if ! is_uint "$epoch"; then
-    printf '0\n'
-    return 0
-  fi
-  now=$(now_epoch)
-  if [ "$epoch" -gt $((now + 120)) ]; then
-    printf '0\n'
-    return 0
-  fi
-  if [ "$epoch" -gt "$now" ]; then
-    printf '%s\n' "$now"
-    return 0
-  fi
-  printf '%s\n' "$epoch"
+	local unit=$1 raw epoch now
+	raw=$("$SYSTEMCTL" show -p ActiveEnterTimestamp --value "$unit" 2>/dev/null || true)
+	raw=${raw%%$'\n'*}
+	case "$raw" in
+	"" | n/a | N/A | 0)
+		printf '0\n'
+		return 0
+		;;
+	esac
+	epoch=$(date -d "$raw" +%s 2>/dev/null || true)
+	if ! is_uint "$epoch"; then
+		printf '0\n'
+		return 0
+	fi
+	now=$(now_epoch)
+	if [ "$epoch" -gt $((now + 120)) ]; then
+		printf '0\n'
+		return 0
+	fi
+	if [ "$epoch" -gt "$now" ]; then
+		printf '%s\n' "$now"
+		return 0
+	fi
+	printf '%s\n' "$epoch"
 }
 
 target_anchor() {
-  local started
-  started=$(unit_started_epoch "${SERVICE_BASE}.target")
-  max_epoch "$started" "$target_last"
+	local started
+	started=$(unit_started_epoch "${SERVICE_BASE}.target")
+	max_epoch "$started" "$target_last"
 }
 
 hw_anchor() {
-  local started
-  started=$(unit_started_epoch "${SERVICE_BASE}-hw-vdf.service")
-  max_epoch "$started" "$hw_last"
+	local started
+	started=$(unit_started_epoch "${SERVICE_BASE}-hw-vdf.service")
+	max_epoch "$started" "$hw_last"
 }
 
 log_skip() {
-  local name=$1 restarts=$2 anchor=$3 now=$4 wait remain=0
-  wait=$(wait_for_restarts "$restarts")
-  if [ "$anchor" -gt 0 ] && [ "$now" -ge "$anchor" ]; then
-    remain=$((wait - (now - anchor)))
-    if [ "$remain" -lt 0 ]; then
-      remain=0
-    fi
-  fi
-  log "skip ${name}: restarts=${restarts} wait=${wait}s anchor=${anchor} now=${now} remaining=${remain}s"
+	local name=$1 restarts=$2 anchor=$3 now=$4 wait remain=0
+	wait=$(wait_for_restarts "$restarts")
+	if [ "$anchor" -gt 0 ] && [ "$now" -ge "$anchor" ]; then
+		remain=$((wait - (now - anchor)))
+		if [ "$remain" -lt 0 ]; then
+			remain=0
+		fi
+	fi
+	log "skip ${name}: restarts=${restarts} wait=${wait}s anchor=${anchor} now=${now} remaining=${remain}s"
 }
 
 alert_notify() {
-  log "alert: $*"
-  if [ -x "$NOTIFY" ]; then
-    "$NOTIFY" || log "notify script exited $?"
-  else
-    log "notify script is not executable: ${NOTIFY}"
-  fi
+	log "alert: $*"
+	if [ -x "$NOTIFY" ]; then
+		"$NOTIFY" || log "notify script exited $?"
+	else
+		log "notify script is not executable: ${NOTIFY}"
+	fi
 }
 
 ensure_state_dir() {
-  if [ -L "$STATE_DIR" ]; then
-    log "state dir ${STATE_DIR} is a symlink; not restarting"
-    alert_notify "chia monit state directory is a symlink"
-    exit 0
-  fi
-  if ! mkdir -p "$STATE_DIR"; then
-    log "cannot create ${STATE_DIR}; not restarting"
-    alert_notify "cannot create chia monit state directory"
-    exit 0
-  fi
-  if ! chmod 0750 "$STATE_DIR"; then
-    log "cannot protect ${STATE_DIR}; not restarting"
-    alert_notify "cannot protect chia monit state directory"
-    exit 0
-  fi
-  if [ -L "$STATE_DIR" ] || [ ! -d "$STATE_DIR" ]; then
-    log "state dir ${STATE_DIR} is not a directory; not restarting"
-    alert_notify "chia monit state directory is not a directory"
-    exit 0
-  fi
+	if [ -L "$STATE_DIR" ]; then
+		log "state dir ${STATE_DIR} is a symlink; not restarting"
+		alert_notify "chia monit state directory is a symlink"
+		exit 0
+	fi
+	if ! mkdir -p "$STATE_DIR"; then
+		log "cannot create ${STATE_DIR}; not restarting"
+		alert_notify "cannot create chia monit state directory"
+		exit 0
+	fi
+	if ! chmod 0750 "$STATE_DIR"; then
+		log "cannot protect ${STATE_DIR}; not restarting"
+		alert_notify "cannot protect chia monit state directory"
+		exit 0
+	fi
+	if [ -L "$STATE_DIR" ] || [ ! -d "$STATE_DIR" ]; then
+		log "state dir ${STATE_DIR} is not a directory; not restarting"
+		alert_notify "chia monit state directory is not a directory"
+		exit 0
+	fi
 }
 
 with_lock() {
-  if ! command -v flock >/dev/null 2>&1; then
-    log "flock is missing; not restarting"
-    alert_notify "flock missing; chia monit restart refused"
-    exit 0
-  fi
-  # shellcheck disable=SC3020
-  exec 9>"$LOCK_FILE" || {
-    log "cannot open ${LOCK_FILE}; not restarting"
-    alert_notify "cannot lock chia monit restart state"
-    exit 0
-  }
-  if ! flock -w 180 9; then
-    log "timed out locking ${LOCK_FILE}; not restarting"
-    exit 0
-  fi
+	if ! command -v flock >/dev/null 2>&1; then
+		log "flock is missing; not restarting"
+		alert_notify "flock missing; chia monit restart refused"
+		exit 0
+	fi
+	# shellcheck disable=SC3020
+	exec 9>"$LOCK_FILE" || {
+		log "cannot open ${LOCK_FILE}; not restarting"
+		alert_notify "cannot lock chia monit restart state"
+		exit 0
+	}
+	if ! flock -w 180 9; then
+		log "timed out locking ${LOCK_FILE}; not restarting"
+		exit 0
+	fi
 }
 
 mark_malformed() {
-  state_malformed=1
+	state_malformed=1
 }
 
 load_state() {
-  local line key val perm other group lines=0
-  local seen_tr=0 seen_tl=0 seen_hr=0 seen_hl=0
-  target_restarts=0
-  target_last=0
-  hw_restarts=0
-  hw_last=0
-  state_malformed=0
-  if [ ! -e "$STATE_FILE" ]; then
-    return 0
-  fi
-  if [ -L "$STATE_FILE" ] || [ ! -f "$STATE_FILE" ] || [ ! -O "$STATE_FILE" ]; then
-    mark_malformed
-    return 0
-  fi
-  perm=$(stat -c %a "$STATE_FILE" 2>/dev/null || echo 666)
-  if ! is_uint "$perm"; then
-    mark_malformed
-    return 0
-  fi
-  perm=$((10#$perm))
-  other=$((perm % 10))
-  group=$(((perm / 10) % 10))
-  if [ $((other & 2)) -ne 0 ] || [ $((group & 2)) -ne 0 ]; then
-    mark_malformed
-    return 0
-  fi
-  while IFS= read -r line || [ -n "$line" ]; do
-    lines=$((lines + 1))
-    if [ "$lines" -gt 20 ]; then
-      mark_malformed
-      return 0
-    fi
-    case "$line" in
-      ""|\#*) continue ;;
-    esac
-    case "$line" in
-      [a-z_]*=[0-9]*) ;;
-      *)
-        mark_malformed
-        return 0
-        ;;
-    esac
-    key=${line%%=*}
-    val=${line#*=}
-    # 11+ digits do not fit the counters or the timestamps this file stores.
-    if ! is_uint "$val" || [[ "$val" =~ ^[0-9]{11,} ]] || [[ "$val" =~ ^0[0-9] ]]; then
-      mark_malformed
-      return 0
-    fi
-    case "$key" in
-      target_restarts)
-        [ "$seen_tr" -eq 1 ] && { mark_malformed; return 0; }
-        seen_tr=1
-        target_restarts=$((10#$val))
-        ;;
-      target_last)
-        [ "$seen_tl" -eq 1 ] && { mark_malformed; return 0; }
-        seen_tl=1
-        target_last=$((10#$val))
-        ;;
-      hw_restarts)
-        [ "$seen_hr" -eq 1 ] && { mark_malformed; return 0; }
-        seen_hr=1
-        hw_restarts=$((10#$val))
-        ;;
-      hw_last)
-        [ "$seen_hl" -eq 1 ] && { mark_malformed; return 0; }
-        seen_hl=1
-        hw_last=$((10#$val))
-        ;;
-      *)
-        mark_malformed
-        return 0
-        ;;
-    esac
-  done <"$STATE_FILE"
-  local now
-  now=$(now_epoch)
-  if [ "$target_last" -gt $((now + 120)) ] || [ "$hw_last" -gt $((now + 120)) ]; then
-    mark_malformed
-  fi
+	local line key val perm other group lines=0
+	local seen_tr=0 seen_tl=0 seen_hr=0 seen_hl=0
+	target_restarts=0
+	target_last=0
+	hw_restarts=0
+	hw_last=0
+	state_malformed=0
+	if [ ! -e "$STATE_FILE" ]; then
+		return 0
+	fi
+	if [ -L "$STATE_FILE" ] || [ ! -f "$STATE_FILE" ] || [ ! -O "$STATE_FILE" ]; then
+		mark_malformed
+		return 0
+	fi
+	perm=$(stat -c %a "$STATE_FILE" 2>/dev/null || echo 666)
+	if ! is_uint "$perm"; then
+		mark_malformed
+		return 0
+	fi
+	perm=$((10#$perm))
+	other=$((perm % 10))
+	group=$(((perm / 10) % 10))
+	if [ $((other & 2)) -ne 0 ] || [ $((group & 2)) -ne 0 ]; then
+		mark_malformed
+		return 0
+	fi
+	while IFS= read -r line || [ -n "$line" ]; do
+		lines=$((lines + 1))
+		if [ "$lines" -gt 20 ]; then
+			mark_malformed
+			return 0
+		fi
+		case "$line" in
+		"" | \#*) continue ;;
+		esac
+		case "$line" in
+		[a-z_]*=[0-9]*) ;;
+		*)
+			mark_malformed
+			return 0
+			;;
+		esac
+		key=${line%%=*}
+		val=${line#*=}
+		# 11+ digits do not fit the counters or the timestamps this file stores.
+		if ! is_uint "$val" || [[ "$val" =~ ^[0-9]{11,} ]] || [[ "$val" =~ ^0[0-9] ]]; then
+			mark_malformed
+			return 0
+		fi
+		case "$key" in
+		target_restarts)
+			[ "$seen_tr" -eq 1 ] && {
+				mark_malformed
+				return 0
+			}
+			seen_tr=1
+			target_restarts=$((10#$val))
+			;;
+		target_last)
+			[ "$seen_tl" -eq 1 ] && {
+				mark_malformed
+				return 0
+			}
+			seen_tl=1
+			target_last=$((10#$val))
+			;;
+		hw_restarts)
+			[ "$seen_hr" -eq 1 ] && {
+				mark_malformed
+				return 0
+			}
+			seen_hr=1
+			hw_restarts=$((10#$val))
+			;;
+		hw_last)
+			[ "$seen_hl" -eq 1 ] && {
+				mark_malformed
+				return 0
+			}
+			seen_hl=1
+			hw_last=$((10#$val))
+			;;
+		*)
+			mark_malformed
+			return 0
+			;;
+		esac
+	done <"$STATE_FILE"
+	local now
+	now=$(now_epoch)
+	if [ "$target_last" -gt $((now + 120)) ] || [ "$hw_last" -gt $((now + 120)) ]; then
+		mark_malformed
+	fi
 }
 
 save_state() {
-  local tmp
-  if [ -d "$STATE_FILE" ]; then
-    return 1
-  fi
-  if [ -L "$STATE_FILE" ]; then
-    rm -f "$STATE_FILE" || return 1
-  fi
-  tmp=$(mktemp "${STATE_DIR}/state.XXXXXX") || return 1
-  cat >"$tmp" <<EOF
+	local tmp
+	if [ -d "$STATE_FILE" ]; then
+		return 1
+	fi
+	if [ -L "$STATE_FILE" ]; then
+		rm -f "$STATE_FILE" || return 1
+	fi
+	tmp=$(mktemp "${STATE_DIR}/state.XXXXXX") || return 1
+	cat >"$tmp" <<EOF
 target_restarts=${target_restarts}
 target_last=${target_last}
 hw_restarts=${hw_restarts}
 hw_last=${hw_last}
 EOF
-  chmod 0600 "$tmp" || {
-    rm -f "$tmp"
-    return 1
-  }
-  mv -f "$tmp" "$STATE_FILE" || {
-    rm -f "$tmp"
-    return 1
-  }
+	chmod 0600 "$tmp" || {
+		rm -f "$tmp"
+		return 1
+	}
+	mv -f "$tmp" "$STATE_FILE" || {
+		rm -f "$tmp"
+		return 1
+	}
 }
 
 repair_state() {
-  local now
-  now=$(now_epoch)
-  target_restarts=32
-  hw_restarts=32
-  target_last=$now
-  hw_last=$now
-  state_malformed=0
-  save_state || log "cannot persist repaired restart state"
-  alert_notify "chia monit restart state was unusable; waiting the maximum interval"
+	local now
+	now=$(now_epoch)
+	target_restarts=32
+	hw_restarts=32
+	target_last=$now
+	hw_last=$now
+	state_malformed=0
+	save_state || log "cannot persist repaired restart state"
+	alert_notify "chia monit restart state was unusable; waiting the maximum interval"
 }
 
 http_status() {
-  local path=$1 code
-  if ! is_uint "$HEALTH_PORT"; then
-    printf '000\n'
-    return 0
-  fi
-  code=$(curl -sS -m 5 -o /dev/null -w '%{http_code}' -- "http://127.0.0.1:${HEALTH_PORT}${path}" 2>/dev/null || true)
-  if [[ "$code" =~ ^[0-9]{3}$ ]]; then
-    printf '%s\n' "$code"
-  else
-    printf '000\n'
-  fi
+	local path=$1 code
+	if ! is_uint "$HEALTH_PORT"; then
+		printf '000\n'
+		return 0
+	fi
+	code=$(curl -sS -m 5 -o /dev/null -w '%{http_code}' -- "http://127.0.0.1:${HEALTH_PORT}${path}" 2>/dev/null || true)
+	if [[ "$code" =~ ^[0-9]{3}$ ]]; then
+		printf '%s\n' "$code"
+	else
+		printf '000\n'
+	fi
 }
 
 health_ok() {
-  local code
-  if [ "$CHECK_FULL_NODE" -ne 1 ] && [ "$CHECK_TIMELORD" -ne 1 ]; then
-    return 1
-  fi
-  if [ "$CHECK_FULL_NODE" -eq 1 ]; then
-    code=$(http_status /full_node)
-    [ "$code" = "200" ] || return 1
-    if [ "$CHECK_PORTS" -eq 1 ]; then
-      code=$(http_status /full_node/ports)
-      [ "$code" = "200" ] || return 1
-    fi
-  fi
-  if [ "$CHECK_TIMELORD" -eq 1 ]; then
-    code=$(http_status /timelord)
-    [ "$code" = "200" ] || return 1
-  fi
-  return 0
+	local code
+	if [ "$CHECK_FULL_NODE" -ne 1 ] && [ "$CHECK_TIMELORD" -ne 1 ]; then
+		return 1
+	fi
+	if [ "$CHECK_FULL_NODE" -eq 1 ]; then
+		code=$(http_status /full_node)
+		[ "$code" = "200" ] || return 1
+		if [ "$CHECK_PORTS" -eq 1 ]; then
+			code=$(http_status /full_node/ports)
+			[ "$code" = "200" ] || return 1
+		fi
+	fi
+	if [ "$CHECK_TIMELORD" -eq 1 ]; then
+		code=$(http_status /timelord)
+		[ "$code" = "200" ] || return 1
+	fi
+	return 0
 }
 
 hw_check_ok() {
-  [ -x "$HW_CHECK" ] || return 1
-  "$HW_CHECK"
+	[ -x "$HW_CHECK" ] || return 1
+	"$HW_CHECK"
 }
 
 bounded_systemctl() {
-  local seconds=$1
-  shift
-  if command -v timeout >/dev/null 2>&1; then
-    timeout --signal=TERM "$seconds" "$SYSTEMCTL" "$@"
-    return
-  fi
-  "$SYSTEMCTL" "$@"
+	local seconds=$1
+	shift
+	if command -v timeout >/dev/null 2>&1; then
+		timeout --signal=TERM "$seconds" "$SYSTEMCTL" "$@"
+		return
+	fi
+	"$SYSTEMCTL" "$@"
 }
 
 proc_uid() {
-  awk '/^Uid:/ {print $2; exit}' "/proc/$1/status" 2>/dev/null || true
+	awk '/^Uid:/ {print $2; exit}' "/proc/$1/status" 2>/dev/null || true
 }
 
 proc_cmd() {
-  tr '\0' ' ' <"/proc/$1/cmdline" 2>/dev/null || true
+	tr '\0' ' ' <"/proc/$1/cmdline" 2>/dev/null || true
 }
 
 proc_cgroup() {
-  tr '\0' ' ' <"/proc/$1/cgroup" 2>/dev/null || true
+	tr '\0' ' ' <"/proc/$1/cgroup" 2>/dev/null || true
 }
 
 # Role entrypoints only. The chia CLI, exporter, and healthcheck do not match.
 entrypoint_matches() {
-  local cmd=$1 exe base
-  [ -n "$cmd" ] || return 1
-  exe=${cmd%% *}
-  base=${exe##*/}
-  case "$base" in
-    chia_daemon|chia_full_node|chia_timelord|chia_timelord_launcher)
-      return 0
-      ;;
-    chia_farmer|chia_harvester|chia_wallet|chia_crawler|chia_seeder|chia_introducer)
-      return 0
-      ;;
-    chia_data_layer|chia_data_layer_http|hw_vdf_client|timelord_launcher)
-      return 0
-      ;;
-    start_full_node|start_timelord|start_farmer|start_harvester|start_wallet)
-      return 0
-      ;;
-    start_crawler|start_seeder|start_introducer|start_data_layer|start_data_layer_http)
-      return 0
-      ;;
-    daemon)
-      [ "$exe" = "/opt/chia/daemon" ]
-      return
-      ;;
-    python|python3|python3.*)
-      case "$cmd" in
-        *chia.daemon.server*) return 0 ;;
-      esac
-      ;;
-  esac
-  return 1
+	local cmd=$1 exe base
+	[ -n "$cmd" ] || return 1
+	exe=${cmd%% *}
+	base=${exe##*/}
+	case "$base" in
+	chia_daemon | chia_full_node | chia_timelord | chia_timelord_launcher)
+		return 0
+		;;
+	chia_farmer | chia_harvester | chia_wallet | chia_crawler | chia_seeder | chia_introducer)
+		return 0
+		;;
+	chia_data_layer | chia_data_layer_http | hw_vdf_client | timelord_launcher)
+		return 0
+		;;
+	start_full_node | start_timelord | start_farmer | start_harvester | start_wallet)
+		return 0
+		;;
+	start_crawler | start_seeder | start_introducer | start_data_layer | start_data_layer_http)
+		return 0
+		;;
+	daemon)
+		[ "$exe" = "/opt/chia/daemon" ]
+		return
+		;;
+	python | python3 | python3.*)
+		case "$cmd" in
+		*chia.daemon.server*) return 0 ;;
+		esac
+		;;
+	esac
+	return 1
 }
 
 cgroup_is_active_unit() {
-  local cgroup=$1 unit
-  for unit in "${MANAGED_UNITS[@]}"; do
-    case "$cgroup" in
-      *"$unit"*)
-        if "$SYSTEMCTL" is-active --quiet "$unit"; then
-          return 0
-        fi
-        ;;
-    esac
-  done
-  return 1
+	local cgroup=$1 unit
+	for unit in "${MANAGED_UNITS[@]}"; do
+		case "$cgroup" in
+		*"$unit"*)
+			if "$SYSTEMCTL" is-active --quiet "$unit"; then
+				return 0
+			fi
+			;;
+		esac
+	done
+	return 1
 }
 
 resolve_uid() {
-  CHIA_UID=$(id -u "$CHIA_USER" 2>/dev/null || true)
-  is_uint "$CHIA_UID"
+	CHIA_UID=$(id -u "$CHIA_USER" 2>/dev/null || true)
+	is_uint "$CHIA_UID"
 }
 
 list_stray_pids() {
-  local pid cmd uid state cgroup
-  [ -n "$CHIA_UID" ] || return 0
-  for pid in /proc/[0-9]*; do
-    pid=${pid#/proc/}
-    case "$pid" in
-      ''|*[!0-9]*) continue ;;
-    esac
-    [ "$pid" -gt 1 ] || continue
-    [ "$pid" -eq "$$" ] && continue
-    [ "$pid" -eq "$PPID" ] && continue
-    state=$(awk '/^State:/ {print $2; exit}' "/proc/${pid}/status" 2>/dev/null || true)
-    [ "$state" = "Z" ] && continue
-    uid=$(proc_uid "$pid")
-    [ "$uid" = "$CHIA_UID" ] || continue
-    cmd=$(proc_cmd "$pid")
-    entrypoint_matches "$cmd" || continue
-    cgroup=$(proc_cgroup "$pid")
-    if cgroup_is_active_unit "$cgroup"; then
-      continue
-    fi
-    printf '%s\n' "$pid"
-  done
+	local pid cmd uid state cgroup
+	[ -n "$CHIA_UID" ] || return 0
+	for pid in /proc/[0-9]*; do
+		pid=${pid#/proc/}
+		case "$pid" in
+		'' | *[!0-9]*) continue ;;
+		esac
+		[ "$pid" -gt 1 ] || continue
+		[ "$pid" -eq "$$" ] && continue
+		[ "$pid" -eq "$PPID" ] && continue
+		state=$(awk '/^State:/ {print $2; exit}' "/proc/${pid}/status" 2>/dev/null || true)
+		[ "$state" = "Z" ] && continue
+		uid=$(proc_uid "$pid")
+		[ "$uid" = "$CHIA_UID" ] || continue
+		cmd=$(proc_cmd "$pid")
+		entrypoint_matches "$cmd" || continue
+		cgroup=$(proc_cgroup "$pid")
+		if cgroup_is_active_unit "$cgroup"; then
+			continue
+		fi
+		printf '%s\n' "$pid"
+	done
 }
 
 signal_if_still_stray() {
-  local sig=$1 pid=$2 cmd uid
-  [ -d "/proc/${pid}" ] || return 0
-  uid=$(proc_uid "$pid")
-  [ "$uid" = "$CHIA_UID" ] || return 0
-  cmd=$(proc_cmd "$pid")
-  entrypoint_matches "$cmd" || return 0
-  if cgroup_is_active_unit "$(proc_cgroup "$pid")"; then
-    return 0
-  fi
-  log "sending ${sig} to stray pid ${pid}: ${cmd:0:160}"
-  kill -s "$sig" "$pid" 2>/dev/null || true
+	local sig=$1 pid=$2 cmd uid
+	[ -d "/proc/${pid}" ] || return 0
+	uid=$(proc_uid "$pid")
+	[ "$uid" = "$CHIA_UID" ] || return 0
+	cmd=$(proc_cmd "$pid")
+	entrypoint_matches "$cmd" || return 0
+	if cgroup_is_active_unit "$(proc_cgroup "$pid")"; then
+		return 0
+	fi
+	log "sending ${sig} to stray pid ${pid}: ${cmd:0:160}"
+	kill -s "$sig" "$pid" 2>/dev/null || true
 }
 
 kill_strays() {
-  local pid found=0
-  local -a pids=()
-  if ! resolve_uid; then
-    log "cannot resolve uid for ${CHIA_USER}; not killing processes"
-    return 0
-  fi
-  while IFS= read -r pid; do
-    [ -n "$pid" ] || continue
-    pids+=("$pid")
-    found=1
-  done < <(list_stray_pids)
-  if [ "$found" -eq 0 ]; then
-    return 0
-  fi
-  for pid in "${pids[@]}"; do
-    signal_if_still_stray TERM "$pid"
-  done
-  sleep 3
-  for pid in "${pids[@]}"; do
-    signal_if_still_stray KILL "$pid"
-  done
+	local pid found=0
+	local -a pids=()
+	if ! resolve_uid; then
+		log "cannot resolve uid for ${CHIA_USER}; not killing processes"
+		return 0
+	fi
+	while IFS= read -r pid; do
+		[ -n "$pid" ] || continue
+		pids+=("$pid")
+		found=1
+	done < <(list_stray_pids)
+	if [ "$found" -eq 0 ]; then
+		return 0
+	fi
+	for pid in "${pids[@]}"; do
+		signal_if_still_stray TERM "$pid"
+	done
+	sleep 3
+	for pid in "${pids[@]}"; do
+		signal_if_still_stray KILL "$pid"
+	done
 }
 
 do_clean_restart() {
-  local unit
-  log "stopping ${SERVICE_BASE}.target"
-  bounded_systemctl 120 stop "${SERVICE_BASE}.target" || log "stop ${SERVICE_BASE}.target exited $?"
-  for unit in "${MANAGED_UNITS[@]}"; do
-    [ "$unit" = "${SERVICE_BASE}.target" ] && continue
-    bounded_systemctl 5 kill --kill-who=all --signal=SIGKILL "$unit" >/dev/null 2>&1 || true
-  done
-  kill_strays
-  sleep 1
-  for unit in "${MANAGED_UNITS[@]}"; do
-    bounded_systemctl 10 reset-failed "$unit" >/dev/null 2>&1 || true
-  done
-  log "starting ${SERVICE_BASE}.target"
-  bounded_systemctl 180 start "${SERVICE_BASE}.target" || log "start ${SERVICE_BASE}.target exited $?"
+	local unit
+	log "stopping ${SERVICE_BASE}.target"
+	bounded_systemctl 120 stop "${SERVICE_BASE}.target" || log "stop ${SERVICE_BASE}.target exited $?"
+	for unit in "${MANAGED_UNITS[@]}"; do
+		[ "$unit" = "${SERVICE_BASE}.target" ] && continue
+		bounded_systemctl 5 kill --kill-who=all --signal=SIGKILL "$unit" >/dev/null 2>&1 || true
+	done
+	kill_strays
+	sleep 1
+	for unit in "${MANAGED_UNITS[@]}"; do
+		bounded_systemctl 10 reset-failed "$unit" >/dev/null 2>&1 || true
+	done
+	log "starting ${SERVICE_BASE}.target"
+	bounded_systemctl 180 start "${SERVICE_BASE}.target" || log "start ${SERVICE_BASE}.target exited $?"
 }
 
 port_open() {
-  local port=$1 listeners
-  if ! is_uint "$port" || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
-    return 1
-  fi
-  if command -v ss >/dev/null 2>&1; then
-    listeners=$(ss -Hltn "sport = :${port}" 2>/dev/null || true)
-    [ -n "$listeners" ]
-    return
-  fi
-  if timeout 1 bash -c "echo >/dev/tcp/127.0.0.1/${port}" >/dev/null 2>&1; then
-    return 0
-  fi
-  timeout 1 bash -c "echo >/dev/tcp/::1/${port}" >/dev/null 2>&1
+	local port=$1 listeners
+	if ! is_uint "$port" || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
+		return 1
+	fi
+	if command -v ss >/dev/null 2>&1; then
+		listeners=$(ss -Hltn "sport = :${port}" 2>/dev/null || true)
+		[ -n "$listeners" ]
+		return
+	fi
+	if timeout 1 bash -c "echo >/dev/tcp/127.0.0.1/${port}" >/dev/null 2>&1; then
+		return 0
+	fi
+	timeout 1 bash -c "echo >/dev/tcp/::1/${port}" >/dev/null 2>&1
 }
 
 unit_ready() {
-  local unit=$1 port=$2
-  "$SYSTEMCTL" is-active --quiet "$unit" || return 1
-  port_open "$port"
+	local unit=$1 port=$2
+	"$SYSTEMCTL" is-active --quiet "$unit" || return 1
+	port_open "$port"
 }
 
 verify_stack() {
-  local deadline now ok
-  deadline=$(($(date +%s) + VERIFY_SECONDS))
-  while true; do
-    ok=1
-    if [ "$CHECK_FULL_NODE" -eq 1 ]; then
-      unit_ready "${SERVICE_BASE}-full-node.service" "$FULL_NODE_PORT" || ok=0
-    fi
-    if [ "$CHECK_TIMELORD" -eq 1 ]; then
-      unit_ready "${SERVICE_BASE}-timelord.service" "$TIMELORD_PORT" || ok=0
-    fi
-    if [ "$CHECK_FULL_NODE" -ne 1 ] && [ "$CHECK_TIMELORD" -ne 1 ]; then
-      "$SYSTEMCTL" is-active --quiet "${SERVICE_BASE}.target" || ok=0
-    fi
-    if [ "$ok" -eq 1 ]; then
-      log "chia units are active and listening"
-      return 0
-    fi
-    now=$(date +%s)
-    if [ "$now" -ge "$deadline" ]; then
-      log "timed out waiting for chia units to listen"
-      return 1
-    fi
-    sleep 1
-  done
+	local deadline now ok
+	deadline=$(($(date +%s) + VERIFY_SECONDS))
+	while true; do
+		ok=1
+		if [ "$CHECK_FULL_NODE" -eq 1 ]; then
+			unit_ready "${SERVICE_BASE}-full-node.service" "$FULL_NODE_PORT" || ok=0
+		fi
+		if [ "$CHECK_TIMELORD" -eq 1 ]; then
+			unit_ready "${SERVICE_BASE}-timelord.service" "$TIMELORD_PORT" || ok=0
+		fi
+		if [ "$CHECK_FULL_NODE" -ne 1 ] && [ "$CHECK_TIMELORD" -ne 1 ]; then
+			"$SYSTEMCTL" is-active --quiet "${SERVICE_BASE}.target" || ok=0
+		fi
+		if [ "$ok" -eq 1 ]; then
+			log "chia units are active and listening"
+			return 0
+		fi
+		now=$(date +%s)
+		if [ "$now" -ge "$deadline" ]; then
+			log "timed out waiting for chia units to listen"
+			return 1
+		fi
+		sleep 1
+	done
 }
 
 consume_target_slot() {
-  local now
-  now=$(now_epoch)
-  if [ "$target_restarts" -lt 32 ]; then
-    target_restarts=$((target_restarts + 1))
-  fi
-  target_last=$now
+	local now
+	now=$(now_epoch)
+	if [ "$target_restarts" -lt 32 ]; then
+		target_restarts=$((target_restarts + 1))
+	fi
+	target_last=$now
 }
 
 consume_hw_slot() {
-  local now
-  now=$(now_epoch)
-  if [ "$hw_restarts" -lt 32 ]; then
-    hw_restarts=$((hw_restarts + 1))
-  fi
-  hw_last=$now
+	local now
+	now=$(now_epoch)
+	if [ "$hw_restarts" -lt 32 ]; then
+		hw_restarts=$((hw_restarts + 1))
+	fi
+	hw_last=$now
 }
 
 perform_hw_restart() {
-  if [ -x "$HW_RESTART" ]; then
-    "$HW_RESTART"
-    return
-  fi
-  log "hw-vdf alert script missing; restarting ${SERVICE_BASE}-hw-vdf.service"
-  bounded_systemctl 180 restart "${SERVICE_BASE}-hw-vdf.service" || log "hw-vdf restart exited $?"
-  alert_notify "hw-vdf restarted and the alert script is missing"
+	if [ -x "$HW_RESTART" ]; then
+		"$HW_RESTART"
+		return
+	fi
+	log "hw-vdf alert script missing; restarting ${SERVICE_BASE}-hw-vdf.service"
+	bounded_systemctl 180 restart "${SERVICE_BASE}-hw-vdf.service" || log "hw-vdf restart exited $?"
+	alert_notify "hw-vdf restarted and the alert script is missing"
 }
 
 prepare() {
-  if ! [[ "$SERVICE_BASE" =~ ^[A-Za-z0-9_.-]+$ ]]; then
-    log "refusing unsafe service name; not restarting"
-    exit 0
-  fi
-  normalize_intervals
-  ensure_state_dir
-  with_lock
-  load_state
-  if [ "$state_malformed" -eq 1 ]; then
-    # Do not continue into a restart or a counter clear with values we
-    # could not read. The repaired file waits at the cap; a later passing
-    # check is what brings the counter back to zero.
-    log "restart state is unusable"
-    repair_state
-    return 1
-  fi
-  return 0
+	if ! [[ "$SERVICE_BASE" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+		log "refusing unsafe service name; not restarting"
+		exit 0
+	fi
+	normalize_intervals
+	ensure_state_dir
+	with_lock
+	load_state
+	if [ "$state_malformed" -eq 1 ]; then
+		# Do not continue into a restart or a counter clear with values we
+		# could not read. The repaired file waits at the cap; a later passing
+		# check is what brings the counter back to zero.
+		log "restart state is unusable"
+		repair_state
+		return 1
+	fi
+	return 0
 }
 
 cmd_target() {
-  local now anchor
-  prepare || return 0
-  if health_ok; then
-    if [ "$target_restarts" -ne 0 ]; then
-      target_restarts=0
-      save_state || log "could not reset target backoff"
-      log "health checks passed; target backoff reset"
-    fi
-    return 0
-  fi
-  now=$(now_epoch)
-  anchor=$(target_anchor)
-  if ! slot_due "$target_restarts" "$anchor" "$now"; then
-    log_skip "chia.target" "$target_restarts" "$anchor" "$now"
-    return 0
-  fi
-  consume_target_slot
-  if ! save_state; then
-    alert_notify "could not record chia.target restart; not restarting"
-    return 0
-  fi
-  log "restarting chia.target (next wait $(wait_for_restarts "$target_restarts")s)"
-  do_clean_restart
-  if ! verify_stack; then
-    alert_notify "chia.target restart did not leave full node and timelord active and listening"
-  fi
+	local now anchor
+	prepare || return 0
+	if health_ok; then
+		if [ "$target_restarts" -ne 0 ]; then
+			target_restarts=0
+			save_state || log "could not reset target backoff"
+			log "health checks passed; target backoff reset"
+		fi
+		return 0
+	fi
+	now=$(now_epoch)
+	anchor=$(target_anchor)
+	if ! slot_due "$target_restarts" "$anchor" "$now"; then
+		log_skip "chia.target" "$target_restarts" "$anchor" "$now"
+		return 0
+	fi
+	consume_target_slot
+	if ! save_state; then
+		alert_notify "could not record chia.target restart; not restarting"
+		return 0
+	fi
+	log "restarting chia.target (next wait $(wait_for_restarts "$target_restarts")s)"
+	do_clean_restart
+	if ! verify_stack; then
+		alert_notify "chia.target restart did not leave full node and timelord active and listening"
+	fi
 }
 
 cmd_hw() {
-  local now t_anchor h_anchor
-  prepare || return 0
-  if hw_check_ok; then
-    if [ "$hw_restarts" -ne 0 ]; then
-      hw_restarts=0
-      save_state || log "could not reset hw-vdf backoff"
-      log "hw-vdf check passed; hw backoff reset"
-    fi
-    return 0
-  fi
-  now=$(now_epoch)
-  t_anchor=$(target_anchor)
-  if ! slot_due "$target_restarts" "$t_anchor" "$now"; then
-    log_skip "hw-vdf (chia.target quiet)" "$target_restarts" "$t_anchor" "$now"
-    return 0
-  fi
-  h_anchor=$(hw_anchor)
-  if ! slot_due "$hw_restarts" "$h_anchor" "$now"; then
-    log_skip "hw-vdf" "$hw_restarts" "$h_anchor" "$now"
-    return 0
-  fi
-  consume_hw_slot
-  if ! save_state; then
-    alert_notify "could not record hw-vdf restart; not restarting"
-    return 0
-  fi
-  log "restarting hw-vdf (next wait $(wait_for_restarts "$hw_restarts")s)"
-  perform_hw_restart
+	local now t_anchor h_anchor
+	prepare || return 0
+	if hw_check_ok; then
+		if [ "$hw_restarts" -ne 0 ]; then
+			hw_restarts=0
+			save_state || log "could not reset hw-vdf backoff"
+			log "hw-vdf check passed; hw backoff reset"
+		fi
+		return 0
+	fi
+	now=$(now_epoch)
+	t_anchor=$(target_anchor)
+	if ! slot_due "$target_restarts" "$t_anchor" "$now"; then
+		log_skip "hw-vdf (chia.target quiet)" "$target_restarts" "$t_anchor" "$now"
+		return 0
+	fi
+	h_anchor=$(hw_anchor)
+	if ! slot_due "$hw_restarts" "$h_anchor" "$now"; then
+		log_skip "hw-vdf" "$hw_restarts" "$h_anchor" "$now"
+		return 0
+	fi
+	consume_hw_slot
+	if ! save_state; then
+		alert_notify "could not record hw-vdf restart; not restarting"
+		return 0
+	fi
+	log "restarting hw-vdf (next wait $(wait_for_restarts "$hw_restarts")s)"
+	perform_hw_restart
 }
 
 cmd_reset_target() {
-  prepare || return 0
-  if ! health_ok; then
-    return 0
-  fi
-  if [ "$target_restarts" -eq 0 ]; then
-    return 0
-  fi
-  target_restarts=0
-  save_state || log "could not reset target backoff"
-  log "health checks passed; target backoff reset"
+	prepare || return 0
+	if ! health_ok; then
+		return 0
+	fi
+	if [ "$target_restarts" -eq 0 ]; then
+		return 0
+	fi
+	target_restarts=0
+	save_state || log "could not reset target backoff"
+	log "health checks passed; target backoff reset"
 }
 
 cmd_reset_hw() {
-  prepare || return 0
-  if ! hw_check_ok; then
-    return 0
-  fi
-  if [ "$hw_restarts" -eq 0 ]; then
-    return 0
-  fi
-  hw_restarts=0
-  save_state || log "could not reset hw-vdf backoff"
-  log "hw-vdf check passed; hw backoff reset"
+	prepare || return 0
+	if ! hw_check_ok; then
+		return 0
+	fi
+	if [ "$hw_restarts" -eq 0 ]; then
+		return 0
+	fi
+	hw_restarts=0
+	save_state || log "could not reset hw-vdf backoff"
+	log "hw-vdf check passed; hw backoff reset"
 }
 
 usage() {
-  printf '%s\n' "usage: $0 target|hw-vdf|reset-target|reset-hw-vdf" >&2
+	printf '%s\n' "usage: $0 target|hw-vdf|reset-target|reset-hw-vdf" >&2
 }
 
 main() {
-  apply_sandbox
-  case "${1:-}" in
-    target) cmd_target ;;
-    hw-vdf) cmd_hw ;;
-    reset-target) cmd_reset_target ;;
-    reset-hw-vdf) cmd_reset_hw ;;
-    *)
-      usage
-      exit 2
-      ;;
-  esac
-  exit 0
+	apply_sandbox
+	case "${1:-}" in
+	target) cmd_target ;;
+	hw-vdf) cmd_hw ;;
+	reset-target) cmd_reset_target ;;
+	reset-hw-vdf) cmd_reset_hw ;;
+	*)
+		usage
+		exit 2
+		;;
+	esac
+	exit 0
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-  main "$@"
+	main "$@"
 fi

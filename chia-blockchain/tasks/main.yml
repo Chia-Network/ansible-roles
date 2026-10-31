@@ -293,7 +293,9 @@
     owner: root
     group: root
     mode: "0750"
-  when: add_monit_config or chia_add_hw_vdf_monit_config
+  when:
+    - add_monit_config or chia_add_hw_vdf_monit_config
+    - chia_monit_restart_backoff | bool
 
 - name: Add monit restart backoff wrapper
   become: true
@@ -303,7 +305,9 @@
     owner: root
     group: root
     mode: "0750"
-  when: add_monit_config or chia_add_hw_vdf_monit_config
+  when:
+    - add_monit_config or chia_add_hw_vdf_monit_config
+    - chia_monit_restart_backoff | bool
   notify: restart-monit
 
 - name: Remove obsolete monit log-level scripts
