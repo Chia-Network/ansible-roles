@@ -4,7 +4,7 @@
   ansible.builtin.copy:
     src: "{{ local_bin_path }}"
     dest: "/usr/local/bin/{{ bin_name }}"
-    mode: '0755'
+    mode: "0755"
   notify: restart-blockchain-status
 
 - name: Systemd Config

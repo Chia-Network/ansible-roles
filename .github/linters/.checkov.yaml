@@ -1,0 +1,9 @@
+---
+# Don't report passed checks in output
+quiet: true
+
+# CKV2_ANSIBLE_3 only fires on the become-only block in awscli/tasks/main.yml.
+# Checkov 3.3.19 cannot honour inline skips for Ansible blocks (its context ID
+# has an extra dot), and adding a rescue would change Ansible behaviour.
+skip-check:
+  - CKV2_ANSIBLE_3

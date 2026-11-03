@@ -3,7 +3,7 @@
   become: true
   ansible.builtin.lineinfile:
     path: "/etc/ssh/sshd_config"
-    regexp: '^PasswordAuthentication'
+    regexp: "^PasswordAuthentication"
     line: "PasswordAuthentication no"
   notify: restart-ssh
   when: base_setup_disable_ssh_password_login | bool
@@ -12,7 +12,7 @@
   become: true
   ansible.builtin.lineinfile:
     path: "/etc/ssh/sshd_config"
-    regexp: '^PermitRootLogin'
+    regexp: "^PermitRootLogin"
     line: "PermitRootLogin no"
   notify: restart-ssh
   when: base_setup_disable_ssh_root_login | bool

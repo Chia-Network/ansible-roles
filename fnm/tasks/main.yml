@@ -4,9 +4,9 @@
   vars:
     params:
       files:
-        - '{{ansible_architecture}}.yml'
+        - "{{ansible_architecture}}.yml"
       paths:
-        - 'vars'
+        - "vars"
 
 - name: Install Common Deps
   become: true
@@ -41,18 +41,18 @@
   ansible.builtin.file:
     path: "/usr/local/bin/fnm"
     state: file
-    mode: '0755'
+    mode: "0755"
 
 - name: Ensure fnm is configured in the shell
   become: yes
   become_user: "{{ user }}"
   ansible.builtin.lineinfile:
     path: /home/ubuntu/.bashrc
-    search_string: 'fnm env'
+    search_string: "fnm env"
     line: 'eval "$(fnm env --fnm-dir /home/{{ user }}/.fnm)"'
     owner: ubuntu
     group: ubuntu
-    mode: '0644'
+    mode: "0644"
 
 - name: Install node
   when: fnm_install_node_version != ""
