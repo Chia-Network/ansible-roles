@@ -284,20 +284,20 @@ chia_monit_progress_restart_seconds: 480
 # When true, also monitor /full_node/ports (process liveness) with the fast failure threshold.
 # Useful when chia_monit_progress_restart_seconds is raised so a dead node still restarts quickly.
 chia_monit_check_full_node_ports: false
-# Off by default so mainnet keeps the monit files from before this change.
-# Testnet11 opts in from inventory with chia_monit_restart_backoff: true.
+# Off by default so mainnet keeps the existing monit files.
 # While a failure persists the quiet period is min, min*factor, min*factor^2,
-# ... capped at max, and monit keeps retrying at max. A passing health check
-# resets the counter. 600, 2, 3600 is 10m, 20m, 40m, then 60m.
+# ... capped at max, and monit keeps retrying at max. The counter goes back to
+# 0 when no restart has been allowed for twice the max (time based, no monit
+# event involved). 600, 2, 3600 is 10m, 20m, 40m, then 60m.
 chia_monit_restart_backoff: false
+chia_monit_restart_script: "/etc/monit/monit-chia-restart-{{ chia_service_base }}.sh"
+chia_monit_restart_state_dir: "/var/lib/chia-monit/{{ chia_service_base }}"
 chia_monit_restart_min_seconds: 600
 chia_monit_restart_backoff_factor: 2
 chia_monit_restart_max_seconds: 3600
-# Seconds to poll after a clean restart for full node and timelord to be
-# active and listening before alerting. Does not change monit cycle counts.
-chia_monit_restart_verify_seconds: 90
-# ASIC connection failures before an hw-vdf restart is requested.
-# Independent of chia_monit_failure_threshold.
+# Only used when chia_monit_restart_backoff is true. Opting in changes the
+# hw-vdf failure threshold from chia_monit_failure_threshold (default 3) to
+# this value (default 5).
 chia_monit_hw_vdf_failure_threshold: 5
 
 # Connect to certain peers on a given interval
