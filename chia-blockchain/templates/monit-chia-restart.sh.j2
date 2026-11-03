@@ -17,23 +17,42 @@ STATE_DIR="{{ chia_monit_restart_state_dir }}"
 STATE_FILE="${STATE_DIR}/state"
 LOCK_FILE="${STATE_DIR}/lock"
 SYSTEMCTL="/bin/systemctl"
+KILL="/bin/kill"
+PROC="/proc"
 NOTIFY="/etc/monit/monit-notify-chia.sh"
 ALERT_ON_RESTART={{ 1 if chia_monit_alert_on_restart else 0 }}
 HW_RESTART="/etc/monit/monit-hw-vdf-restart-alert.sh"
 VERIFY_SECONDS={{ chia_monit_restart_verify_seconds }}
 CHIA_USER="{{ user }}"
-FULL_NODE_PORT={{ full_node_port }}
-TIMELORD_PORT={{ chia_timelord_port }}
-CHECK_FULL_NODE={{ 1 if 'full-node' in chia_enabled_services else 0 }}
-CHECK_TIMELORD={{ 1 if 'timelord' in chia_enabled_services else 0 }}
+READY=(
+	{% if 'full-node' in chia_enabled_services %}
+	"${SERVICE_BASE}-full-node.service:{{ full_node_port }}"
+	{% endif %}
+	{% if 'timelord' in chia_enabled_services %}
+	"${SERVICE_BASE}-timelord.service:{{ chia_timelord_port }}"
+	{% endif %}
+)
 MANAGED_UNITS=(
 	"${SERVICE_BASE}.target"
-	{% for service in chia_all_services %}
+	"${SERVICE_BASE}-daemon.service"
+	{% for service in chia_enabled_services %}
 	"${SERVICE_BASE}-{{ service }}.service"
+	{% endfor %}
+)
+STRAY_NAMES=(
+	chia_daemon
+	chia_full_node
+	chia_timelord
+	chia_timelord_launcher
+	hw_vdf_client
+	timelord_launcher
+	{% for service in chia_all_services %}
+	"start_{{ service | replace('-', '_') }}"
 	{% endfor %}
 )
 declare -A restarts=([target]=0 [hw]=0) last=([target]=0 [hw]=0)
 CHIA_UID=""
+FAILED_UNITS=""
 log() {
 	printf '%s\n' "chia-monit-restart: $*"
 	if command -v logger >/dev/null 2>&1; then logger -t chia-monit-restart -- "$*" || true; fi
@@ -45,7 +64,7 @@ skip() {
 alert_notify() {
 	log "alert: $*"
 	if [ -x "$NOTIFY" ]; then
-		"$NOTIFY" "$*" || log "notify script exited $?"
+		timeout 30 "$NOTIFY" "$*" || log "notify script exited $?"
 	else log "notify script is not executable: ${NOTIFY}"; fi
 }
 wait_for() {
@@ -170,7 +189,7 @@ prepare() {
 }
 proc_name() {
 	local pid=$1 word
-	IFS= read -r -d '' word <"/proc/${pid}/cmdline" 2>/dev/null || true
+	IFS= read -r -d '' word <"${PROC}/${pid}/cmdline" 2>/dev/null || true
 	printf '%s\n' "${word##*/}"
 }
 unit_active_for() {
@@ -185,18 +204,19 @@ unit_active_for() {
 	return 1
 }
 is_stray() {
-	local pid=$1 name cgroup
-	[ -d "/proc/${pid}" ] || return 1
-	[ "$(stat -c %u "/proc/${pid}" 2>/dev/null)" = "$CHIA_UID" ] || return 1
+	local pid=$1 name cgroup stray found=0
+	[ -d "${PROC}/${pid}" ] || return 1
+	[ "$(stat -c %u "${PROC}/${pid}" 2>/dev/null)" = "$CHIA_UID" ] || return 1
 	name=$(proc_name "$pid")
-	case "$name" in
-	chia_daemon | chia_full_node | chia_timelord | chia_timelord_launcher | hw_vdf_client | timelord_launcher | start_*) ;;
-	*) return 1 ;;
-	esac
-	cgroup=$(tr '\0' ' ' <"/proc/${pid}/cgroup" 2>/dev/null || true)
+	for stray in "${STRAY_NAMES[@]}"; do
+		[ "$name" = "$stray" ] && found=1
+	done
+	[ "$found" -eq 1 ] || return 1
+	cgroup=$(tr '\0' ' ' <"${PROC}/${pid}/cgroup" 2>/dev/null || true)
 	unit_active_for "$cgroup" && return 1
 	return 0
 }
+# Processes owned by the chia user that are not in an active managed unit (for example started outside systemd) are terminated after the stop so the start is clean; processes of other users are not touched.
 kill_strays() {
 	local uid pid found=0
 	local -a pids=()
@@ -206,8 +226,9 @@ kill_strays() {
 		return 0
 	fi
 	CHIA_UID=$uid
-	for pid in /proc/[0-9]*; do
-		pid=${pid#/proc/}
+	for pid in "$PROC"/[0-9]*; do
+		pid=${pid#"$PROC"/}
+		[[ "$pid" =~ ^[0-9]+$ ]] || continue
 		[ "$pid" -gt 1 ] || continue
 		[ "$pid" -eq "$$" ] && continue
 		[ "$pid" -eq "$PPID" ] && continue
@@ -220,14 +241,14 @@ kill_strays() {
 	for pid in "${pids[@]}"; do
 		if is_stray "$pid"; then
 			log "sending SIGTERM to stray pid ${pid}"
-			kill -s TERM "$pid" 2>/dev/null || true
+			"$KILL" -s TERM "$pid" 2>/dev/null || true
 		fi
 	done
 	sleep 3
 	for pid in "${pids[@]}"; do
 		if is_stray "$pid"; then
 			log "sending SIGKILL to stray pid ${pid}"
-			kill -s KILL "$pid" 2>/dev/null || true
+			"$KILL" -s KILL "$pid" 2>/dev/null || true
 		fi
 	done
 }
@@ -259,14 +280,25 @@ unit_ready() {
 	port_listening "$port"
 }
 verify_stack() {
-	local deadline now ok
+	local deadline now ok entry unit port
 	deadline=$(($(date +%s) + VERIFY_SECONDS))
 	while true; do
 		ok=1
-		if [ "$CHECK_FULL_NODE" -eq 1 ]; then unit_ready "${SERVICE_BASE}-full-node.service" "$FULL_NODE_PORT" || ok=0; fi
-		if [ "$CHECK_TIMELORD" -eq 1 ]; then unit_ready "${SERVICE_BASE}-timelord.service" "$TIMELORD_PORT" || ok=0; fi
-		if [ "$CHECK_FULL_NODE" -ne 1 ] && [ "$CHECK_TIMELORD" -ne 1 ]; then
-			"$SYSTEMCTL" is-active --quiet "${SERVICE_BASE}.target" || ok=0
+		FAILED_UNITS=""
+		if [ -z "${READY[*]+x}" ]; then
+			if ! "$SYSTEMCTL" is-active --quiet "${SERVICE_BASE}.target"; then
+				ok=0
+				FAILED_UNITS="${SERVICE_BASE}.target"
+			fi
+		else
+			for entry in "${READY[@]}"; do
+				unit=${entry%:*}
+				port=${entry##*:}
+				if ! unit_ready "$unit" "$port"; then
+					ok=0
+					FAILED_UNITS="${FAILED_UNITS} ${unit}"
+				fi
+			done
 		fi
 		if [ "$ok" -eq 1 ]; then
 			log "chia units are active and listening"
@@ -274,7 +306,7 @@ verify_stack() {
 		fi
 		now=$(date +%s)
 		if [ "$now" -ge "$deadline" ]; then
-			log "timed out waiting for chia units to be active and listening"
+			log "timed out waiting for chia units to be active and listening:${FAILED_UNITS}"
 			return 1
 		fi
 		sleep 1
@@ -291,7 +323,7 @@ cmd_target() {
 	log "restarting ${SERVICE_BASE}.target (next wait $(wait_for "${restarts[target]}")s)"
 	clean_restart
 	if ! verify_stack; then
-		alert_notify "chia.target restart did not leave full node and timelord active and listening"
+		alert_notify "chia.target restart did not leave these units active and listening: ${FAILED_UNITS}"
 	elif [ "$ALERT_ON_RESTART" -eq 1 ]; then
 		alert_notify "chia monit restarted ${SERVICE_BASE}.target"
 	fi
