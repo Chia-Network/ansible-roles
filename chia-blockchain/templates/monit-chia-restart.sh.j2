@@ -1,0 +1,203 @@
+#!/bin/bash
+# Monit calls this as its restart program for a check that stayed failed.
+# It allows a restart only when the unit has been up for wait(n) seconds,
+# where n is the number of restarts already allowed and
+# wait(n) = min(MAX, MIN * FACTOR^n): 600, 1200, 2400, 3600, 3600, ...
+# A skipped call exits 0. It never unmonitors.
+# The counter is time based: if more than 2*MAX seconds have passed since the
+# last allowed restart, the counter is treated as 0.
+# The state file holds: target_restarts, target_last, hw_restarts, hw_last.
+
+set -uo pipefail
+MIN_SECONDS={{ chia_monit_restart_min_seconds }}
+MAX_SECONDS={{ chia_monit_restart_max_seconds }}
+FACTOR={{ chia_monit_restart_backoff_factor }}
+SERVICE_BASE="{{ chia_service_base }}"
+STATE_DIR="{{ chia_monit_restart_state_dir }}"
+STATE_FILE="${STATE_DIR}/state"
+LOCK_FILE="${STATE_DIR}/lock"
+SYSTEMCTL="/bin/systemctl"
+NOTIFY="/etc/monit/monit-notify-chia.sh"
+ALERT_ON_RESTART={{ 1 if chia_monit_alert_on_restart else 0 }}
+HW_RESTART="/etc/monit/monit-hw-vdf-restart-alert.sh"
+declare -A restarts=([target]=0 [hw]=0) last=([target]=0 [hw]=0)
+log() {
+	printf '%s\n' "chia-monit-restart: $*"
+	if command -v logger >/dev/null 2>&1; then logger -t chia-monit-restart -- "$*" || true; fi
+}
+skip() {
+	log "$*"
+	exit 0
+}
+alert_notify() {
+	log "alert: $*"
+	if [ -x "$NOTIFY" ]; then
+		"$NOTIFY" "$*" || log "notify script exited $?"
+	else log "notify script is not executable: ${NOTIFY}"; fi
+}
+wait_for() {
+	local n=$1 wait=$MIN_SECONDS i=0
+	while [ "$i" -lt "$n" ] && [ "$wait" -lt "$MAX_SECONDS" ]; do
+		wait=$((wait * FACTOR))
+		i=$((i + 1))
+	done
+	if [ "$wait" -gt "$MAX_SECONDS" ]; then wait=$MAX_SECONDS; fi
+	printf '%s\n' "$wait"
+}
+unit_started_epoch() {
+	local unit=$1 raw epoch
+	raw=$("$SYSTEMCTL" show -p ActiveEnterTimestamp --value "$unit" 2>/dev/null || true)
+	[[ "$raw" =~ ^(n/a|N/A|0)?$ ]] && raw=""
+	epoch=$(date -d "${raw:-@0}" +%s 2>/dev/null || true)
+	[[ "$epoch" =~ ^[0-9]+$ ]] || epoch=0
+	[ "$epoch" -le "$(date +%s)" ] || epoch=$(date +%s)
+	printf '%s\n' "$epoch"
+}
+slot_anchor() {
+	local name=$1 unit=$2 started
+	started=$(unit_started_epoch "$unit")
+	if [ "${last[$name]}" -gt "$started" ]; then started=${last[$name]}; fi
+	printf '%s\n' "$started"
+}
+slot_due() {
+	local name=$1 anchor=$2 now=$3 wait
+	wait=$(wait_for "${restarts[$name]}")
+	[ "$anchor" -gt 0 ] || return 0
+	[ "$now" -ge "$anchor" ] || return 1
+	[ $((now - anchor)) -ge "$wait" ]
+}
+consume() {
+	local name=$1 now=$2
+	if [ "${restarts[$name]}" -lt 32 ]; then restarts[$name]=$((restarts[$name] + 1)); fi
+	last[$name]=$now
+}
+log_skip() {
+	local name=$1 count=$2 anchor=$3 now=$4 wait
+	wait=$(wait_for "$count")
+	log "skip ${name}: restarts=${count} wait=${wait}s anchor=${anchor} now=${now} remaining=$((wait > now - anchor ? wait - (now - anchor) : 0))s"
+}
+due_or_skip() {
+	local name=$1 anchor=$2 now=$3
+	if slot_due "$name" "$anchor" "$now"; then return 0; fi
+	log_skip "$name" "${restarts[$name]}" "$anchor" "$now"
+	exit 0
+}
+load_state() {
+	local line key val nkeys=0
+	local -A state=()
+	[ -e "$STATE_FILE" ] || return 0
+	[ -f "$STATE_FILE" ] || return 1
+	while IFS= read -r line || [ -n "$line" ]; do
+		key=${line%%=*}
+		val=${line#*=}
+		[ "$key" != "$line" ] || return 1
+		[[ "$val" =~ ^[0-9]{1,10}$ ]] || return 1
+		case "$key" in
+		target_restarts | target_last | hw_restarts | hw_last) ;;
+		*) return 1 ;;
+		esac
+		[ -n "${state[$key]+x}" ] || nkeys=$((nkeys + 1))
+		state[$key]=$val
+	done <"$STATE_FILE"
+	[ "$nkeys" -eq 4 ] || return 1
+	[ "${state[target_last]}" -le $(($(date +%s) + 120)) ] || return 1
+	[ "${state[hw_last]}" -le $(($(date +%s) + 120)) ] || return 1
+	restarts[target]=$((10#${state[target_restarts]}))
+	last[target]=$((10#${state[target_last]}))
+	restarts[hw]=$((10#${state[hw_restarts]}))
+	last[hw]=$((10#${state[hw_last]}))
+}
+save_state() {
+	local tmp
+	tmp=$(mktemp "${STATE_DIR}/state.XXXXXX") || return 1
+	printf 'target_restarts=%s\ntarget_last=%s\nhw_restarts=%s\nhw_last=%s\n' "${restarts[target]}" "${last[target]}" "${restarts[hw]}" "${last[hw]}" >"$tmp" || return 1
+	chmod 0600 "$tmp" || return 1
+	mv -f "$tmp" "$STATE_FILE" || return 1
+}
+save_or_skip() {
+	save_state && return 0
+	alert_notify "$*"
+	exit 0
+}
+repair_state() {
+	local now key
+	now=$(date +%s)
+	for key in target hw; do
+		restarts[$key]=32
+		last[$key]=$now
+	done
+	save_state || log "cannot persist repaired restart state"
+	alert_notify "chia monit restart state was unusable; waiting the maximum interval"
+	exit 0
+}
+reset_counters() {
+	local now=$1 name
+	for name in target hw; do
+		[ "${last[$name]}" -gt 0 ] || continue
+		if [ $((now - ${last[$name]})) -gt $((2 * MAX_SECONDS)) ]; then restarts[$name]=0; fi
+	done
+}
+check_state_dir() {
+	[ ! -L "$STATE_DIR" ] && [ -d "$STATE_DIR" ] && return 0
+	log "state dir ${STATE_DIR} is not a usable directory; not restarting"
+	alert_notify "chia monit state directory is not a directory"
+	exit 0
+}
+with_lock() {
+	command -v flock >/dev/null 2>&1 || skip "flock is missing; not restarting"
+	exec 9>"$LOCK_FILE" || skip "cannot open ${LOCK_FILE}; not restarting"
+	flock -n 9 || skip "another restart call holds ${LOCK_FILE}; not restarting"
+}
+prepare() {
+	[[ "$SERVICE_BASE" =~ ^[A-Za-z0-9_.-]+$ ]] || skip "refusing unsafe service name; not restarting"
+	check_state_dir
+	with_lock
+	load_state || repair_state
+	reset_counters "$(date +%s)"
+}
+cmd_target() {
+	local now anchor
+	prepare
+	now=$(date +%s)
+	anchor=$(slot_anchor target "${SERVICE_BASE}.target")
+	due_or_skip target "$anchor" "$now"
+	consume target "$now"
+	save_or_skip "could not record chia.target restart; not restarting"
+	log "restarting ${SERVICE_BASE}.target (next wait $(wait_for "${restarts[target]}")s)"
+	if "$SYSTEMCTL" restart "${SERVICE_BASE}.target"; then
+		if [ "$ALERT_ON_RESTART" -eq 1 ]; then
+			alert_notify "chia monit restarted ${SERVICE_BASE}.target"
+		fi
+	else
+		log "restart ${SERVICE_BASE}.target exited $?"
+	fi
+}
+cmd_hw() {
+	local now t_anchor h_anchor
+	prepare
+	now=$(date +%s)
+	t_anchor=$(slot_anchor target "${SERVICE_BASE}.target")
+	due_or_skip target "$t_anchor" "$now"
+	h_anchor=$(slot_anchor hw "${SERVICE_BASE}-hw-vdf.service")
+	due_or_skip hw "$h_anchor" "$now"
+	consume hw "$now"
+	save_or_skip "could not record hw-vdf restart; not restarting"
+	log "restarting ${SERVICE_BASE}-hw-vdf.service (next wait $(wait_for "${restarts[hw]}")s)"
+	if [ -x "$HW_RESTART" ]; then
+		"$HW_RESTART"
+	else
+		log "hw-vdf alert script is not executable; restarting ${SERVICE_BASE}-hw-vdf.service"
+		"$SYSTEMCTL" restart "${SERVICE_BASE}-hw-vdf.service" || log "restart ${SERVICE_BASE}-hw-vdf.service exited $?"
+	fi
+}
+usage() {
+	printf '%s\n' "usage: $0 target|hw-vdf" >&2
+}
+main() {
+	case "${1:-}" in
+	target) cmd_target ;;
+	hw-vdf) cmd_hw ;;
+	*) usage && exit 2 ;;
+	esac
+}
+main "$@"
