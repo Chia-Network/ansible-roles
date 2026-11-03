@@ -17,10 +17,42 @@ STATE_DIR="{{ chia_monit_restart_state_dir }}"
 STATE_FILE="${STATE_DIR}/state"
 LOCK_FILE="${STATE_DIR}/lock"
 SYSTEMCTL="/bin/systemctl"
+KILL="/bin/kill"
+PROC="/proc"
 NOTIFY="/etc/monit/monit-notify-chia.sh"
 ALERT_ON_RESTART={{ 1 if chia_monit_alert_on_restart else 0 }}
 HW_RESTART="/etc/monit/monit-hw-vdf-restart-alert.sh"
+VERIFY_SECONDS={{ chia_monit_restart_verify_seconds }}
+CHIA_USER="{{ user }}"
+READY=(
+	{% if 'full-node' in chia_enabled_services %}
+	"${SERVICE_BASE}-full-node.service:{{ full_node_port }}"
+	{% endif %}
+	{% if 'timelord' in chia_enabled_services %}
+	"${SERVICE_BASE}-timelord.service:{{ chia_timelord_port }}"
+	{% endif %}
+)
+MANAGED_UNITS=(
+	"${SERVICE_BASE}.target"
+	"${SERVICE_BASE}-daemon.service"
+	{% for service in chia_enabled_services %}
+	"${SERVICE_BASE}-{{ service }}.service"
+	{% endfor %}
+)
+STRAY_NAMES=(
+	chia_daemon
+	chia_full_node
+	chia_timelord
+	chia_timelord_launcher
+	hw_vdf_client
+	timelord_launcher
+	{% for service in chia_all_services %}
+	"start_{{ service | replace('-', '_') }}"
+	{% endfor %}
+)
 declare -A restarts=([target]=0 [hw]=0) last=([target]=0 [hw]=0)
+CHIA_UID=""
+FAILED_UNITS=""
 log() {
 	printf '%s\n' "chia-monit-restart: $*"
 	if command -v logger >/dev/null 2>&1; then logger -t chia-monit-restart -- "$*" || true; fi
@@ -32,7 +64,7 @@ skip() {
 alert_notify() {
 	log "alert: $*"
 	if [ -x "$NOTIFY" ]; then
-		"$NOTIFY" "$*" || log "notify script exited $?"
+		timeout 30 "$NOTIFY" "$*" || log "notify script exited $?"
 	else log "notify script is not executable: ${NOTIFY}"; fi
 }
 wait_for() {
@@ -155,6 +187,131 @@ prepare() {
 	load_state || repair_state
 	reset_counters "$(date +%s)"
 }
+proc_name() {
+	local pid=$1 word
+	IFS= read -r -d '' word <"${PROC}/${pid}/cmdline" 2>/dev/null || true
+	printf '%s\n' "${word##*/}"
+}
+unit_active_for() {
+	local cgroup=$1 unit
+	for unit in "${MANAGED_UNITS[@]}"; do
+		case "$cgroup" in
+		*"$unit"*)
+			if "$SYSTEMCTL" is-active --quiet "$unit"; then return 0; fi
+			;;
+		esac
+	done
+	return 1
+}
+is_stray() {
+	local pid=$1 name cgroup stray found=0
+	[ -d "${PROC}/${pid}" ] || return 1
+	[ "$(stat -c %u "${PROC}/${pid}" 2>/dev/null)" = "$CHIA_UID" ] || return 1
+	name=$(proc_name "$pid")
+	for stray in "${STRAY_NAMES[@]}"; do
+		[ "$name" = "$stray" ] && found=1
+	done
+	[ "$found" -eq 1 ] || return 1
+	cgroup=$(tr '\0' ' ' <"${PROC}/${pid}/cgroup" 2>/dev/null || true)
+	unit_active_for "$cgroup" && return 1
+	return 0
+}
+# Processes owned by the chia user that are not in an active managed unit (for example started outside systemd) are terminated after the stop so the start is clean; processes of other users are not touched.
+kill_strays() {
+	local uid pid found=0
+	local -a pids=()
+	uid=$(id -u "$CHIA_USER" 2>/dev/null || true)
+	if ! [[ "$uid" =~ ^[0-9]+$ ]] || [ "$uid" -eq 0 ]; then
+		log "refusing to kill strays: cannot use uid '${uid}' for ${CHIA_USER}"
+		return 0
+	fi
+	CHIA_UID=$uid
+	for pid in "$PROC"/[0-9]*; do
+		pid=${pid#"$PROC"/}
+		[[ "$pid" =~ ^[0-9]+$ ]] || continue
+		[ "$pid" -gt 1 ] || continue
+		[ "$pid" -eq "$$" ] && continue
+		[ "$pid" -eq "$PPID" ] && continue
+		if is_stray "$pid"; then
+			pids+=("$pid")
+			found=1
+		fi
+	done
+	[ "$found" -eq 1 ] || return 0
+	for pid in "${pids[@]}"; do
+		if is_stray "$pid"; then
+			log "sending SIGTERM to stray pid ${pid}"
+			"$KILL" -s TERM "$pid" 2>/dev/null || true
+		fi
+	done
+	sleep 3
+	for pid in "${pids[@]}"; do
+		if is_stray "$pid"; then
+			log "sending SIGKILL to stray pid ${pid}"
+			"$KILL" -s KILL "$pid" 2>/dev/null || true
+		fi
+	done
+}
+clean_restart() {
+	local unit
+	log "stopping ${SERVICE_BASE}.target"
+	timeout 120 "$SYSTEMCTL" stop "${SERVICE_BASE}.target" || log "stop ${SERVICE_BASE}.target exited $?"
+	log "killing processes left in managed units"
+	for unit in "${MANAGED_UNITS[@]}"; do
+		[ "$unit" = "${SERVICE_BASE}.target" ] && continue
+		"$SYSTEMCTL" kill --kill-who=all --signal=SIGKILL "$unit" >/dev/null 2>&1 || true
+	done
+	kill_strays
+	sleep 1
+	log "clearing failed state for managed units"
+	for unit in "${MANAGED_UNITS[@]}"; do
+		"$SYSTEMCTL" reset-failed "$unit" >/dev/null 2>&1 || true
+	done
+	log "starting ${SERVICE_BASE}.target"
+	timeout 180 "$SYSTEMCTL" start "${SERVICE_BASE}.target" || log "start ${SERVICE_BASE}.target exited $?"
+}
+port_listening() {
+	local port=$1
+	[ -n "$(ss -Hltn "sport = :${port}" 2>/dev/null || true)" ]
+}
+unit_ready() {
+	local unit=$1 port=$2
+	"$SYSTEMCTL" is-active --quiet "$unit" || return 1
+	port_listening "$port"
+}
+verify_stack() {
+	local deadline now ok entry unit port
+	deadline=$(($(date +%s) + VERIFY_SECONDS))
+	while true; do
+		ok=1
+		FAILED_UNITS=""
+		if [ -z "${READY[*]+x}" ]; then
+			if ! "$SYSTEMCTL" is-active --quiet "${SERVICE_BASE}.target"; then
+				ok=0
+				FAILED_UNITS="${SERVICE_BASE}.target"
+			fi
+		else
+			for entry in "${READY[@]}"; do
+				unit=${entry%:*}
+				port=${entry##*:}
+				if ! unit_ready "$unit" "$port"; then
+					ok=0
+					FAILED_UNITS="${FAILED_UNITS} ${unit}"
+				fi
+			done
+		fi
+		if [ "$ok" -eq 1 ]; then
+			log "chia units are active and listening"
+			return 0
+		fi
+		now=$(date +%s)
+		if [ "$now" -ge "$deadline" ]; then
+			log "timed out waiting for chia units to be active and listening:${FAILED_UNITS}"
+			return 1
+		fi
+		sleep 1
+	done
+}
 cmd_target() {
 	local now anchor
 	prepare
@@ -164,12 +321,11 @@ cmd_target() {
 	consume target "$now"
 	save_or_skip "could not record chia.target restart; not restarting"
 	log "restarting ${SERVICE_BASE}.target (next wait $(wait_for "${restarts[target]}")s)"
-	if "$SYSTEMCTL" restart "${SERVICE_BASE}.target"; then
-		if [ "$ALERT_ON_RESTART" -eq 1 ]; then
-			alert_notify "chia monit restarted ${SERVICE_BASE}.target"
-		fi
-	else
-		log "restart ${SERVICE_BASE}.target exited $?"
+	clean_restart
+	if ! verify_stack; then
+		alert_notify "chia.target restart did not leave these units active and listening: ${FAILED_UNITS}"
+	elif [ "$ALERT_ON_RESTART" -eq 1 ]; then
+		alert_notify "chia monit restarted ${SERVICE_BASE}.target"
 	fi
 }
 cmd_hw() {
