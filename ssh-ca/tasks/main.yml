@@ -4,7 +4,7 @@
   get_url:
     url: "{{ ca_url }}"
     dest: /etc/ssh/trusted-user-ca-keys.pem
-    mode: '0644'
+    mode: "0644"
   when: ca_url != ""
   notify: restart-ssh
 
@@ -13,7 +13,7 @@
   copy:
     content: "{{ ca_content }}"
     dest: /etc/ssh/trusted-user-ca-keys.pem
-    mode: '0644'
+    mode: "0644"
   when: ca_content != ""
   notify: restart-ssh
 
@@ -22,7 +22,7 @@
   become: yes
   ansible.builtin.lineinfile:
     path: /etc/ssh/sshd_config
-    regexp: '^TrustedUserCAKeys'
+    regexp: "^TrustedUserCAKeys"
     line: "TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem"
   when: ca_url != "" or ca_content != ""
   notify: restart-ssh

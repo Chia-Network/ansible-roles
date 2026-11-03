@@ -19,14 +19,14 @@
   ansible.builtin.file:
     path: /usr/share/keyrings
     state: directory
-    mode: '0755'
+    mode: "0755"
 
 - name: Download Grafana GPG key (ASCII)
   become: true
   ansible.builtin.get_url:
     url: https://apt.grafana.com/gpg.key
     dest: /tmp/grafana.key
-    mode: '0644'
+    mode: "0644"
   register: grafana_key_download
 
 - name: Check whether keyring already exists
@@ -61,7 +61,7 @@
   ansible.builtin.file:
     path: /etc/alloy
     state: directory
-    mode: '0755'
+    mode: "0755"
 
 - name: Add alloy user to groups for log file access
   become: true
@@ -78,7 +78,7 @@
     content: "{{ item.content }}"
     owner: root
     group: alloy
-    mode: '0640'
+    mode: "0640"
   loop: "{{ alloy_additional_files }}"
   loop_control:
     label: "{{ item.path }}"
@@ -91,7 +91,7 @@
     dest: /etc/alloy/config.alloy
     owner: root
     group: alloy
-    mode: '0640'
+    mode: "0640"
   notify: restart alloy
 
 - name: Set Alloy desired boot state

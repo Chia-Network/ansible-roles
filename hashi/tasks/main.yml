@@ -4,9 +4,9 @@
   vars:
     params:
       files:
-        - '{{ ansible_architecture }}.yml'
+        - "{{ ansible_architecture }}.yml"
       paths:
-        - 'vars'
+        - "vars"
 
 - name: Install deps
   become: true
@@ -28,14 +28,14 @@
   ansible.builtin.file:
     path: /usr/share/keyrings
     state: directory
-    mode: '0755'
+    mode: "0755"
 
 - name: Download HashiCorp GPG key (ASCII)
   become: true
   ansible.builtin.get_url:
     url: https://apt.releases.hashicorp.com/gpg
     dest: /tmp/hashicorp.key
-    mode: '0644'
+    mode: "0644"
   register: hashicorp_key_download
 
 - name: Check whether HashiCorp keyring already exists

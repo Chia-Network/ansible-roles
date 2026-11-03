@@ -7,9 +7,9 @@
   vars:
     params:
       files:
-        - '{{ansible_architecture}}.yml'
+        - "{{ansible_architecture}}.yml"
       paths:
-        - 'vars'
+        - "vars"
 
 - name: Add runner_user to the docker group
   become: yes
@@ -23,13 +23,13 @@
   ansible.builtin.file:
     path: "{{ runner_directory_path }}"
     state: directory
-    mode: '0755'
+    mode: "0755"
 
 - name: Download runner tarball
   get_url:
     url: https://github.com/actions/runner/releases/download/v{{ runner_release_version }}/actions-runner-linux-{{ runner_download_arch }}-{{ runner_release_version }}.tar.gz
     dest: "{{ runner_directory_path }}"
-    mode: '0755'
+    mode: "0755"
 
 - name: Unarchive runner tarball
   ansible.builtin.unarchive:
@@ -43,7 +43,7 @@
   ansible.builtin.file:
     path: "{{ runner_directory_path }}"
     state: directory
-    mode: '0755'
+    mode: "0755"
     owner: "{{ runner_user }}"
     group: "{{ runner_group }}"
     recurse: yes
