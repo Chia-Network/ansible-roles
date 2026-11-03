@@ -7,6 +7,8 @@ rules:
   unpinned-uses:
     ignore:
       - dependency-review.yml
+      # Version tag pin kept to match the repository's version-pin convention.
+      - monit-restart-tests.yml
   artipacked:
     ignore:
       - dependency-review.yml
