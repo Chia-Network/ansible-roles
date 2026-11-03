@@ -3,7 +3,7 @@
   ansible.builtin.template:
     src: backup.sh.j2
     dest: "/home/{{ user }}/backup.sh"
-    mode: '0755'
+    mode: "0755"
 
 - name: Create log directory for backup script
   ansible.builtin.file:
@@ -16,4 +16,4 @@
   ansible.builtin.template:
     src: backup-script-logrotate.j2
     dest: "/etc/logrotate.d/backup-script-logrotate"
-    mode: '0644'
+    mode: "0644"

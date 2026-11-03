@@ -24,7 +24,7 @@
   ansible.builtin.template:
     src: jail.local.j2
     dest: "/etc/fail2ban/jail.local"
-    mode: '0644'
+    mode: "0644"
   notify: Restart fail2ban
 
 - name: Ensure jail.d directory exists
@@ -34,7 +34,7 @@
     state: directory
     owner: root
     group: root
-    mode: '0755'
+    mode: "0755"
 
 - name: Add per-service jail configs
   become: true
@@ -43,7 +43,7 @@
     dest: "/etc/fail2ban/jail.d/{{ item.key }}.local"
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   vars:
     jail_name: "{{ item.key }}"
     jail_options: "{{ item.value }}"

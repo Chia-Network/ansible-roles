@@ -29,7 +29,7 @@ check host localhost with address 127.0.0.1
     else if succeeded then exec "/etc/monit/monit-set-log-level.sh INFO"
     if failed port {{ chia_healthcheck_port }} protocol http request "/timelord" status = 200 for {{ chia_monit_failure_threshold }} cycles then restart
     {% endif %}
-    {% if chia_monit_alert_on_restart %}
+    {% if chia_monit_alert_on_restart and not (chia_monit_restart_backoff | bool) %}
     if 1 restarts within {{ chia_monit_failure_threshold }} cycles then exec "/etc/monit/monit-notify-chia.sh"
     {% endif %}
 {% endif %}

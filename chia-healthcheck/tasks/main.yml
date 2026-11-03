@@ -4,9 +4,9 @@
   vars:
     params:
       files:
-        - '{{ansible_architecture}}.yml'
+        - "{{ansible_architecture}}.yml"
       paths:
-        - 'vars'
+        - "vars"
 
 - name: Chia Healthcheck Repository
   become: true

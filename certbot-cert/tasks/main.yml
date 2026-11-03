@@ -31,7 +31,7 @@
     dest: /root/cloudflare.ini
     owner: root
     group: root
-    mode: '0600'
+    mode: "0600"
   when: certbot_validation_strategy == "cloudflare"
   tags: certbot
 
@@ -62,7 +62,7 @@
     dest: "/etc/nginx/conf.d/{{ item }}"
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   with_items:
     - "custom-default.conf"
   notify: Reload-nginx
@@ -74,7 +74,7 @@
   ansible.builtin.file:
     path: "{{ certbot_webroot_path }}"
     state: directory
-    mode: '0755'
+    mode: "0755"
   when: certbot_validation_strategy == "webroot"
   tags: certbot
 
@@ -85,7 +85,7 @@
     dest: "/etc/nginx/snippets/{{ item }}"
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   with_items:
     - "lets-encrypt-webroot.conf"
   notify: Reload-nginx

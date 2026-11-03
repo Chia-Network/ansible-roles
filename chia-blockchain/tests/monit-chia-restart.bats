@@ -43,7 +43,7 @@ EOF
 
 	cat >"$BIN/notify" <<'EOF'
 #!/usr/bin/env bash
-printf '%s\n' notified >>"${BATS_TEST_TMPDIR}/notify.log"
+printf '%s\n' "$*" >>"${BATS_TEST_TMPDIR}/notify.log"
 EOF
 
 	cat >"$BIN/hw-restart" <<'EOF'
@@ -82,6 +82,13 @@ EOF
 	chmod +x "$BIN/systemctl" "$BIN/date" "$BIN/notify" "$BIN/hw-restart" \
 		"$BIN/ss" "$BIN/sleep" "$BIN/id" "$BIN/timeout" "$BIN/kill"
 
+	render_script
+
+	export PATH="$BIN:$PATH"
+	export FAKE_NOW=1000000
+}
+
+render_script() {
 	SCRIPT="$BATS_TEST_TMPDIR/monit-chia-restart.sh"
 	ANSIBLE_LOCALHOST_WARNING=False ANSIBLE_INVENTORY_UNPARSED_WARNING=False \
 		ansible localhost -c local -m template \
@@ -96,7 +103,8 @@ EOF
 		-e "full_node_port=8444" \
 		-e "chia_timelord_port=8446" \
 		-e '{"chia_enabled_services":["full-node","timelord"]}' \
-		-e '{"chia_all_services":["full-node","timelord"]}' >/dev/null
+		-e '{"chia_all_services":["full-node","timelord"]}' \
+		-e "{\"chia_monit_alert_on_restart\": ${ALERT:-false}}" >/dev/null
 	sed -i \
 		-e "s|^SYSTEMCTL=.*|SYSTEMCTL=\"${BIN}/systemctl\"|" \
 		-e "s|^NOTIFY=.*|NOTIFY=\"${BIN}/notify\"|" \
@@ -104,9 +112,6 @@ EOF
 		-e "s|^STATE_DIR=.*|STATE_DIR=\"${STATE_DIR}\"|" \
 		"$SCRIPT"
 	chmod +x "$SCRIPT"
-
-	export PATH="$BIN:$PATH"
-	export FAKE_NOW=1000000
 }
 
 write_state() {
@@ -188,6 +193,69 @@ restart_count() {
 	grep -q '^hw_restarts=32$' "$STATE_DIR/state"
 	[ -s "$NOTIFY_LOG" ]
 	! grep -q '^start chia.target$' "$SYSTEMCTL_LOG"
+}
+
+@test "with alerts enabled a restart notifies" {
+	export ALERT=true
+	render_script
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	grep -q 'restarted' "$NOTIFY_LOG"
+}
+
+@test "with alerts enabled a skipped call does not notify" {
+	export ALERT=true
+	render_script
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	local before
+	before=$(grep -c 'restarted' "$NOTIFY_LOG" || true)
+	FAKE_NOW=$((FAKE_NOW + 300))
+	export FAKE_NOW
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[ "$(grep -c 'restarted' "$NOTIFY_LOG" || true)" -eq "$before" ]
+}
+
+@test "with alerts disabled a restart does not notify" {
+	unset ALERT
+	render_script
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[ ! -s "$NOTIFY_LOG" ]
+}
+
+@test "state repair notify passes the unusable message" {
+	printf 'garbage\n' >"$STATE_DIR/state"
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	grep -q 'unusable' "$NOTIFY_LOG"
+}
+
+@test "a held lock skips without restarting" {
+	local lock_pid
+	flock "$STATE_DIR/lock" /bin/sleep 5 &
+	lock_pid=$!
+	for _ in {1..100}; do
+		if ! flock -n "$STATE_DIR/lock" true 2>/dev/null; then break; fi
+		/bin/sleep 0.02
+	done
+	run "$SCRIPT" target
+	kill "$lock_pid" 2>/dev/null || true
+	wait "$lock_pid" 2>/dev/null || true
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"holds"* ]]
+	! grep -q '^start chia.target$' "$SYSTEMCTL_LOG"
+	! grep -q '^stop chia.target$' "$SYSTEMCTL_LOG"
+}
+
+@test "state with duplicate and missing keys is repaired" {
+	printf 'target_restarts=1\ntarget_restarts=1\ntarget_last=1000000\nhw_restarts=1\n' >"$STATE_DIR/state"
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	grep -q '^target_restarts=32$' "$STATE_DIR/state"
+	grep -q '^hw_restarts=32$' "$STATE_DIR/state"
+	[ ! -s "$SYSTEMCTL_LOG" ]
 }
 
 @test "hw-vdf is skipped while the target unit started recently" {

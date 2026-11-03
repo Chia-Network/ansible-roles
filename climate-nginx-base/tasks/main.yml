@@ -6,7 +6,7 @@
     dest: /etc/nginx/conf.d/{{ climate_apps_domains | first }}.conf
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   tags: climate-nginx-base
   notify: Reload-nginx
 
@@ -32,7 +32,7 @@
     password: "{{ basic_authentication_password }}"
     owner: root
     group: www-data
-    mode: '0640'
+    mode: "0640"
   when: basic_authentication
   tags: climate-nginx-base
   notify: Reload-nginx
@@ -45,7 +45,7 @@
   ansible.builtin.file:
     path: /etc/nginx/{{ climate_apps_domains | first }}_proxy_includes
     state: directory
-    mode: '0755'
+    mode: "0755"
     owner: "root"
     group: "root"
   tags: climate-nginx-base
@@ -56,7 +56,7 @@
   ansible.builtin.file:
     path: /etc/nginx/{{ climate_apps_domains | first }}_ui_includes
     state: directory
-    mode: '0755'
+    mode: "0755"
     owner: "root"
     group: "root"
   tags: climate-nginx-base
@@ -67,7 +67,7 @@
   ansible.builtin.copy:
     src: cloudflare-update-ip-ranges.sh
     dest: /usr/local/bin/cloudflare-update-ip-ranges.sh
-    mode: '0755'
+    mode: "0755"
   when: cloudflare_proxy | bool
   tags: climate-nginx-base
 
@@ -109,7 +109,7 @@
   ansible.builtin.file:
     path: /etc/nginx/blocklist-includes
     state: directory
-    mode: '0755'
+    mode: "0755"
     owner: "root"
     group: "root"
   when: nginx_blocklist != ""
@@ -123,7 +123,7 @@
     dest: /etc/nginx/blocklist-includes/90-blocklist.conf
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   when: nginx_blocklist != ""
   notify: Reload-nginx
   tags: climate-nginx-base
@@ -134,7 +134,7 @@
   ansible.builtin.copy:
     src: uptimerobot-update-ip.sh
     dest: /usr/local/bin/uptimerobot-update-ip.sh
-    mode: '0755'
+    mode: "0755"
   when: nginx_blocklist != ""
   register: uptimerobot_script_upload
   tags: climate-nginx-base
@@ -160,4 +160,3 @@
     weekday: "*"
   when: nginx_blocklist != "" and uptimerobot_script_upload.changed
   tags: climate-nginx-base
-

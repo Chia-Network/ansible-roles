@@ -4,9 +4,9 @@
   vars:
     params:
       files:
-        - '{{ansible_architecture}}.yml'
+        - "{{ansible_architecture}}.yml"
       paths:
-        - 'vars'
+        - "vars"
   tags: core-registry-api
 
 - name: Add Climate Repository
@@ -43,7 +43,7 @@
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    mode: '0755'
+    mode: "0755"
     owner: "{{ user }}"
     group: "{{ user }}"
   loop:
@@ -59,7 +59,7 @@
     dest: "{{ chia_root }}/cadt/v1/config.yaml"
     owner: "{{ user }}"
     group: "{{ user }}"
-    mode: '0644'
+    mode: "0644"
   notify:
     - restart-core-registry-api
   tags: core-registry-api
@@ -70,7 +70,7 @@
     dest: "{{ chia_root }}/climate_token/config/config.yaml"
     owner: "{{ user }}"
     group: "{{ user }}"
-    mode: '0644'
+    mode: "0644"
   notify:
     - restart-core-registry-api
   tags: core-registry-api
@@ -81,7 +81,7 @@
     dest: "{{ chia_root }}/climate-tokenization-engine/config.yaml"
     owner: "{{ user }}"
     group: "{{ user }}"
-    mode: '0644'
+    mode: "0644"
   notify:
     - restart-core-registry-api
   tags: core-registry-api
@@ -92,7 +92,7 @@
     dest: "{{ chia_root }}/core-registry/config.yaml"
     owner: "{{ user }}"
     group: "{{ user }}"
-    mode: '0644'
+    mode: "0644"
   notify:
     - restart-core-registry-api
   tags: core-registry-api
@@ -104,14 +104,20 @@
     dest: /etc/nginx/{{ climate_apps_domains | first }}_proxy_includes/{{ item.proxy_type }}-api-proxy-{{ item.proxy_port }}.inc
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   vars:
     proxy_path: "{{ item.proxy_path }}"
     proxy_port: "{{ item.proxy_port }}"
   loop:
-    - { proxy_type: 'cadt', proxy_path: "{{ cadt_api_proxy_path }}", proxy_port: "{{ cadt_port }}" }
-    - { proxy_type: 'explorer', proxy_path: "{{ climate_explorer_api_proxy_path }}", proxy_port: "{{ climate_explorer_port }}" }
-    - { proxy_type: 'engine', proxy_path: "{{ climate_tokenization_engine_api_proxy_path }}", proxy_port: "{{ climate_tokenization_engine_port }}" }
+    - proxy_type: "cadt"
+      proxy_path: "{{ cadt_api_proxy_path }}"
+      proxy_port: "{{ cadt_port }}"
+    - proxy_type: "explorer"
+      proxy_path: "{{ climate_explorer_api_proxy_path }}"
+      proxy_port: "{{ climate_explorer_port }}"
+    - proxy_type: "engine"
+      proxy_path: "{{ climate_tokenization_engine_api_proxy_path }}"
+      proxy_port: "{{ climate_tokenization_engine_port }}"
   when:
     - core_registry_api_proxy == true
   tags: core-registry-api
@@ -125,7 +131,6 @@
     enabled: true
     state: restarted
   tags: core-registry-api
-
 # TO BE ADDED IN NEAR FUTURE
 # - name: Add custom monit configs to conf.d for Core Registry
 #   become: true

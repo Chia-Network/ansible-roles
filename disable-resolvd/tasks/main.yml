@@ -3,7 +3,7 @@
   become: yes
   lineinfile:
     path: "/etc/hosts"
-    regexp: '^127.0.0.1 localhost'
+    regexp: "^127.0.0.1 localhost"
     line: "127.0.0.1 localhost {{ ansible_facts.hostname }}"
 
 - name: Copy updated config into place
