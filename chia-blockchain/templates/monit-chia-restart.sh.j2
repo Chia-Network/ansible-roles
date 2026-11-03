@@ -18,6 +18,7 @@ STATE_FILE="${STATE_DIR}/state"
 LOCK_FILE="${STATE_DIR}/lock"
 SYSTEMCTL="/bin/systemctl"
 NOTIFY="/etc/monit/monit-notify-chia.sh"
+ALERT_ON_RESTART={{ 1 if chia_monit_alert_on_restart else 0 }}
 HW_RESTART="/etc/monit/monit-hw-vdf-restart-alert.sh"
 declare -A restarts=([target]=0 [hw]=0) last=([target]=0 [hw]=0)
 log() {
@@ -31,7 +32,7 @@ skip() {
 alert_notify() {
 	log "alert: $*"
 	if [ -x "$NOTIFY" ]; then
-		"$NOTIFY" || log "notify script exited $?"
+		"$NOTIFY" "$*" || log "notify script exited $?"
 	else log "notify script is not executable: ${NOTIFY}"; fi
 }
 wait_for() {
@@ -82,32 +83,29 @@ due_or_skip() {
 	exit 0
 }
 load_state() {
-	local line key val
+	local line key val nkeys=0
+	local -A state=()
 	[ -e "$STATE_FILE" ] || return 0
 	[ -f "$STATE_FILE" ] || return 1
-	restarts[target]=""
-	restarts[hw]=""
-	last[target]=""
-	last[hw]=""
 	while IFS= read -r line || [ -n "$line" ]; do
 		key=${line%%=*}
 		val=${line#*=}
 		[ "$key" != "$line" ] || return 1
 		[[ "$val" =~ ^[0-9]{1,10}$ ]] || return 1
 		case "$key" in
-		target_restarts) restarts[target]=$((10#$val)) ;;
-		target_last) last[target]=$((10#$val)) ;;
-		hw_restarts) restarts[hw]=$((10#$val)) ;;
-		hw_last) last[hw]=$((10#$val)) ;;
+		target_restarts | target_last | hw_restarts | hw_last) ;;
 		*) return 1 ;;
 		esac
+		[ -n "${state[$key]+x}" ] || nkeys=$((nkeys + 1))
+		state[$key]=$val
 	done <"$STATE_FILE"
-	[ -n "${restarts[target]}" ] || return 1
-	[ -n "${restarts[hw]}" ] || return 1
-	[ -n "${last[target]}" ] || return 1
-	[ -n "${last[hw]}" ] || return 1
-	[ "${last[target]}" -le $(($(date +%s) + 120)) ] || return 1
-	[ "${last[hw]}" -le $(($(date +%s) + 120)) ] || return 1
+	[ "$nkeys" -eq 4 ] || return 1
+	[ "${state[target_last]}" -le $(($(date +%s) + 120)) ] || return 1
+	[ "${state[hw_last]}" -le $(($(date +%s) + 120)) ] || return 1
+	restarts[target]=$((10#${state[target_restarts]}))
+	last[target]=$((10#${state[target_last]}))
+	restarts[hw]=$((10#${state[hw_restarts]}))
+	last[hw]=$((10#${state[hw_last]}))
 }
 save_state() {
 	local tmp
@@ -148,7 +146,7 @@ check_state_dir() {
 with_lock() {
 	command -v flock >/dev/null 2>&1 || skip "flock is missing; not restarting"
 	exec 9>"$LOCK_FILE" || skip "cannot open ${LOCK_FILE}; not restarting"
-	flock -w 180 9 || skip "timed out locking ${LOCK_FILE}; not restarting"
+	flock -n 9 || skip "another restart call holds ${LOCK_FILE}; not restarting"
 }
 prepare() {
 	[[ "$SERVICE_BASE" =~ ^[A-Za-z0-9_.-]+$ ]] || skip "refusing unsafe service name; not restarting"
@@ -166,7 +164,13 @@ cmd_target() {
 	consume target "$now"
 	save_or_skip "could not record chia.target restart; not restarting"
 	log "restarting ${SERVICE_BASE}.target (next wait $(wait_for "${restarts[target]}")s)"
-	"$SYSTEMCTL" restart "${SERVICE_BASE}.target" || log "restart ${SERVICE_BASE}.target exited $?"
+	if "$SYSTEMCTL" restart "${SERVICE_BASE}.target"; then
+		if [ "$ALERT_ON_RESTART" -eq 1 ]; then
+			alert_notify "chia monit restarted ${SERVICE_BASE}.target"
+		fi
+	else
+		log "restart ${SERVICE_BASE}.target exited $?"
+	fi
 }
 cmd_hw() {
 	local now t_anchor h_anchor

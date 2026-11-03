@@ -7,18 +7,6 @@ template_dir="${repo_root}/chia-blockchain/templates"
 workdir=$(mktemp -d)
 trap 'rm -rf "$workdir"' EXIT
 
-cat >"${workdir}/vars.yml" <<'EOF'
-chia_service_base: chia
-chia_monit_progress_restart_seconds: 480
-chia_healthcheck_threshold_seconds: 60
-chia_monit_cycle_seconds: 60
-chia_healthcheck_port: 9950
-chia_monit_log_debug_threshold: 2
-chia_monit_failure_threshold: 3
-chia_monit_hw_vdf_failure_threshold: 5
-chia_monit_restart_script: "/etc/monit/monit-chia-restart-chia.sh"
-EOF
-
 export ANSIBLE_LOCALHOST_WARNING=False
 export ANSIBLE_INVENTORY_UNPARSED_WARNING=False
 
@@ -26,7 +14,7 @@ render() {
 	local src=$1 dest=$2 extra=$3
 	ansible localhost -c local -m template \
 		-a "src=${src} dest=${dest}" \
-		-e @"${workdir}/vars.yml" \
+		-e @"${repo_root}/chia-blockchain/defaults/main.yml" \
 		-e "$extra" >/dev/null
 }
 
@@ -95,6 +83,19 @@ for pair in "monit_config.j2 target" "monit_hw_vdf.j2 hw-vdf"; do
 	fi
 	if grep -Fq 'reset-' "${workdir}/backoff-${name}"; then
 		printf 'FAIL backoff=true %s contains reset-\n' "$name"
+		exit 1
+	fi
+done
+
+for backoff in true false; do
+	render "${template_dir}/monit_config.j2" "${workdir}/alert-${backoff}.j2" \
+		"{\"chia_monit_alert_on_restart\":true,\"chia_monit_restart_backoff\":${backoff}}"
+	if [ "$backoff" = true ] && grep -Fq 'monit-notify-chia.sh' "${workdir}/alert-${backoff}.j2"; then
+		printf 'FAIL backoff=true alert=true monit_config.j2 contains monit-notify-chia.sh\n'
+		exit 1
+	fi
+	if [ "$backoff" = false ] && ! grep -Fq 'monit-notify-chia.sh' "${workdir}/alert-${backoff}.j2"; then
+		printf 'FAIL backoff=false alert=true monit_config.j2 is missing monit-notify-chia.sh\n'
 		exit 1
 	fi
 done
