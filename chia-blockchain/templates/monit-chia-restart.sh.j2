@@ -19,7 +19,20 @@ LOCK_FILE="${STATE_DIR}/lock"
 SYSTEMCTL="/bin/systemctl"
 NOTIFY="/etc/monit/monit-notify-chia.sh"
 HW_RESTART="/etc/monit/monit-hw-vdf-restart-alert.sh"
+VERIFY_SECONDS={{ chia_monit_restart_verify_seconds }}
+CHIA_USER="{{ user }}"
+FULL_NODE_PORT={{ full_node_port }}
+TIMELORD_PORT={{ chia_timelord_port }}
+CHECK_FULL_NODE={{ 1 if 'full-node' in chia_enabled_services else 0 }}
+CHECK_TIMELORD={{ 1 if 'timelord' in chia_enabled_services else 0 }}
+MANAGED_UNITS=(
+	"${SERVICE_BASE}.target"
+{% for service in chia_all_services %}
+	"${SERVICE_BASE}-{{ service }}.service"
+{% endfor %}
+)
 declare -A restarts=([target]=0 [hw]=0) last=([target]=0 [hw]=0)
+CHIA_UID=""
 log() {
 	printf '%s\n' "chia-monit-restart: $*"
 	if command -v logger >/dev/null 2>&1; then logger -t chia-monit-restart -- "$*" || true; fi
@@ -157,6 +170,118 @@ prepare() {
 	load_state || repair_state
 	reset_counters "$(date +%s)"
 }
+proc_name() {
+	local pid=$1 word
+	IFS= read -r -d '' word <"/proc/${pid}/cmdline" 2>/dev/null || true
+	printf '%s\n' "${word##*/}"
+}
+unit_active_for() {
+	local cgroup=$1 unit
+	for unit in "${MANAGED_UNITS[@]}"; do
+		case "$cgroup" in
+		*"$unit"*)
+			if "$SYSTEMCTL" is-active --quiet "$unit"; then return 0; fi
+			;;
+		esac
+	done
+	return 1
+}
+is_stray() {
+	local pid=$1 name cgroup
+	[ -d "/proc/${pid}" ] || return 1
+	[ "$(stat -c %u "/proc/${pid}" 2>/dev/null)" = "$CHIA_UID" ] || return 1
+	name=$(proc_name "$pid")
+	case "$name" in
+	chia_daemon | chia_full_node | chia_timelord | chia_timelord_launcher | hw_vdf_client | timelord_launcher | start_*) ;;
+	*) return 1 ;;
+	esac
+	cgroup=$(tr '\0' ' ' <"/proc/${pid}/cgroup" 2>/dev/null || true)
+	unit_active_for "$cgroup" && return 1
+	return 0
+}
+kill_strays() {
+	local uid pid found=0
+	local -a pids=()
+	uid=$(id -u "$CHIA_USER" 2>/dev/null || true)
+	if ! [[ "$uid" =~ ^[0-9]+$ ]] || [ "$uid" -eq 0 ]; then
+		log "refusing to kill strays: cannot use uid '${uid}' for ${CHIA_USER}"
+		return 0
+	fi
+	CHIA_UID=$uid
+	for pid in /proc/[0-9]*; do
+		pid=${pid#/proc/}
+		[ "$pid" -gt 1 ] || continue
+		[ "$pid" -eq "$$" ] && continue
+		[ "$pid" -eq "$PPID" ] && continue
+		if is_stray "$pid"; then
+			pids+=("$pid")
+			found=1
+		fi
+	done
+	[ "$found" -eq 1 ] || return 0
+	for pid in "${pids[@]}"; do
+		if is_stray "$pid"; then
+			log "sending SIGTERM to stray pid ${pid}"
+			kill -s TERM "$pid" 2>/dev/null || true
+		fi
+	done
+	sleep 3
+	for pid in "${pids[@]}"; do
+		if is_stray "$pid"; then
+			log "sending SIGKILL to stray pid ${pid}"
+			kill -s KILL "$pid" 2>/dev/null || true
+		fi
+	done
+}
+clean_restart() {
+	local unit
+	log "stopping ${SERVICE_BASE}.target"
+	timeout 120 "$SYSTEMCTL" stop "${SERVICE_BASE}.target" || log "stop ${SERVICE_BASE}.target exited $?"
+	log "killing processes left in managed units"
+	for unit in "${MANAGED_UNITS[@]}"; do
+		[ "$unit" = "${SERVICE_BASE}.target" ] && continue
+		"$SYSTEMCTL" kill --kill-who=all --signal=SIGKILL "$unit" >/dev/null 2>&1 || true
+	done
+	kill_strays
+	sleep 1
+	log "clearing failed state for managed units"
+	for unit in "${MANAGED_UNITS[@]}"; do
+		"$SYSTEMCTL" reset-failed "$unit" >/dev/null 2>&1 || true
+	done
+	log "starting ${SERVICE_BASE}.target"
+	timeout 180 "$SYSTEMCTL" start "${SERVICE_BASE}.target" || log "start ${SERVICE_BASE}.target exited $?"
+}
+port_listening() {
+	local port=$1
+	[ -n "$(ss -Hltn "sport = :${port}" 2>/dev/null || true)" ]
+}
+unit_ready() {
+	local unit=$1 port=$2
+	"$SYSTEMCTL" is-active --quiet "$unit" || return 1
+	port_listening "$port"
+}
+verify_stack() {
+	local deadline now ok
+	deadline=$(($(date +%s) + VERIFY_SECONDS))
+	while true; do
+		ok=1
+		if [ "$CHECK_FULL_NODE" -eq 1 ]; then unit_ready "${SERVICE_BASE}-full-node.service" "$FULL_NODE_PORT" || ok=0; fi
+		if [ "$CHECK_TIMELORD" -eq 1 ]; then unit_ready "${SERVICE_BASE}-timelord.service" "$TIMELORD_PORT" || ok=0; fi
+		if [ "$CHECK_FULL_NODE" -ne 1 ] && [ "$CHECK_TIMELORD" -ne 1 ]; then
+			"$SYSTEMCTL" is-active --quiet "${SERVICE_BASE}.target" || ok=0
+		fi
+		if [ "$ok" -eq 1 ]; then
+			log "chia units are active and listening"
+			return 0
+		fi
+		now=$(date +%s)
+		if [ "$now" -ge "$deadline" ]; then
+			log "timed out waiting for chia units to be active and listening"
+			return 1
+		fi
+		sleep 1
+	done
+}
 cmd_target() {
 	local now anchor
 	prepare
@@ -166,7 +291,10 @@ cmd_target() {
 	consume target "$now"
 	save_or_skip "could not record chia.target restart; not restarting"
 	log "restarting ${SERVICE_BASE}.target (next wait $(wait_for "${restarts[target]}")s)"
-	"$SYSTEMCTL" restart "${SERVICE_BASE}.target" || log "restart ${SERVICE_BASE}.target exited $?"
+	clean_restart
+	if ! verify_stack; then
+		alert_notify "chia.target restart did not leave full node and timelord active and listening"
+	fi
 }
 cmd_hw() {
 	local now t_anchor h_anchor

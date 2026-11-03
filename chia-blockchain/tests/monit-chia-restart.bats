@@ -7,10 +7,12 @@ setup() {
 	SYSTEMCTL_LOG="$BATS_TEST_TMPDIR/systemctl.log"
 	NOTIFY_LOG="$BATS_TEST_TMPDIR/notify.log"
 	HW_LOG="$BATS_TEST_TMPDIR/hw.log"
+	KILL_LOG="$BATS_TEST_TMPDIR/kill.log"
 	mkdir -p "$BIN" "$STATE_DIR"
 	: >"$SYSTEMCTL_LOG"
 	: >"$NOTIFY_LOG"
 	: >"$HW_LOG"
+	: >"$KILL_LOG"
 
 	cat >"$BIN/systemctl" <<'EOF'
 #!/usr/bin/env bash
@@ -49,7 +51,36 @@ EOF
 printf '%s\n' restarted >>"${BATS_TEST_TMPDIR}/hw.log"
 EOF
 
-	chmod +x "$BIN/systemctl" "$BIN/date" "$BIN/notify" "$BIN/hw-restart"
+	cat >"$BIN/ss" <<'EOF'
+#!/usr/bin/env bash
+[ "${FAKE_SS_EMPTY:-}" = 1 ] && exit 0
+printf '%s\n' 'LISTEN 0 128 0.0.0.0:8444 0.0.0.0:*'
+EOF
+
+	cat >"$BIN/sleep" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+
+	cat >"$BIN/id" <<'EOF'
+#!/usr/bin/env bash
+if [ "${FAKE_ID_FAIL:-}" = 1 ]; then exit 1; fi
+printf '%s\n' "${FAKE_UID:-1001}"
+EOF
+
+	cat >"$BIN/timeout" <<'EOF'
+#!/usr/bin/env bash
+shift
+exec "$@"
+EOF
+
+	cat >"$BIN/kill" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"${BATS_TEST_TMPDIR}/kill.log"
+EOF
+
+	chmod +x "$BIN/systemctl" "$BIN/date" "$BIN/notify" "$BIN/hw-restart" \
+		"$BIN/ss" "$BIN/sleep" "$BIN/id" "$BIN/timeout" "$BIN/kill"
 
 	SCRIPT="$BATS_TEST_TMPDIR/monit-chia-restart.sh"
 	ANSIBLE_LOCALHOST_WARNING=False ANSIBLE_INVENTORY_UNPARSED_WARNING=False \
@@ -59,7 +90,13 @@ EOF
 		-e "chia_monit_restart_min_seconds=600" \
 		-e "chia_monit_restart_max_seconds=3600" \
 		-e "chia_monit_restart_backoff_factor=2" \
-		-e "chia_monit_restart_state_dir=${STATE_DIR}" >/dev/null
+		-e "chia_monit_restart_verify_seconds=90" \
+		-e "chia_monit_restart_state_dir=${STATE_DIR}" \
+		-e "user=chia-test" \
+		-e "full_node_port=8444" \
+		-e "chia_timelord_port=8446" \
+		-e '{"chia_enabled_services":["full-node","timelord"]}' \
+		-e '{"chia_all_services":["full-node","timelord"]}' >/dev/null
 	sed -i \
 		-e "s|^SYSTEMCTL=.*|SYSTEMCTL=\"${BIN}/systemctl\"|" \
 		-e "s|^NOTIFY=.*|NOTIFY=\"${BIN}/notify\"|" \
@@ -79,7 +116,7 @@ write_state() {
 }
 
 restart_count() {
-	grep -c '^restart chia.target$' "$SYSTEMCTL_LOG" || true
+	grep -c '^start chia.target$' "$SYSTEMCTL_LOG" || true
 }
 
 @test "first call with no state restarts chia.target" {
@@ -150,7 +187,7 @@ restart_count() {
 	grep -q '^target_restarts=32$' "$STATE_DIR/state"
 	grep -q '^hw_restarts=32$' "$STATE_DIR/state"
 	[ -s "$NOTIFY_LOG" ]
-	! grep -q '^restart chia.target$' "$SYSTEMCTL_LOG"
+	! grep -q '^start chia.target$' "$SYSTEMCTL_LOG"
 }
 
 @test "hw-vdf is skipped while the target unit started recently" {
@@ -186,6 +223,52 @@ restart_count() {
 	[[ "$output" == *"not a usable directory"* ]]
 	[ -s "$NOTIFY_LOG" ]
 	[ ! -s "$SYSTEMCTL_LOG" ]
+}
+
+@test "a due target restart stops, kills, resets and starts in order" {
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	local actions
+	actions=$(grep -E '^(stop|kill|reset-failed|start) ' "$SYSTEMCTL_LOG" || true)
+	[ "$actions" = "stop chia.target
+kill --kill-who=all --signal=SIGKILL chia-full-node.service
+kill --kill-who=all --signal=SIGKILL chia-timelord.service
+reset-failed chia.target
+reset-failed chia-full-node.service
+reset-failed chia-timelord.service
+start chia.target" ]
+}
+
+@test "verify success does not notify" {
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[ ! -s "$NOTIFY_LOG" ]
+	[[ "$output" == *"active and listening"* ]]
+}
+
+@test "verify timeout notifies and still exits 0" {
+	sed -i 's/^VERIFY_SECONDS=.*/VERIFY_SECONDS=0/' "$SCRIPT"
+	export FAKE_SS_EMPTY=1
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[ -s "$NOTIFY_LOG" ]
+	[[ "$output" == *"timed out waiting"* ]]
+}
+
+@test "kill_strays refuses when the user resolves to uid 0" {
+	export FAKE_UID=0
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"refusing to kill strays"* ]]
+	[ ! -s "$KILL_LOG" ]
+}
+
+@test "kill_strays does not signal when the user cannot be resolved" {
+	export FAKE_ID_FAIL=1
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"refusing to kill strays"* ]]
+	[ ! -s "$KILL_LOG" ]
 }
 
 @test "unknown command exits 2" {

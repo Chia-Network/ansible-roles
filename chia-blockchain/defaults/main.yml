@@ -294,6 +294,8 @@ chia_monit_restart_script: "/etc/monit/monit-chia-restart-{{ chia_service_base }
 chia_monit_restart_state_dir: "/var/lib/chia-monit/{{ chia_service_base }}"
 chia_monit_restart_min_seconds: 600
 chia_monit_restart_backoff_factor: 2
+# Seconds to wait after a restart for the units to be active and listening before alerting.
+chia_monit_restart_verify_seconds: 90
 chia_monit_restart_max_seconds: 3600
 # Only used when chia_monit_restart_backoff is true. Opting in changes the
 # hw-vdf failure threshold from chia_monit_failure_threshold (default 3) to

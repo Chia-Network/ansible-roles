@@ -291,16 +291,20 @@
       - chia_monit_restart_min_seconds | string is match('^[0-9]+$')
       - chia_monit_restart_max_seconds | string is match('^[0-9]+$')
       - chia_monit_restart_backoff_factor | string is match('^[0-9]+$')
+      - chia_monit_restart_verify_seconds | string is match('^[0-9]+$')
       - chia_monit_restart_min_seconds | int >= 1
       - chia_monit_restart_max_seconds | int >= 1
       - chia_monit_restart_backoff_factor | int >= 2
       - chia_monit_restart_backoff_factor | int <= 8
+      - chia_monit_restart_verify_seconds | int >= 10
+      - chia_monit_restart_verify_seconds | int <= 600
       - chia_monit_restart_max_seconds | int >= chia_monit_restart_min_seconds | int
       - chia_monit_restart_max_seconds | int <= 604800
     fail_msg: >-
       chia_monit_restart_min_seconds, chia_monit_restart_max_seconds and
       chia_monit_restart_backoff_factor must be integers: min and max >= 1,
-      factor between 2 and 8, max >= min and max <= 604800.
+      factor between 2 and 8, verify between 10 and 600, max >= min and max
+      <= 604800.
     quiet: true
   when:
     - chia_monit_restart_backoff | bool
