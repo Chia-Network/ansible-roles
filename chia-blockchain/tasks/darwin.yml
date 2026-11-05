@@ -389,32 +389,43 @@
   environment:
     HOME: "{{ chia_darwin_home }}"
 
+# The pip module imports packaging or setuptools from the interpreter that
+# runs Ansible modules. A fresh Homebrew python@3.13 has neither. Call this
+# virtualenv's pip instead. PyPI remains the default index.
 - name: Ensure pip, setuptools, and wheel are in the virtualenv
   become: true
   become_user: "{{ user }}"
-  ansible.builtin.pip:
-    name:
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_venv }}/bin/python"
+      - -m
+      - pip
+      - install
       - pip
       - setuptools
       - wheel
-    state: present
-    virtualenv: "{{ chia_darwin_venv }}"
   environment:
     HOME: "{{ chia_darwin_home }}"
+  register: chia_darwin_pip_bootstrap
+  changed_when: "'Successfully installed' in chia_darwin_pip_bootstrap.stdout"
 
 - name: Install pinned chia-blockchain into the virtualenv
   become: true
   become_user: "{{ user }}"
-  ansible.builtin.pip:
-    name: "{{ chia_darwin_pip_package }}"
-    version: "{{ chia_darwin_pip_version }}"
-    state: present
-    virtualenv: "{{ chia_darwin_venv }}"
-    extra_args: "--extra-index-url {{ chia_darwin_pip_extra_index }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_venv }}/bin/python"
+      - -m
+      - pip
+      - install
+      - --extra-index-url
+      - "{{ chia_darwin_pip_extra_index }}"
+      - "{{ chia_darwin_pip_package }}=={{ chia_darwin_pip_version }}"
   environment:
     HOME: "{{ chia_darwin_home }}"
     CHIA_ROOT: "{{ chia_root }}"
   register: chia_darwin_pip_pinned
+  changed_when: "'Successfully installed' in chia_darwin_pip_pinned.stdout"
 
 - name: Ensure CHIA_ROOT config and db directories exist
   become: true

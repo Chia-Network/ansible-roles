@@ -333,6 +333,13 @@ chia_wallet_connect_to_unknown_peers: true
 # (the reference uses timelord). Leaving `user` at the Linux default `ubuntu`
 # is refused. Homebrew itself is not installed by this role.
 #
+# Ansible runs modules with whatever interpreter discovery selects. On a fresh
+# Mac that is often Homebrew python@3.13, which does not ship packaging or
+# setuptools. This role does not use the pip module, and it does not need a
+# chia virtualenv (or any other virtualenv) on the SSH user's PATH. Packages
+# are installed with chia_darwin_venv's python -m pip. PyPI stays the default
+# index, and chia_darwin_pip_extra_index is added with --extra-index-url.
+#
 # chia_darwin_enable_hw_vdf is independent of chia_enable_hw_vdf. The Linux
 # flag still selects apt chiavdf-hw and monit, and stays false by default.
 # ---------------------------------------------------------------------------
@@ -378,6 +385,11 @@ chia_darwin_timelord_throttle_interval: 15
 chia_darwin_timelord_exit_timeout: 60
 chia_darwin_hw_vdf_throttle_interval: 15
 chia_darwin_hw_vdf_exit_timeout: 30
+# Seconds to keep polling after a job's ExitTimeOut before giving up.
+# launchd SIGKILLs at ExitTimeOut; launchctl print can still see the job
+# briefly after that. The restart handler waits ExitTimeOut plus this margin
+# (one second per try) and does not bootstrap a job that is still loaded.
+chia_darwin_restart_unload_margin: 30
 # Software VDF launcher is not installed. Zero keeps a manual launcher from
 # spawning CPU clients next to the ASIC.
 chia_darwin_process_count: 0

@@ -24,13 +24,28 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y zsh shellcheck
+          sudo apt-get install -y zsh shellcheck python3-venv
           python3 -m pip install --user 'ansible-core>=2.18,<2.23'
 
       - name: Syntax check
         env:
           ANSIBLE_ROLES_PATH: ${{ github.workspace }}
-        run: ansible-playbook --syntax-check .github/ci/darwin-syntax-check.yml
+        run: |
+          ansible-playbook --syntax-check .github/ci/darwin-syntax-check.yml
+          ansible-playbook --syntax-check .github/ci/darwin-assumptions.yml
+          ansible-playbook --syntax-check .github/ci/darwin-bare-interpreter.yml
+
+      - name: Check Darwin restart and pip assumptions
+        run: ansible-playbook .github/ci/darwin-assumptions.yml
+
+      - name: Prove virtualenv pip works without packaging on the module interpreter
+        run: |
+          python3 -m venv "$RUNNER_TEMP/bare-interpreter"
+          "$RUNNER_TEMP/bare-interpreter/bin/python" -m pip uninstall -y setuptools packaging wheel
+          ansible-playbook \
+            -e mod_python="$RUNNER_TEMP/bare-interpreter/bin/python" \
+            -e work_venv="$RUNNER_TEMP/work-venv" \
+            .github/ci/darwin-bare-interpreter.yml
 
       - name: Render Darwin templates
         run: ansible-playbook -e render_out="$RUNNER_TEMP/darwin" .github/ci/darwin-render-templates.yml
