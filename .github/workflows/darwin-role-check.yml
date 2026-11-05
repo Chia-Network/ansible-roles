@@ -38,9 +38,9 @@ jobs:
       - name: Lint rendered output
         working-directory: ${{ runner.temp }}/darwin
         run: |
-          for f in */*.sh; do zsh -n "$f"; done
-          shellcheck -s bash -S warning */*.sh
-          for f in */*.plist */*.mobileconfig; do
+          for f in ./*/*.sh; do zsh -n "$f"; done
+          shellcheck -s bash -S warning ./*/*.sh
+          for f in ./*/*.plist ./*/*.mobileconfig; do
             python3 -c 'import plistlib, sys; plistlib.load(open(sys.argv[1], "rb"))' "$f"
           done
-          python3 -m py_compile */rotpipe.py
+          python3 -m py_compile ./*/rotpipe.py

@@ -24,10 +24,12 @@ JOB_VARS = {
 
 
 def to_bool(value):
+    """Mirror the Ansible bool filter."""
     return str(value).strip().lower() in ("1", "true", "yes", "on")
 
 
 def make_env():
+    """Build a Jinja environment close to Ansible template defaults."""
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(ROLE / "templates" / "darwin")),
         undefined=jinja2.StrictUndefined,
@@ -40,7 +42,7 @@ def make_env():
 
 
 def resolve(env, variables):
-    # Defaults reference each other; render string values until stable.
+    """Render defaults that reference other defaults."""
     for _ in range(10):
         changed = False
         for key, value in variables.items():
@@ -55,6 +57,7 @@ def resolve(env, variables):
 
 
 def main():
+    """Render every Darwin template for every topology."""
     out = pathlib.Path(sys.argv[1])
     env = make_env()
     defaults = yaml.safe_load((ROLE / "defaults" / "main.yml").read_text())

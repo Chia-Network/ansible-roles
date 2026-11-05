@@ -22,7 +22,13 @@
 
     - name: Start LaunchDaemon {{ chia_job.label }}
       ansible.builtin.command:
-        argv: [launchctl, bootstrap, system, "/Library/LaunchDaemons/{{ chia_job.label }}.plist"]
+        argv:
+          [
+            launchctl,
+            bootstrap,
+            system,
+            "/Library/LaunchDaemons/{{ chia_job.label }}.plist",
+          ]
       changed_when: true
 
     - name: Disable LaunchDaemon at boot {{ chia_job.label }}

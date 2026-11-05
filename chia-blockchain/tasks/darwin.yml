@@ -148,10 +148,10 @@
       ansible.builtin.set_fact:
         chia_darwin_pmset_current: >-
           {{ dict(chia_darwin_pmset_custom.stdout_lines
-             | map('regex_findall', '^\s+(\w+)\s+(\S+)')
-             | select('truthy')
-             | map('first')
-             | list) }}
+              | map('regex_findall', '^\s+(\w+)\s+(\S+)')
+              | select('truthy')
+              | map('first')
+              | list) }}
 
     - name: Clear the pmset drift state
       ansible.builtin.set_fact:
@@ -497,9 +497,9 @@
   ansible.builtin.set_fact:
     chia_darwin_ca_needs_update: >-
       {{ (not (chia_darwin_ca_stat.results[0].stat.exists | default(false))) or
-         ((chia_darwin_ca_stat.results[0].stat.checksum | default('')) != (chia_ca_crt | hash('sha1'))) or
-         (not (chia_darwin_ca_stat.results[1].stat.exists | default(false))) or
-         ((chia_darwin_ca_stat.results[1].stat.checksum | default('')) != (chia_private_ca_crt | hash('sha1'))) }}
+          ((chia_darwin_ca_stat.results[0].stat.checksum | default('')) != (chia_ca_crt | hash('sha1'))) or
+          (not (chia_darwin_ca_stat.results[1].stat.exists | default(false))) or
+          ((chia_darwin_ca_stat.results[1].stat.checksum | default('')) != (chia_private_ca_crt | hash('sha1'))) }}
   when:
     - chia_ca_crt | length > 0
     - chia_ca_key | length > 0
