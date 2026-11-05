@@ -144,41 +144,45 @@
       register: chia_darwin_pmset_custom
       changed_when: false
 
-    - name: Parse the current power settings
+    - name: Clear the pmset drift flag
       ansible.builtin.set_fact:
-        chia_darwin_pmset_current: >-
-          {{ dict(chia_darwin_pmset_custom.stdout_lines
-              | map('regex_findall', '^\s+(\w+)\s+(\S+)')
-              | select('truthy')
-              | map('first')
-              | list) }}
+        chia_darwin_pmset_needs_update: false
 
-    - name: Clear the pmset drift state
+    # dict() keeps only the last profile. A laptop has Battery and AC, and
+    # pmset -a must correct every profile, so flag a key if any line differs.
+    - name: Flag a pmset key that differs in any power profile
       ansible.builtin.set_fact:
-        chia_darwin_pmset_drift: []
-        chia_darwin_pmset_argv: [pmset, -a]
-
-    - name: Find pmset keys that are not at the requested value
-      ansible.builtin.set_fact:
-        chia_darwin_pmset_drift: "{{ chia_darwin_pmset_drift + [item.key] }}"
-      loop: "{{ chia_darwin_pmset | dict2items }}"
+        chia_darwin_pmset_needs_update: true
       when: >-
-        (item.value | string) !=
-        (chia_darwin_pmset_current[item.key] | default('') | string)
+        (
+          chia_darwin_pmset_custom.stdout is not regex(
+            '(?m)^[ \t]+' ~ item.key ~ '[ \t]+' ~ (item.value | string) ~ '[ \t]*$'
+          )
+        ) or (
+          chia_darwin_pmset_custom.stdout is regex(
+            '(?m)^[ \t]+' ~ item.key ~ '[ \t]+(?!' ~ (item.value | string) ~ '[ \t]*$).*$'
+          )
+        )
+      loop: "{{ chia_darwin_pmset | dict2items }}"
       loop_control:
         label: "{{ item.key }}"
 
-    - name: Build the pmset argument list
-      ansible.builtin.set_fact:
-        chia_darwin_pmset_argv: "{{ chia_darwin_pmset_argv + [item, chia_darwin_pmset[item] | string] }}"
-      loop: "{{ chia_darwin_pmset_drift }}"
-      loop_control:
-        label: "{{ item }}"
-
     - name: Keep the Mac awake for the timelord
       ansible.builtin.command:
-        argv: "{{ chia_darwin_pmset_argv }}"
-      when: chia_darwin_pmset_drift | length > 0
+        argv:
+          - pmset
+          - -a
+          - sleep
+          - "{{ chia_darwin_pmset.sleep }}"
+          - disksleep
+          - "{{ chia_darwin_pmset.disksleep }}"
+          - womp
+          - "{{ chia_darwin_pmset.womp }}"
+          - autorestart
+          - "{{ chia_darwin_pmset.autorestart }}"
+          - tcpkeepalive
+          - "{{ chia_darwin_pmset.tcpkeepalive }}"
+      when: chia_darwin_pmset_needs_update | bool
       changed_when: true
 
 - name: Ensure service directories exist
@@ -337,7 +341,9 @@
           - "{{ chia_darwin_chiavdf_tap }}"
       when:
         - chia_darwin_enable_hw_vdf | bool
-        - (chia_darwin_chiavdf_tap | lower) not in (chia_darwin_brew_taps.stdout_lines | map('lower') | list)
+        - >-
+          chia_darwin_chiavdf_tap | lower not in
+          (chia_darwin_brew_taps.stdout_lines | default([]) | map('lower') | list)
       changed_when: true
 
     - name: Check whether chiavdf is installed
