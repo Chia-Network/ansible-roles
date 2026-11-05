@@ -517,6 +517,9 @@
     dest: "{{ chia_root }}/config/config.yaml"
     mode: "0644"
 
+- name: Seed the full-node database from S3
+  ansible.builtin.include_tasks: darwin-db-seed.yml
+
 - name: Write the reference chia config used to detect restarts
   become: true
   become_user: "{{ user }}"

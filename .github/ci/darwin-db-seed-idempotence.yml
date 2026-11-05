@@ -1,0 +1,57 @@
+---
+# Run twice with the same test_root. The first run seeds; the second must
+# report changed=0 because the database is no longer absent or a stub.
+- name: Prove a second Darwin database seed run is idempotent
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+  vars:
+    test_root: "{{ lookup('env', 'DARWIN_DB_SEED_TEST_ROOT') | default('/tmp/darwin-db-seed-idempotence', true) }}"
+    external_volume: "{{ test_root }}/Volumes/Chia DB"
+    external_root: "{{ test_root }}/Volumes/Chia DB/dot-chia"
+    fixture_main: "{{ 'M' * 20000 }}"
+    fixture_h2h: "height-to-hash fixture"
+    fixture_ses: "sub-epoch-summaries fixture"
+  tasks:
+    - name: Set the test identity and fixtures
+      ansible.builtin.set_fact:
+        test_user: "{{ lookup('env', 'USER') }}"
+        test_group: "{{ lookup('pipe', 'id -gn') }}"
+        user: "{{ lookup('env', 'USER') }}"
+        chia_darwin_group: "{{ lookup('pipe', 'id -gn') }}"
+        chia_darwin_home: "{{ test_root }}/home"
+        chia_darwin_aws: "{{ test_root }}/bin/aws"
+        chia_darwin_brew: "{{ test_root }}/bin/brew-not-used"
+        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
+        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+        chia_darwin_launchd_prefix: net.chia.seedtest
+        chia_darwin_db_volume: "{{ external_volume }}"
+        chia_darwin_db_seed_become: false
+        chia_darwin_db_seed_stub_bytes: 10240
+
+    - name: Create the shared fake tools and fixtures
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-setup.yml"
+
+    - name: Prepare the idempotence database directory
+      ansible.builtin.file:
+        path: "{{ test_root }}/idempotence/mainnet/db"
+        state: directory
+        mode: "0755"
+
+    - name: Seed the idempotence database
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+      vars:
+        chia_darwin_topology: local-internal
+        chia_root: "{{ test_root }}/idempotence/mainnet"
+        network: mainnet
+        download_blockchain_db: true
+        blockchain_backup_bucket: test-bucket
+        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
+        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+
+    - name: Require the first run to publish the fixture database
+      ansible.builtin.assert:
+        that:
+          - lookup('file', test_root ~ '/idempotence/mainnet/db/blockchain_v2_mainnet.sqlite') == fixture_main

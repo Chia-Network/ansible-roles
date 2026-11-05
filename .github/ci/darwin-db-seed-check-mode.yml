@@ -1,0 +1,78 @@
+---
+# Run with --check. Fixture creation is forced to run so the seed sees a real
+# destination; the seed tasks themselves stay in check mode.
+- name: Check-mode safety for the Darwin database seed
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+  vars:
+    test_root: "{{ lookup('env', 'DARWIN_DB_SEED_TEST_ROOT') | default('/tmp/darwin-db-seed-checkmode', true) }}"
+    external_volume: "{{ test_root }}/Volumes/Chia DB"
+    external_root: "{{ test_root }}/Volumes/Chia DB/dot-chia"
+    fixture_main: "{{ 'M' * 20000 }}"
+    fixture_h2h: "height-to-hash fixture"
+    fixture_ses: "sub-epoch-summaries fixture"
+  tasks:
+    - name: Set the test identity and fixtures
+      ansible.builtin.set_fact:
+        test_user: "{{ lookup('env', 'USER') }}"
+        test_group: "{{ lookup('pipe', 'id -gn') }}"
+        user: "{{ lookup('env', 'USER') }}"
+        chia_darwin_group: "{{ lookup('pipe', 'id -gn') }}"
+        chia_darwin_home: "{{ test_root }}/home"
+        chia_darwin_aws: "{{ test_root }}/bin/aws"
+        chia_darwin_brew: "{{ test_root }}/bin/brew-not-used"
+        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-loaded"
+        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+        chia_darwin_launchd_prefix: net.chia.seedtest
+        chia_darwin_db_volume: "{{ external_volume }}"
+        chia_darwin_db_seed_become: false
+        chia_darwin_db_seed_stub_bytes: 10240
+
+    - name: Create fixtures even when the play runs in check mode
+      check_mode: false
+      block:
+        - name: Create the shared fake tools and fixtures
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-setup.yml"
+
+        - name: Prepare the check-mode database directory
+          ansible.builtin.file:
+            path: "{{ test_root }}/checkmode/mainnet/db"
+            state: directory
+            mode: "0755"
+
+        - name: Reset the fake AWS state
+          ansible.builtin.copy:
+            content: ""
+            dest: "{{ item }}"
+            mode: "0644"
+          loop:
+            - "{{ test_root }}/aws.log"
+            - "{{ test_root }}/fail-file"
+
+    - name: Run the seed with the full node loaded in check mode
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+      vars:
+        chia_darwin_topology: local-internal
+        chia_root: "{{ test_root }}/checkmode/mainnet"
+        network: mainnet
+        download_blockchain_db: true
+        blockchain_backup_bucket: test-bucket
+        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-loaded"
+        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+
+    - name: Inspect the check-mode database and staging paths
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ test_root }}/checkmode/mainnet/db/blockchain_v2_mainnet.sqlite"
+        - "{{ test_root }}/checkmode/mainnet/db/.chia-s3-seed-mainnet"
+      register: darwin_db_seed_checkmode
+
+    - name: Assert check mode downloaded nothing and wrote nothing
+      ansible.builtin.assert:
+        that:
+          - darwin_db_seed_checkmode.results | rejectattr('stat.exists') | list | length == 2
+          - (lookup('file', test_root ~ '/aws.log') | length) == 0

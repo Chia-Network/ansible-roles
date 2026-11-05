@@ -4,9 +4,14 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin.yml
-    - ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-launchd-job.yml
-    - ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-restart-job.yml
+    - name: Import the Darwin role tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin.yml
+    - name: Import the Darwin database seed tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-db-seed.yml
+    - name: Import the Darwin LaunchDaemon tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-launchd-job.yml
+    - name: Import the Darwin restart tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-restart-job.yml
 
 - name: Syntax check the chia-blockchain role on Darwin
   hosts: localhost

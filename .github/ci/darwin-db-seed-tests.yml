@@ -1,0 +1,514 @@
+---
+# Local tests for chia-blockchain/tasks/darwin-db-seed.yml. They use a fake aws
+# executable and local fixtures. No S3 bucket, Mac, launchd job, or external
+# volume is touched.
+- name: Test the Darwin database seed without S3 or a Mac
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+  tasks:
+    - name: Create a temporary test root
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: " darwin db seed"
+      register: darwin_db_seed_temp
+
+    - name: Record the test paths and fixtures
+      ansible.builtin.set_fact:
+        test_root: "{{ darwin_db_seed_temp.path }}"
+        test_user: "{{ lookup('env', 'USER') }}"
+        test_group: "{{ lookup('pipe', 'id -gn') }}"
+        fixture_main: "{{ 'M' * 20000 }}"
+        fixture_h2h: "height-to-hash fixture"
+        fixture_ses: "sub-epoch-summaries fixture"
+        external_volume: "{{ darwin_db_seed_temp.path }}/Volumes/Chia DB"
+        external_root: "{{ darwin_db_seed_temp.path }}/Volumes/Chia DB/dot-chia"
+        mainnet_root: "{{ darwin_db_seed_temp.path }}/internal/mainnet"
+        testnet_root: "{{ darwin_db_seed_temp.path }}/external testnet/CHIA ROOT"
+        remote_root: "{{ darwin_db_seed_temp.path }}/remote/mainnet"
+        disabled_root: "{{ darwin_db_seed_temp.path }}/disabled/mainnet"
+        empty_bucket_root: "{{ darwin_db_seed_temp.path }}/empty-bucket/mainnet"
+        existing_root: "{{ darwin_db_seed_temp.path }}/existing/mainnet"
+        directory_root: "{{ darwin_db_seed_temp.path }}/directory/mainnet"
+        symlink_root: "{{ darwin_db_seed_temp.path }}/symlink/mainnet"
+        boundary_root: "{{ darwin_db_seed_temp.path }}/boundary/mainnet"
+        stub_root: "{{ darwin_db_seed_temp.path }}/stub/mainnet"
+        missing_external_root: "{{ darwin_db_seed_temp.path }}/missing external/mainnet"
+        running_root: "{{ darwin_db_seed_temp.path }}/running/mainnet"
+
+    - name: Create the shared fake tools and fixtures
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-setup.yml"
+
+    - name: Set the common role variables under test
+      ansible.builtin.set_fact:
+        user: "{{ test_user }}"
+        chia_darwin_group: "{{ test_group }}"
+        chia_darwin_home: "{{ test_root }}/home"
+        chia_darwin_aws: "{{ test_root }}/bin/aws"
+        chia_darwin_brew: "{{ test_root }}/bin/brew-not-used"
+        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
+        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+        chia_darwin_launchd_prefix: net.chia.seedtest
+        chia_darwin_db_volume: "{{ external_volume }}"
+        chia_darwin_db_seed_become: false
+        chia_darwin_db_seed_stub_bytes: 10240
+
+    - name: Reset the fake AWS state
+      ansible.builtin.copy:
+        content: ""
+        dest: "{{ item }}"
+        mode: "0644"
+      loop:
+        - "{{ test_root }}/aws.log"
+        - "{{ test_root }}/fail-file"
+
+    - name: Prepare the local-internal database directory
+      ansible.builtin.file:
+        path: "{{ mainnet_root }}/db"
+        state: directory
+        mode: "0755"
+
+    - name: Seed an absent local-internal database
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+      vars:
+        chia_darwin_topology: local-internal
+        chia_root: "{{ mainnet_root }}"
+        network: mainnet
+        download_blockchain_db: true
+        blockchain_backup_bucket: test-bucket
+        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
+        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+
+    - name: Assert the local-internal database was seeded
+      ansible.builtin.assert:
+        that:
+          - lookup('file', mainnet_root ~ '/db/blockchain_v2_mainnet.sqlite') == fixture_main
+          - lookup('file', mainnet_root ~ '/db/height-to-hash') == fixture_h2h
+          - lookup('file', mainnet_root ~ '/db/sub-epoch-summaries') == fixture_ses
+          - "'s3://test-bucket/mainnet/blockchain_v2_mainnet.sqlite' in lookup('file', test_root ~ '/aws.log')"
+          - "'s3://test-bucket/mainnet/height-to-hash' in lookup('file', test_root ~ '/aws.log')"
+          - "'s3://test-bucket/mainnet/sub-epoch-summaries' in lookup('file', test_root ~ '/aws.log')"
+
+    - name: Inspect the seeded local-internal database
+      ansible.builtin.stat:
+        path: "{{ mainnet_root }}/db/blockchain_v2_mainnet.sqlite"
+      register: darwin_db_seed_internal_main
+
+    - name: Inspect the local-internal staging directory
+      ansible.builtin.stat:
+        path: "{{ mainnet_root }}/db/.chia-s3-seed-mainnet"
+      register: darwin_db_seed_internal_staging
+
+    - name: Assert ownership, permissions, and staging cleanup
+      ansible.builtin.assert:
+        that:
+          - darwin_db_seed_internal_main.stat.pw_name == test_user
+          - darwin_db_seed_internal_main.stat.gr_name == test_group
+          - darwin_db_seed_internal_main.stat.mode == "0644"
+          - not (darwin_db_seed_internal_staging.stat.exists | default(false))
+
+    - name: Record the first-run database and download state
+      ansible.builtin.set_fact:
+        first_run_log_size: "{{ lookup('file', test_root ~ '/aws.log') | length }}"
+        first_run_inode: "{{ darwin_db_seed_internal_main.stat.inode }}"
+        first_run_size: "{{ darwin_db_seed_internal_main.stat.size }}"
+        first_run_mtime: "{{ darwin_db_seed_internal_main.stat.mtime }}"
+
+    - name: Run the local-internal seed a second time
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+      vars:
+        chia_darwin_topology: local-internal
+        chia_root: "{{ mainnet_root }}"
+        network: mainnet
+        download_blockchain_db: true
+        blockchain_backup_bucket: test-bucket
+        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
+        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+
+    - name: Inspect the database after the second run
+      ansible.builtin.stat:
+        path: "{{ mainnet_root }}/db/blockchain_v2_mainnet.sqlite"
+      register: darwin_db_seed_internal_second
+
+    - name: A second successful run does not redownload or change the database
+      ansible.builtin.assert:
+        that:
+          - (lookup('file', test_root ~ '/aws.log') | length) == (first_run_log_size | int)
+          - darwin_db_seed_internal_second.stat.inode == (first_run_inode | int)
+          - darwin_db_seed_internal_second.stat.size == (first_run_size | int)
+          - darwin_db_seed_internal_second.stat.mtime == (first_run_mtime | float)
+
+    - name: Seed an absent local-external testnet11 database through the symlink
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+      vars:
+        chia_darwin_topology: local-external
+        chia_root: "{{ test_root }}/home ext/.chia/testnet11"
+        network: testnet11
+        download_blockchain_db: true
+        blockchain_backup_bucket: test-bucket
+        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
+        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-present"
+        chia_darwin_db_volume: "{{ external_volume }}"
+
+    - name: Assert the external testnet11 database was seeded
+      ansible.builtin.assert:
+        that:
+          - lookup('file', external_root ~ '/testnet11/db/blockchain_v2_testnet11.sqlite') == fixture_main
+          - lookup('file', external_root ~ '/testnet11/db/height-to-hash') == fixture_h2h
+          - lookup('file', external_root ~ '/testnet11/db/sub-epoch-summaries') == fixture_ses
+          - "'s3://test-bucket/testnet11/blockchain_v2_testnet11.sqlite' in lookup('file', test_root ~ '/aws.log')"
+          - "'s3://test-bucket/testnet11/height-to-hash' in lookup('file', test_root ~ '/aws.log')"
+          - "'s3://test-bucket/testnet11/sub-epoch-summaries' in lookup('file', test_root ~ '/aws.log')"
+
+    - name: Prepare the skip-case database directories
+      ansible.builtin.file:
+        path: "{{ item }}/db"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ remote_root }}"
+        - "{{ disabled_root }}"
+        - "{{ empty_bucket_root }}"
+
+    - name: Reset the fake AWS state before the skip cases
+      ansible.builtin.copy:
+        content: ""
+        dest: "{{ item }}"
+        mode: "0644"
+      loop:
+        - "{{ test_root }}/aws.log"
+        - "{{ test_root }}/fail-file"
+
+    - name: Skip the seed for a remote-node topology
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+      vars:
+        chia_darwin_topology: remote-node
+        chia_root: "{{ remote_root }}"
+        network: mainnet
+        download_blockchain_db: true
+        blockchain_backup_bucket: test-bucket
+        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-loaded"
+        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+
+    - name: Skip the seed when database downloads are disabled
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+      vars:
+        chia_darwin_topology: local-internal
+        chia_root: "{{ disabled_root }}"
+        network: mainnet
+        download_blockchain_db: false
+        blockchain_backup_bucket: test-bucket
+        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-loaded"
+        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+
+    - name: Skip the seed when the backup bucket is empty
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+      vars:
+        chia_darwin_topology: local-internal
+        chia_root: "{{ empty_bucket_root }}"
+        network: mainnet
+        download_blockchain_db: true
+        blockchain_backup_bucket: ""
+        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-loaded"
+        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+
+    - name: Inspect the skip-case database paths
+      ansible.builtin.stat:
+        path: "{{ item }}/db/blockchain_v2_mainnet.sqlite"
+      loop:
+        - "{{ remote_root }}"
+        - "{{ disabled_root }}"
+        - "{{ empty_bucket_root }}"
+      register: darwin_db_seed_skips
+
+    - name: Assert the skip cases downloaded nothing and left no database
+      ansible.builtin.assert:
+        that:
+          - darwin_db_seed_skips.results | rejectattr('stat.exists') | list | length == 3
+          - (lookup('file', test_root ~ '/aws.log') | length) == 0
+
+    - name: Prepare the remaining scenario database directories
+      ansible.builtin.file:
+        path: "{{ item }}/db"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ existing_root }}"
+        - "{{ directory_root }}"
+        - "{{ symlink_root }}"
+        - "{{ boundary_root }}"
+        - "{{ stub_root }}"
+
+    - name: Prepare an existing large database and old caches
+      ansible.builtin.copy:
+        content: "{{ item.content }}"
+        dest: "{{ existing_root }}/db/{{ item.name }}"
+        mode: "0644"
+      loop:
+        - name: blockchain_v2_mainnet.sqlite
+          content: "{{ 'K' * 11000 }}"
+        - name: height-to-hash
+          content: old-height-to-hash
+        - name: sub-epoch-summaries
+          content: old-sub-epoch-summaries
+
+    - name: Reset the fake AWS state before the existing-database cases
+      ansible.builtin.copy:
+        content: ""
+        dest: "{{ item }}"
+        mode: "0644"
+      loop:
+        - "{{ test_root }}/aws.log"
+        - "{{ test_root }}/fail-file"
+
+    - name: Preserve an existing non-stub database
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+      vars:
+        chia_darwin_topology: local-internal
+        chia_root: "{{ existing_root }}"
+        network: mainnet
+        download_blockchain_db: true
+        blockchain_backup_bucket: test-bucket
+        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
+        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+
+    - name: Assert the existing database and caches were not touched
+      ansible.builtin.assert:
+        that:
+          - lookup('file', existing_root ~ '/db/blockchain_v2_mainnet.sqlite') == ('K' * 11000)
+          - lookup('file', existing_root ~ '/db/height-to-hash') == 'old-height-to-hash'
+          - lookup('file', existing_root ~ '/db/sub-epoch-summaries') == 'old-sub-epoch-summaries'
+          - (lookup('file', test_root ~ '/aws.log') | length) == 0
+
+    - name: Prepare a directory at the main database path
+      ansible.builtin.file:
+        path: "{{ directory_root }}/db/blockchain_v2_mainnet.sqlite"
+        state: directory
+        mode: "0755"
+
+    - name: Preserve a directory at the main database path
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+      vars:
+        chia_darwin_topology: local-internal
+        chia_root: "{{ directory_root }}"
+        network: mainnet
+        download_blockchain_db: true
+        blockchain_backup_bucket: test-bucket
+        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
+        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+
+    - name: Inspect the directory at the main database path
+      ansible.builtin.stat:
+        path: "{{ directory_root }}/db/blockchain_v2_mainnet.sqlite"
+      register: darwin_db_seed_directory
+
+    - name: Assert the directory was not removed or replaced
+      ansible.builtin.assert:
+        that:
+          - darwin_db_seed_directory.stat.isdir | default(false)
+          - (lookup('file', test_root ~ '/aws.log') | length) == 0
+
+    - name: Prepare a symlink at the main database path
+      ansible.builtin.copy:
+        content: "{{ 'L' * 12000 }}"
+        dest: "{{ symlink_root }}/linked-database.sqlite"
+        mode: "0644"
+
+    - name: Create the main database symlink
+      ansible.builtin.file:
+        src: "{{ symlink_root }}/linked-database.sqlite"
+        dest: "{{ symlink_root }}/db/blockchain_v2_mainnet.sqlite"
+        state: link
+        force: true
+
+    - name: Preserve a symlink at the main database path
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+      vars:
+        chia_darwin_topology: local-internal
+        chia_root: "{{ symlink_root }}"
+        network: mainnet
+        download_blockchain_db: true
+        blockchain_backup_bucket: test-bucket
+        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
+        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+
+    - name: Inspect the symlink at the main database path
+      ansible.builtin.stat:
+        path: "{{ symlink_root }}/db/blockchain_v2_mainnet.sqlite"
+        follow: false
+      register: darwin_db_seed_symlink
+
+    - name: Assert the symlink and its target were not replaced
+      ansible.builtin.assert:
+        that:
+          - darwin_db_seed_symlink.stat.islnk | default(false)
+          - lookup('file', symlink_root ~ '/linked-database.sqlite') == ('L' * 12000)
+          - (lookup('file', test_root ~ '/aws.log') | length) == 0
+
+    - name: Prepare a database one byte above the stub limit
+      ansible.builtin.copy:
+        content: "{{ 'B' * 10241 }}"
+        dest: "{{ boundary_root }}/db/blockchain_v2_mainnet.sqlite"
+        mode: "0644"
+
+    - name: Preserve a database one byte above the stub limit
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+      vars:
+        chia_darwin_topology: local-internal
+        chia_root: "{{ boundary_root }}"
+        network: mainnet
+        download_blockchain_db: true
+        blockchain_backup_bucket: test-bucket
+        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
+        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+
+    - name: Assert the 10241-byte database was preserved
+      ansible.builtin.assert:
+        that:
+          - lookup('file', boundary_root ~ '/db/blockchain_v2_mainnet.sqlite') == ('B' * 10241)
+          - (lookup('file', test_root ~ '/aws.log') | length) == 0
+
+    - name: Prepare a database exactly at the stub limit
+      ansible.builtin.copy:
+        content: "{{ 'S' * 10240 }}"
+        dest: "{{ stub_root }}/db/blockchain_v2_mainnet.sqlite"
+        mode: "0644"
+
+    - name: Replace a database exactly at the documented stub limit
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+      vars:
+        chia_darwin_topology: local-internal
+        chia_root: "{{ stub_root }}"
+        network: mainnet
+        download_blockchain_db: true
+        blockchain_backup_bucket: test-bucket
+        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
+        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+
+    - name: Assert the stub was replaced with the snapshot
+      ansible.builtin.assert:
+        that:
+          - lookup('file', stub_root ~ '/db/blockchain_v2_mainnet.sqlite') == fixture_main
+          - lookup('file', stub_root ~ '/db/height-to-hash') == fixture_h2h
+          - lookup('file', stub_root ~ '/db/sub-epoch-summaries') == fixture_ses
+          - (lookup('file', test_root ~ '/aws.log') | split('\n') | reject('eq', '') | list | length) == 3
+
+    - name: Prepare the missing-external test database directory
+      ansible.builtin.file:
+        path: "{{ missing_external_root }}/db"
+        state: directory
+        mode: "0755"
+
+    - name: Reset the fake AWS state before the missing-external case
+      ansible.builtin.copy:
+        content: ""
+        dest: "{{ item }}"
+        mode: "0644"
+      loop:
+        - "{{ test_root }}/aws.log"
+        - "{{ test_root }}/fail-file"
+
+    - name: Missing external storage is refused before any write
+      block:
+        - name: Attempt a local-external seed without the volume mounted
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+          vars:
+            chia_darwin_topology: local-external
+            chia_root: "{{ missing_external_root }}"
+            network: mainnet
+            download_blockchain_db: true
+            blockchain_backup_bucket: test-bucket
+            chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
+            chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+            chia_darwin_db_volume: "{{ external_volume }}"
+        - name: Mark a missing-external failure that did not happen
+          ansible.builtin.fail:
+            msg: "The seed unexpectedly accepted a missing external volume"
+      rescue:
+        - name: Confirm the missing external volume was refused
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg is search('is not mounted')
+
+    - name: Inspect the missing-external database and staging paths
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ missing_external_root }}/db/blockchain_v2_mainnet.sqlite"
+        - "{{ missing_external_root }}/db/.chia-s3-seed-mainnet"
+      register: darwin_db_seed_missing_external
+
+    - name: Assert the missing-external case wrote nothing
+      ansible.builtin.assert:
+        that:
+          - darwin_db_seed_missing_external.results | rejectattr('stat.exists') | list | length == 2
+          - (lookup('file', test_root ~ '/aws.log') | length) == 0
+
+    - name: Prepare the loaded-node test database directory
+      ansible.builtin.file:
+        path: "{{ running_root }}/db"
+        state: directory
+        mode: "0755"
+
+    - name: Reset the fake AWS state before the loaded-node case
+      ansible.builtin.copy:
+        content: ""
+        dest: "{{ item }}"
+        mode: "0644"
+      loop:
+        - "{{ test_root }}/aws.log"
+        - "{{ test_root }}/fail-file"
+
+    - name: A loaded full node is refused before any write
+      block:
+        - name: Attempt a seed while the full node LaunchDaemon is loaded
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+          vars:
+            chia_darwin_topology: local-internal
+            chia_root: "{{ running_root }}"
+            network: mainnet
+            download_blockchain_db: true
+            blockchain_backup_bucket: test-bucket
+            chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-loaded"
+            chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+        - name: Mark a loaded-node refusal that did not happen
+          ansible.builtin.fail:
+            msg: "The seed unexpectedly wrote a database under a loaded full node"
+      rescue:
+        - name: Confirm the loaded full node was refused
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg is search('LaunchDaemon is loaded')
+
+    - name: Inspect the loaded-node database and staging paths
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ running_root }}/db/blockchain_v2_mainnet.sqlite"
+        - "{{ running_root }}/db/.chia-s3-seed-mainnet"
+      register: darwin_db_seed_running
+
+    - name: Assert the loaded-node case wrote nothing
+      ansible.builtin.assert:
+        that:
+          - darwin_db_seed_running.results | rejectattr('stat.exists') | list | length == 2
+          - (lookup('file', test_root ~ '/aws.log') | length) == 0
+
+    - name: Each snapshot copy failure is fatal and publishes no partial database
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-failure-case.yml"
+      loop:
+        - name: height-to-hash
+          file: height-to-hash
+          copies: 2
+        - name: sub-epoch-summaries
+          file: sub-epoch-summaries
+          copies: 3
+      loop_control:
+        loop_var: failure_case
+        label: "{{ failure_case.name }}"
+
+    - name: Report the temporary test root
+      ansible.builtin.debug:
+        msg: "Darwin database seed tests passed under {{ test_root }}"
