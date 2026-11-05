@@ -1,0 +1,70 @@
+---
+# A disabled hw-vdf slot is retired only when this role already owns the
+# LaunchDaemon (its plist or launchctl print contains our wrapper path).
+# A job that merely shares the label is left loaded and is not disabled.
+- name: Look for our wrapper path in a retired hw-vdf plist
+  become: "{{ chia_darwin_launchd_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      - grep
+      - -F
+      - -q
+      - "{{ item.wrapper }}"
+      - "{{ chia_darwin_launchd_dir }}/{{ item.label }}.plist"
+  register: chia_darwin_hw_plist_owner
+  changed_when: false
+  failed_when: false
+  loop: "{{ chia_darwin_hw_vdf_jobs }}"
+  loop_control:
+    label: "{{ item.label }}"
+  when: not (item.enabled | bool)
+
+- name: Look for our wrapper path in a retired hw-vdf job
+  become: "{{ chia_darwin_launchd_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_launchctl }}"
+      - print
+      - "system/{{ item.label }}"
+  register: chia_darwin_hw_print_owner
+  changed_when: false
+  failed_when: false
+  loop: "{{ chia_darwin_hw_vdf_jobs }}"
+  loop_control:
+    label: "{{ item.label }}"
+  when: not (item.enabled | bool)
+
+- name: Clear the owned hw-vdf label list
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_owned_labels: []
+  changed_when: false
+
+- name: Record retired hw-vdf jobs this role owns
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_owned_labels: "{{ chia_darwin_hw_vdf_owned_labels + [item.label] }}"
+  loop: "{{ chia_darwin_hw_vdf_jobs }}"
+  loop_control:
+    index_var: idx
+    label: "{{ item.label }}"
+  when:
+    - not (item.enabled | bool)
+    - >-
+      ((chia_darwin_hw_plist_owner.results[idx].rc | default(1) | int) == 0) or
+      (item.wrapper in (chia_darwin_hw_print_owner.results[idx].stdout | default('')))
+  changed_when: false
+
+- name: Start the LaunchDaemon list with the non-ASIC jobs
+  ansible.builtin.set_fact:
+    chia_darwin_launchd_jobs: "{{ chia_darwin_service_jobs | default([]) }}"
+  changed_when: false
+
+- name: Add enabled or role-owned hw-vdf jobs
+  ansible.builtin.set_fact:
+    chia_darwin_launchd_jobs: "{{ chia_darwin_launchd_jobs + [item] }}"
+  loop: "{{ chia_darwin_hw_vdf_jobs }}"
+  loop_control:
+    label: "{{ item.label }}"
+  when: >-
+    (item.enabled | bool) or
+    (item.label in chia_darwin_hw_vdf_owned_labels)
+  changed_when: false

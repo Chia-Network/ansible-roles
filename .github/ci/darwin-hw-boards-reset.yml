@@ -1,0 +1,16 @@
+---
+- name: Reset ASIC inventory inputs
+  ansible.builtin.set_fact:
+    chia_darwin_enable_hw_vdf: true
+    chia_darwin_hw_vdf_expected_serial: ""
+    chia_darwin_hw_vdf_boards: []
+    chia_darwin_hw_vdf_freq: 1540
+    chia_darwin_hw_vdf_voltage: "1.0"
+    chia_darwin_hw_vdf_vdf_threads: 12
+    chia_darwin_hw_vdf_proof_threads: 11
+    chia_darwin_hw_vdf_checkpoint_threshold: 500000
+    chia_darwin_hw_vdf_mask: 7
+    chia_darwin_start_now: true
+    chia_darwin_start_on_boot: true
+    chia_darwin_service_jobs: []
+    chia_darwin_fresh_bootstraps: []

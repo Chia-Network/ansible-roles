@@ -10,11 +10,11 @@
     - chia_job.enabled | bool
     - chia_darwin_start_now | bool
     - chia_job.label not in (chia_darwin_fresh_bootstraps | default([]))
-  become: true
+  become: "{{ chia_darwin_launchd_become | bool }}"
   block:
     - name: Stop LaunchDaemon {{ chia_job.label }}
       ansible.builtin.command:
-        argv: [launchctl, bootout, "system/{{ chia_job.label }}"]
+        argv: ["{{ chia_darwin_launchctl }}", bootout, "system/{{ chia_job.label }}"]
       register: chia_darwin_restart_bootout
       changed_when: chia_darwin_restart_bootout.rc == 0
       failed_when: false
@@ -23,7 +23,7 @@
     # status is success here, so ignore the command's own failure.
     - name: Wait until LaunchDaemon is unloaded {{ chia_job.label }}
       ansible.builtin.command:
-        argv: [launchctl, print, "system/{{ chia_job.label }}"]
+        argv: ["{{ chia_darwin_launchctl }}", print, "system/{{ chia_job.label }}"]
       register: chia_darwin_restart_gone
       changed_when: false
       failed_when: false
@@ -45,16 +45,16 @@
 
     - name: Enable LaunchDaemon before starting {{ chia_job.label }}
       ansible.builtin.command:
-        argv: [launchctl, enable, "system/{{ chia_job.label }}"]
+        argv: ["{{ chia_darwin_launchctl }}", enable, "system/{{ chia_job.label }}"]
       changed_when: false
 
     - name: Start LaunchDaemon {{ chia_job.label }}
       ansible.builtin.command:
         argv:
-          - launchctl
+          - "{{ chia_darwin_launchctl }}"
           - bootstrap
           - system
-          - "/Library/LaunchDaemons/{{ chia_job.label }}.plist"
+          - "{{ chia_darwin_launchd_dir }}/{{ chia_job.label }}.plist"
       register: chia_darwin_restart_bootstrap
       changed_when: chia_darwin_restart_bootstrap.rc == 0
       retries: 10
@@ -63,6 +63,6 @@
 
     - name: Disable LaunchDaemon at boot {{ chia_job.label }}
       ansible.builtin.command:
-        argv: [launchctl, disable, "system/{{ chia_job.label }}"]
+        argv: ["{{ chia_darwin_launchctl }}", disable, "system/{{ chia_job.label }}"]
       changed_when: false
       when: not (chia_darwin_start_on_boot | bool)

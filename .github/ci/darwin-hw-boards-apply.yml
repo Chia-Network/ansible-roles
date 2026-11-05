@@ -1,0 +1,44 @@
+---
+- name: Reset inputs before applying boards
+  ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+
+- name: Set the inventory to apply
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_expected_serial: "{{ hw_apply_serial }}"
+    chia_darwin_hw_vdf_boards: "{{ hw_apply_boards }}"
+    chia_darwin_start_now: "{{ hw_apply_start_now | default(true) }}"
+    chia_darwin_start_on_boot: "{{ hw_apply_start_on_boot | default(true) }}"
+
+- name: Resolve the inventory
+  ansible.builtin.include_role:
+    name: chia-blockchain
+    tasks_from: darwin-hw-vdf-boards.yml
+
+- name: Install enabled wrappers
+  ansible.builtin.include_role:
+    name: chia-blockchain
+    tasks_from: darwin-hw-vdf-install.yml
+
+- name: Decide which disabled jobs are role-owned
+  ansible.builtin.include_role:
+    name: chia-blockchain
+    tasks_from: darwin-hw-vdf-launchd.yml
+
+- name: Apply LaunchDaemons
+  ansible.builtin.include_role:
+    name: chia-blockchain
+    tasks_from: darwin-launchd-job.yml
+  vars:
+    chia_job: "{{ hw_job }}"
+  loop: "{{ chia_darwin_launchd_jobs }}"
+  loop_control:
+    loop_var: hw_job
+    label: "{{ hw_job.label }}"
+
+- name: Remove retired wrappers
+  ansible.builtin.include_role:
+    name: chia-blockchain
+    tasks_from: darwin-hw-vdf-retire.yml
+
+- name: Run pending LaunchDaemon restarts
+  ansible.builtin.meta: flush_handlers

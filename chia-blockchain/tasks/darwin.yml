@@ -50,32 +50,17 @@
     fail_msg: Set chia_darwin_db_volume for the local-external topology.
   when: chia_darwin_topology == "local-external"
 
-- name: Require an ASIC serial and a sane hw_vdf_client argv
-  ansible.builtin.assert:
-    that:
-      - chia_darwin_hw_vdf_expected_serial | length > 0
-      - (chia_darwin_hw_vdf_proof_threads | int) < (chia_darwin_hw_vdf_vdf_threads | int)
-      - (chia_darwin_hw_vdf_proof_threads | int) >= 1
-      - (chia_darwin_hw_vdf_freq | int) >= 200
-      - (chia_darwin_hw_vdf_freq | int) <= 2200
-      - (chia_darwin_hw_vdf_mask | int) >= 1
-      - (chia_darwin_hw_vdf_mask | int) <= 7
-      - (chia_darwin_hw_num_vdfs | int) >= 1
-      - (chia_darwin_hw_num_vdfs | int) <= 3
-    fail_msg: >-
-      Set chia_darwin_hw_vdf_expected_serial to this board's serial.
-      proof-threads must be lower than vdf-threads, freq must be 200-2200,
-      and the VDF mask must be 1-7.
-  when: chia_darwin_enable_hw_vdf | bool
+- name: Resolve ASIC boards and hw-vdf LaunchDaemon slots
+  ansible.builtin.include_tasks: darwin-hw-vdf-boards.yml
 
 - name: Use the Darwin CHIA_ROOT and skip software VDF clients
   ansible.builtin.set_fact:
     chia_root: "{{ chia_darwin_root }}"
     process_count: "{{ chia_darwin_process_count }}"
 
-- name: Build the LaunchDaemon job list
+- name: Build the non-ASIC LaunchDaemon job list
   ansible.builtin.set_fact:
-    chia_darwin_launchd_jobs:
+    chia_darwin_service_jobs:
       - name: daemon
         label: "{{ chia_darwin_launchd_prefix }}.daemon"
         wrapper: "{{ chia_darwin_bin_dir }}/chia-daemon-run.sh"
@@ -94,12 +79,6 @@
         throttle: "{{ chia_darwin_timelord_throttle_interval }}"
         exit_timeout: "{{ chia_darwin_timelord_exit_timeout }}"
         enabled: true
-      - name: hw-vdf
-        label: "{{ chia_darwin_launchd_prefix }}.hw-vdf"
-        wrapper: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
-        throttle: "{{ chia_darwin_hw_vdf_throttle_interval }}"
-        exit_timeout: "{{ chia_darwin_hw_vdf_exit_timeout }}"
-        enabled: "{{ chia_darwin_enable_hw_vdf | bool }}"
 
 - name: Ensure the timelord service user exists
   become: true
@@ -618,8 +597,6 @@
       dest: "{{ chia_darwin_bin_dir }}/chia-full-node-run.sh"
     - src: darwin/chia-timelord-run.sh.j2
       dest: "{{ chia_darwin_bin_dir }}/chia-timelord-run.sh"
-    - src: darwin/chia-hw-vdf-run.sh.j2
-      dest: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
     - src: darwin/rotpipe.py.j2
       dest: "{{ chia_darwin_bin_dir }}/rotpipe.py"
   loop_control:
@@ -665,12 +642,21 @@
       See {{ chia_darwin_fda_note_dest }}. This role does not edit TCC.db.
       An SSH session being able to read the volume does not mean launchd can.
 
+- name: Install enabled hw_vdf wrappers
+  ansible.builtin.include_tasks: darwin-hw-vdf-install.yml
+
+- name: Choose which hw-vdf LaunchDaemons this role will change
+  ansible.builtin.include_tasks: darwin-hw-vdf-launchd.yml
+
 - name: Install and load LaunchDaemons
   ansible.builtin.include_tasks: darwin-launchd-job.yml
   loop: "{{ chia_darwin_launchd_jobs }}"
   loop_control:
     loop_var: chia_job
     label: "{{ chia_job.label }}"
+
+- name: Remove retired hw_vdf wrappers
+  ansible.builtin.include_tasks: darwin-hw-vdf-retire.yml
 
 - name: Note the testnet full node port
   ansible.builtin.debug:
@@ -681,6 +667,18 @@
   when:
     - network == "testnet11"
     - (full_node_port | int) == 8444
+
+- name: Summarize Darwin ASIC boards
+  when: chia_darwin_enable_hw_vdf | bool
+  ansible.builtin.debug:
+    msg: >-
+      id={{ item.id }} mask={{ item.vdfs_mask }} n_vdfs={{ item.n_vdfs }}
+      device_loc={{ item.device_loc if (item.device_loc | string | length) > 0 else 'first' }}
+      serial={{ item.expected_serial }} log={{ item.log_name }}
+      vdf_threads={{ item.vdf_threads }} proof_threads={{ item.proof_threads }}
+  loop: "{{ chia_darwin_hw_vdf_active }}"
+  loop_control:
+    label: "{{ item.id }}"
 
 - name: Summarize the Darwin timelord
   ansible.builtin.debug:

@@ -2,41 +2,111 @@
 # Managed by the chia-blockchain Ansible role.
 # hw_vdf_client for one Chia VDF ASIC board (Homebrew chiavdf).
 # Linux systemd passes a shorter argv (threads, freq, optional auto-freq/max-freq, mask, ip, port, n_vdfs).
-# Darwin adds voltage, retain-asic-values, checkpoint-threshold, and expected-serial.
+# Darwin adds voltage, retain-asic-values, checkpoint-threshold, expected-serial,
+# and, when a board list is set, --device-loc.
+# One process opens one board. A non-zero --vdfs-mask chooses engines; N_VDFS does not change that mask.
 # The FTDI D2XX driver is not installed by this role; the board will not enumerate without it.
 . {{ chia_darwin_env_script | quote }}
 
+{% set board = chia_hw_board | default({}) %}
+{% set use_board = (board.expected_serial | default('') | length) > 0 %}
 FREQ={{ chia_darwin_hw_vdf_freq | quote }}
 VOLTAGE={{ chia_darwin_hw_vdf_voltage | quote }}
+{% if use_board %}
+VDF_THREADS={{ board.vdf_threads | quote }}
+PROOF_THREADS={{ board.proof_threads | quote }}
+VDFS_MASK={{ board.vdfs_mask | quote }}
+N_VDFS={{ board.n_vdfs | quote }}
+SERIAL={{ board.expected_serial | quote }}
+DEVICE_LOC={{ ('' if (board.legacy | bool) else (board.device_loc | string)) | quote }}
+PEER_LOG={{ board.peer_log | default('') | quote }}
+LOG={{ (chia_darwin_log_dir ~ '/' ~ board.log_name) | quote }}
+{% else %}
 VDF_THREADS={{ chia_darwin_hw_vdf_vdf_threads | quote }}
 PROOF_THREADS={{ chia_darwin_hw_vdf_proof_threads | quote }}
-CHECKPOINT_THRESHOLD={{ chia_darwin_hw_vdf_checkpoint_threshold | quote }}
 VDFS_MASK={{ chia_darwin_hw_vdf_mask | quote }}
 N_VDFS={{ chia_darwin_hw_num_vdfs | quote }}
 SERIAL={{ chia_darwin_hw_vdf_expected_serial | quote }}
+DEVICE_LOC=""
+PEER_LOG=""
+LOG={{ chia_darwin_log_dir | quote }}/hw-vdf.log
+{% endif %}
+CHECKPOINT_THRESHOLD={{ chia_darwin_hw_vdf_checkpoint_threshold | quote }}
 IP={{ chia_darwin_hw_vdf_ip | quote }}
 PORT={{ chia_darwin_hw_vdf_port | quote }}
 RETAIN_ASIC_VALUES={{ 1 if chia_darwin_hw_vdf_retain_asic_values | bool else 0 }}
 HW_VDF_CLIENT={{ chia_darwin_hw_vdf_client | quote }}
+SEQUENCE_OPENS={{ 1 if (chia_darwin_hw_vdf_sequence_opens | bool) else 0 }}
+PEER_WAIT_ATTEMPTS={{ chia_darwin_hw_vdf_peer_wait_attempts | int }}
+PEER_WAIT_INTERVAL={{ chia_darwin_wait_interval | int }}
+PEER_LOG_EVERY={{ chia_darwin_wait_log_every | int }}
+OPEN_MARKER={{ chia_darwin_hw_vdf_open_marker | quote }}
+CONNECTED_MARKER={{ chia_darwin_hw_vdf_connected_marker | quote }}
 
-wait_for_db_volume
-wait_for_listen "$PORT" # timelord vdf_server must be up (hw_vdf_client exits if it can't connect)
-sleep {{ chia_darwin_hw_vdf_settle_seconds | int }}
+# Positions in the rotated log sort before the live log, so a connection that
+# landed after rotation still counts and an older connection does not.
+marker_pos() {
+	needle=$1
+	pos=""
+	line=""
+	if [ -f "${PEER_LOG}.1" ]; then
+		line=$(grep -F -n -- "$needle" "${PEER_LOG}.1" | tail -n 1 | cut -d: -f1 || true)
+		if [ -n "$line" ]; then
+			pos=$line
+		fi
+	fi
+	if [ -f "$PEER_LOG" ]; then
+		line=$(grep -F -n -- "$needle" "$PEER_LOG" | tail -n 1 | cut -d: -f1 || true)
+		if [ -n "$line" ]; then
+			pos=$((100000000 + line))
+		fi
+	fi
+	printf '%s\n' "$pos"
+}
 
-LOG={{ chia_darwin_log_dir | quote }}/hw-vdf.log
-log "starting hw_vdf_client freq=$FREQ voltage=$VOLTAGE vdf-threads=$VDF_THREADS proof-threads=$PROOF_THREADS mask=$VDFS_MASK serial=$SERIAL -> $IP:$PORT x$N_VDFS" >>"$LOG"
+# chiavdf enumerates FTDI inside hw_vdf_client, then logs "Connected to timelord".
+# Wait for that line to follow this role's opening marker before the next board
+# starts. Simultaneous enumeration has failed the macOS USB stack.
+wait_for_previous_board() {
+	if [ -z "$PEER_LOG" ] || [ "$SEQUENCE_OPENS" != 1 ]; then
+		return 0
+	fi
+	n=0
+	while true; do
+		open_pos=$(marker_pos "$OPEN_MARKER")
+		conn_pos=$(marker_pos "$CONNECTED_MARKER")
+		if [ -n "$open_pos" ] && [ -n "$conn_pos" ] && [ "$conn_pos" -gt "$open_pos" ]; then
+			log "previous board connected; opening this USB device"
+			return 0
+		fi
+		n=$((n + 1))
+		if [ "$PEER_WAIT_ATTEMPTS" -gt 0 ] && [ "$n" -ge "$PEER_WAIT_ATTEMPTS" ]; then
+			log "previous board did not connect; not opening USB ($PEER_LOG)"
+			exit 1
+		fi
+		if [ "$PEER_LOG_EVERY" -gt 0 ] && [ $((n % PEER_LOG_EVERY)) -eq 0 ]; then
+			log "waiting for previous board to connect before opening USB ($PEER_LOG)"
+		fi
+		sleep "$PEER_WAIT_INTERVAL"
+	done
+}
 
-cmd=("$HW_VDF_CLIENT" --freq "$FREQ")
-[ -n "$VOLTAGE" ] && cmd+=(--voltage "$VOLTAGE")
-cmd+=(--vdf-threads "$VDF_THREADS" --proof-threads "$PROOF_THREADS")
-[ "$RETAIN_ASIC_VALUES" = "1" ] && cmd+=(--retain-asic-values)
-cmd+=(
-	--checkpoint-threshold "$CHECKPOINT_THRESHOLD"
-	--vdfs-mask "$VDFS_MASK"
-	--expected-serial "$SERIAL"
-	--ip "$IP"
-	"$PORT"
-	"$N_VDFS"
-)
-# exec keeps hw_vdf_client as the launchd-tracked PID (SIGTERM goes straight to it).
-exec "${cmd[@]}" > >({{ chia_darwin_bin_dir | quote }}/rotpipe.py "$LOG" {{ chia_darwin_rotpipe_max_bytes | quote }} {{ chia_darwin_rotpipe_backups | quote }}) 2>&1
+if [ -z "${CHIA_HW_VDF_SOURCE_ONLY:-}" ]; then
+	wait_for_db_volume
+	wait_for_listen "$PORT" # timelord vdf_server must be up (hw_vdf_client exits if it can't connect)
+	wait_for_previous_board
+	sleep {{ chia_darwin_hw_vdf_settle_seconds | int }}
+
+	log "starting hw_vdf_client freq=$FREQ voltage=$VOLTAGE vdf-threads=$VDF_THREADS proof-threads=$PROOF_THREADS mask=$VDFS_MASK serial=$SERIAL device-loc=${DEVICE_LOC:-first} -> $IP:$PORT x$N_VDFS" >>"$LOG"
+	log "$OPEN_MARKER device-loc=${DEVICE_LOC:-first} serial=$SERIAL" >>"$LOG"
+
+	cmd=("$HW_VDF_CLIENT" --freq "$FREQ")
+	[ -n "$VOLTAGE" ] && cmd+=(--voltage "$VOLTAGE")
+	cmd+=(--vdf-threads "$VDF_THREADS" --proof-threads "$PROOF_THREADS")
+	[ "$RETAIN_ASIC_VALUES" = "1" ] && cmd+=(--retain-asic-values)
+	cmd+=(--checkpoint-threshold "$CHECKPOINT_THRESHOLD" --vdfs-mask "$VDFS_MASK")
+	[ -n "$DEVICE_LOC" ] && cmd+=(--device-loc "$DEVICE_LOC")
+	cmd+=(--expected-serial "$SERIAL" --ip "$IP" "$PORT" "$N_VDFS")
+	# exec keeps hw_vdf_client as the launchd-tracked PID (SIGTERM goes straight to it).
+	exec "${cmd[@]}" > >({{ chia_darwin_bin_dir | quote }}/rotpipe.py "$LOG" {{ chia_darwin_rotpipe_max_bytes | quote }} {{ chia_darwin_rotpipe_backups | quote }}) 2>&1
+fi

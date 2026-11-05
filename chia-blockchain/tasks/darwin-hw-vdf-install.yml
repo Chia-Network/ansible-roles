@@ -1,0 +1,16 @@
+---
+# Render one wrapper per enabled board from darwin/chia-hw-vdf-run.sh.j2.
+- name: Install enabled hw_vdf wrappers
+  become: "{{ chia_darwin_launchd_become | bool }}"
+  become_user: "{{ user }}"
+  ansible.builtin.template:
+    src: darwin/chia-hw-vdf-run.sh.j2
+    dest: "{{ item.wrapper }}"
+    mode: "0755"
+  vars:
+    chia_hw_board: "{{ item.board }}"
+  loop: "{{ chia_darwin_hw_vdf_jobs }}"
+  loop_control:
+    label: "{{ item.wrapper }}"
+  when: item.enabled | bool
+  notify: restart-chia-darwin

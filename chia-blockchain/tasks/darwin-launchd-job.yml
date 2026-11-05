@@ -3,21 +3,21 @@
 # launchd has no Requires/After, so start order is whatever bootstraps first;
 # the zsh wrappers wait for the daemon port and the timelord VDF port.
 - name: Install LaunchDaemon plist {{ chia_job.label }}
-  become: true
+  become: "{{ chia_darwin_launchd_become | bool }}"
   ansible.builtin.template:
     src: darwin/launchdaemon.plist.j2
-    dest: "/Library/LaunchDaemons/{{ chia_job.label }}.plist"
-    owner: root
-    group: wheel
+    dest: "{{ chia_darwin_launchd_dir }}/{{ chia_job.label }}.plist"
+    owner: "{{ 'root' if (chia_darwin_launchd_become | bool) else omit }}"
+    group: "{{ 'wheel' if (chia_darwin_launchd_become | bool) else omit }}"
     mode: "0644"
   when: chia_job.enabled | bool
   notify: restart-chia-darwin
 
 - name: Check whether LaunchDaemon is loaded {{ chia_job.label }}
-  become: true
+  become: "{{ chia_darwin_launchd_become | bool }}"
   ansible.builtin.command:
     argv:
-      - launchctl
+      - "{{ chia_darwin_launchctl }}"
       - print
       - "system/{{ chia_job.label }}"
   register: chia_darwin_launchd_loaded
@@ -25,10 +25,10 @@
   failed_when: false
 
 - name: Bootout LaunchDaemon {{ chia_job.label }}
-  become: true
+  become: "{{ chia_darwin_launchd_become | bool }}"
   ansible.builtin.command:
     argv:
-      - launchctl
+      - "{{ chia_darwin_launchctl }}"
       - bootout
       - "system/{{ chia_job.label }}"
   when:
@@ -39,17 +39,17 @@
   failed_when: false
 
 - name: Remove retired LaunchDaemon plist {{ chia_job.label }}
-  become: true
+  become: "{{ chia_darwin_launchd_become | bool }}"
   ansible.builtin.file:
-    path: "/Library/LaunchDaemons/{{ chia_job.label }}.plist"
+    path: "{{ chia_darwin_launchd_dir }}/{{ chia_job.label }}.plist"
     state: absent
   when: not (chia_job.enabled | bool)
 
 - name: Enable LaunchDaemon at boot {{ chia_job.label }}
-  become: true
+  become: "{{ chia_darwin_launchd_become | bool }}"
   ansible.builtin.command:
     argv:
-      - launchctl
+      - "{{ chia_darwin_launchctl }}"
       - enable
       - "system/{{ chia_job.label }}"
   when:
@@ -58,13 +58,13 @@
   changed_when: false
 
 - name: Bootstrap LaunchDaemon {{ chia_job.label }}
-  become: true
+  become: "{{ chia_darwin_launchd_become | bool }}"
   ansible.builtin.command:
     argv:
-      - launchctl
+      - "{{ chia_darwin_launchctl }}"
       - bootstrap
       - system
-      - "/Library/LaunchDaemons/{{ chia_job.label }}.plist"
+      - "{{ chia_darwin_launchd_dir }}/{{ chia_job.label }}.plist"
   register: chia_darwin_launchd_bootstrap
   changed_when: true
   when:
@@ -78,10 +78,10 @@
   when: chia_darwin_launchd_bootstrap.changed | default(false)
 
 - name: Disable LaunchDaemon at boot {{ chia_job.label }}
-  become: true
+  become: "{{ chia_darwin_launchd_become | bool }}"
   ansible.builtin.command:
     argv:
-      - launchctl
+      - "{{ chia_darwin_launchctl }}"
       - disable
       - "system/{{ chia_job.label }}"
   when: not ((chia_job.enabled | bool) and (chia_darwin_start_on_boot | bool))
