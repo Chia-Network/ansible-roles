@@ -1,0 +1,23 @@
+---
+# Shared identity, fixtures, and fake tool paths for the Darwin database seed
+# tests. These tasks never touch S3, launchd, or a real Mac.
+- name: Set the test identity, fixtures, and tool paths
+  ansible.builtin.set_fact:
+    test_user: "{{ lookup('env', 'USER') }}"
+    test_group: "{{ lookup('pipe', 'id -gn') }}"
+    user: "{{ lookup('env', 'USER') }}"
+    chia_darwin_group: "{{ lookup('pipe', 'id -gn') }}"
+    chia_darwin_home: "{{ test_root }}/home"
+    chia_darwin_aws: "{{ test_root }}/bin/aws"
+    chia_darwin_brew: "{{ test_root }}/bin/brew-not-used"
+    chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
+    chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+    chia_darwin_launchd_prefix: net.chia.seedtest
+    chia_darwin_db_volume: "{{ test_root }}/Volumes/Chia DB"
+    chia_darwin_db_seed_become: false
+    chia_darwin_db_seed_stub_bytes: 10240
+    external_volume: "{{ test_root }}/Volumes/Chia DB"
+    external_root: "{{ test_root }}/Volumes/Chia DB/dot-chia"
+    fixture_main: "{{ 'M' * 20000 }}"
+    fixture_h2h: "height-to-hash fixture"
+    fixture_ses: "sub-epoch-summaries fixture"

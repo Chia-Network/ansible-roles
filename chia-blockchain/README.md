@@ -16,21 +16,21 @@ node keeps its normal syncing behavior.
 
 The Darwin seed reuses the existing Linux variables:
 
-| Variable | Purpose |
-| --- | --- |
-| `download_blockchain_db` | Enables initial database seeding. Defaults to `true`. |
-| `blockchain_backup_bucket` | S3 bucket holding `<network>/` snapshots. Defaults to empty, which skips seeding. |
-| `network` | Selects the S3 prefix and the `blockchain_<db_version>_<network>.sqlite` filename. |
-| `db_version` | Database version in the filename. Defaults to `v2`. |
+| Variable                   | Purpose                                                                            |
+| -------------------------- | ---------------------------------------------------------------------------------- |
+| `download_blockchain_db`   | Enables initial database seeding. Defaults to `true`.                              |
+| `blockchain_backup_bucket` | S3 bucket holding `<network>/` snapshots. Defaults to empty, which skips seeding.  |
+| `network`                  | Selects the S3 prefix and the `blockchain_<db_version>_<network>.sqlite` filename. |
+| `db_version`               | Database version in the filename. Defaults to `v2`.                                |
 
 Darwin-specific settings:
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `chia_darwin_aws` | `/opt/homebrew/bin/aws` | AWS CLI binary used by the seed. |
-| `chia_darwin_awscli_formula` | `awscli` | Homebrew formula installed when seeding is needed and the binary is missing. |
-| `chia_darwin_db_seed_stub_bytes` | `10240` | Largest regular file treated as a `chia init` stub. |
-| `chia_darwin_mount_binary` | `/sbin/mount` | Command used to confirm the external volume is mounted. |
+| Variable                         | Default                 | Purpose                                                                      |
+| -------------------------------- | ----------------------- | ---------------------------------------------------------------------------- |
+| `chia_darwin_aws`                | `/opt/homebrew/bin/aws` | AWS CLI binary used by the seed.                                             |
+| `chia_darwin_awscli_formula`     | `awscli`                | Homebrew formula installed when seeding is needed and the binary is missing. |
+| `chia_darwin_db_seed_stub_bytes` | `10240`                 | Largest regular file treated as a `chia init` stub.                          |
+| `chia_darwin_mount_binary`       | `/sbin/mount`           | Command used to confirm the external volume is mounted.                      |
 
 ### Prerequisites and credentials
 

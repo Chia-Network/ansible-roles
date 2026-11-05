@@ -13,9 +13,11 @@
 - name: Resolve the Darwin S3 database seed settings
   ansible.builtin.set_fact:
     chia_darwin_db_seed_enabled: >-
-      {{ (chia_darwin_topology in ['local-internal', 'local-external']) and
-         (download_blockchain_db | bool) and
-         (blockchain_backup_bucket | length > 0) }}
+      {{
+        (chia_darwin_topology in ['local-internal', 'local-external']) and
+        (download_blockchain_db | bool) and
+        (blockchain_backup_bucket | length > 0)
+      }}
     chia_darwin_db_seed_db_dir: "{{ chia_root }}/db"
     chia_darwin_db_seed_main_name: "blockchain_{{ db_version }}_{{ network }}.sqlite"
     chia_darwin_db_seed_staging_dir: "{{ chia_root }}/db/.chia-s3-seed-{{ network }}"
@@ -34,11 +36,17 @@
 - name: Decide whether the Darwin database needs an initial seed
   ansible.builtin.set_fact:
     chia_darwin_db_seed_needed: >-
-      {{ (chia_darwin_db_seed_enabled | bool) and
-         ((not (chia_darwin_db_seed_main.stat.exists | default(false))) or
-          ((chia_darwin_db_seed_main.stat.isreg | default(false)) and
-           ((chia_darwin_db_seed_main.stat.size | default(0) | int) <=
-            (chia_darwin_db_seed_stub_bytes | int)))) }}
+      {{
+        (chia_darwin_db_seed_enabled | bool) and
+        (
+          not (chia_darwin_db_seed_main.stat.exists | default(false)) or
+          (
+            (chia_darwin_db_seed_main.stat.isreg | default(false)) and
+            (chia_darwin_db_seed_main.stat.size | default(0) | int)
+            <= (chia_darwin_db_seed_stub_bytes | int)
+          )
+        )
+      }}
 
 - name: Explain why an existing Darwin database will not be replaced
   ansible.builtin.debug:
