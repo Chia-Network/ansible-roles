@@ -350,7 +350,7 @@ chia_darwin_etc_dir: "{{ chia_darwin_home }}/etc"
 chia_darwin_log_dir: "{{ chia_darwin_home }}/Library/Logs/chia"
 chia_darwin_env_script: "{{ chia_darwin_bin_dir }}/chia-env.sh"
 chia_darwin_pip_package: chia-blockchain
-# Empty installs the current release. Pin this on a production timelord.
+# Required. Pin this to the chia-blockchain release to run.
 chia_darwin_pip_version: ""
 chia_darwin_pip_extra_index: https://pypi.chia.net/simple
 # brew tap name for github.com/Chia-Network/homebrew-chia
@@ -399,11 +399,12 @@ chia_darwin_hw_vdf_settle_seconds: 3
 chia_darwin_rotpipe_max_bytes: 52428800
 chia_darwin_rotpipe_backups: 5
 chia_darwin_pmset_apply: true
-chia_darwin_pmset_sleep: 0
-chia_darwin_pmset_disksleep: 0
-chia_darwin_pmset_womp: 1
-chia_darwin_pmset_autorestart: 1
-chia_darwin_pmset_tcpkeepalive: 1
+chia_darwin_pmset:
+  sleep: 0
+  disksleep: 0
+  womp: 1
+  autorestart: 1
+  tcpkeepalive: 1
 chia_darwin_emit_pppc: true
 chia_darwin_pppc_dest: "{{ chia_darwin_etc_dir }}/chia-timelord-fda.mobileconfig"
 chia_darwin_fda_note_dest: "{{ chia_darwin_etc_dir }}/FULL-DISK-ACCESS.txt"
@@ -411,6 +412,3 @@ chia_darwin_pppc_identifier: net.chia.timelord.fda
 chia_darwin_pppc_payload_uuid: 6f2c1a84-7b3e-4d19-9c5a-1e8d4f0a7b22
 chia_darwin_pppc_profile_uuid: c4a91e57-2d08-4f6b-b731-9a0e5c8d14f6
 chia_darwin_pppc_code_requirement: 'identifier "com.apple.zsh" and anchor apple'
-# The blockchain DB is large and the reference host already has one on the
-# external volume. Linux still defaults download_blockchain_db to true.
-chia_darwin_download_blockchain_db: false

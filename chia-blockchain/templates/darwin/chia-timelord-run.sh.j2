@@ -1,7 +1,10 @@
 #!/bin/zsh
 # Managed by the chia-blockchain Ansible role.
-. "{{ chia_darwin_env_script }}"
+. {{ chia_darwin_env_script | quote }}
 wait_for_db_volume
-wait_for_listen {{ chia_daemon_port }} # chia daemon
-log "starting chia_timelord (vdf_server on :{{ chia_timelord_launcher_port }}, full node peer {{ chia_timelord_full_node_peer_host }}:{{ full_node_port }})"
-exec "{{ chia_darwin_venv }}/bin/chia_timelord"
+wait_for_listen {{ chia_daemon_port | string | quote }} # chia daemon
+LAUNCHER_PORT={{ chia_timelord_launcher_port | string | quote }}
+PEER_HOST={{ chia_timelord_full_node_peer_host | quote }}
+FULL_NODE_PORT={{ full_node_port | string | quote }}
+log "starting chia_timelord (vdf_server on :$LAUNCHER_PORT, full node peer $PEER_HOST:$FULL_NODE_PORT)"
+exec {{ chia_darwin_venv | quote }}/bin/chia_timelord

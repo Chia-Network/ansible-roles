@@ -11,7 +11,7 @@
     group: wheel
     mode: "0644"
   when: chia_job.enabled | bool
-  register: chia_darwin_plist
+  notify: restart-chia-darwin
 
 - name: Check whether LaunchDaemon is loaded {{ chia_job.label }}
   become: true
@@ -33,7 +33,7 @@
       - "system/{{ chia_job.label }}"
   when:
     - chia_darwin_launchd_loaded.rc == 0
-    - (not (chia_job.enabled | bool)) or (not (chia_darwin_start_now | bool)) or (chia_darwin_plist.changed | default(false) | bool)
+    - (not (chia_job.enabled | bool)) or (not (chia_darwin_start_now | bool))
   register: chia_darwin_bootout
   changed_when: chia_darwin_bootout.rc == 0
   failed_when: false
@@ -45,20 +45,6 @@
     state: absent
   when: not (chia_job.enabled | bool)
 
-- name: Bootstrap LaunchDaemon {{ chia_job.label }}
-  become: true
-  ansible.builtin.command:
-    argv:
-      - launchctl
-      - bootstrap
-      - system
-      - "/Library/LaunchDaemons/{{ chia_job.label }}.plist"
-  changed_when: true
-  when:
-    - chia_job.enabled | bool
-    - chia_darwin_start_now | bool
-    - (chia_darwin_launchd_loaded.rc != 0) or (chia_darwin_plist.changed | default(false) | bool) or (chia_darwin_bootout.changed | default(false) | bool)
-
 - name: Enable LaunchDaemon at boot {{ chia_job.label }}
   become: true
   ansible.builtin.command:
@@ -68,8 +54,28 @@
       - "system/{{ chia_job.label }}"
   when:
     - chia_job.enabled | bool
-    - chia_darwin_start_on_boot | bool
+    - (chia_darwin_start_now | bool) or (chia_darwin_start_on_boot | bool)
   changed_when: false
+
+- name: Bootstrap LaunchDaemon {{ chia_job.label }}
+  become: true
+  ansible.builtin.command:
+    argv:
+      - launchctl
+      - bootstrap
+      - system
+      - "/Library/LaunchDaemons/{{ chia_job.label }}.plist"
+  register: chia_darwin_launchd_bootstrap
+  changed_when: true
+  when:
+    - chia_job.enabled | bool
+    - chia_darwin_start_now | bool
+    - chia_darwin_launchd_loaded.rc != 0
+
+- name: Record freshly bootstrapped LaunchDaemons
+  ansible.builtin.set_fact:
+    chia_darwin_fresh_bootstraps: "{{ (chia_darwin_fresh_bootstraps | default([])) + [chia_job.label] }}"
+  when: chia_darwin_launchd_bootstrap.changed | default(false)
 
 - name: Disable LaunchDaemon at boot {{ chia_job.label }}
   become: true

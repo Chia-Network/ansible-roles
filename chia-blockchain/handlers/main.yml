@@ -24,15 +24,8 @@
   until: systemd_action is success
 
 - name: restart-chia-darwin
-  become: true
-  ansible.builtin.command:
-    argv:
-      - launchctl
-      - kickstart
-      - -k
-      - "system/{{ item.label }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/darwin-restart-job.yml"
   loop: "{{ chia_darwin_launchd_jobs }}"
-  changed_when: true
-  when:
-    - chia_darwin_start_now | bool
-    - item.enabled | bool
+  loop_control:
+    loop_var: chia_job
+    label: "{{ chia_job.label }}"

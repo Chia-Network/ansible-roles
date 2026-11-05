@@ -11,25 +11,25 @@
     profile is delivered by MDM (user-approved MDM or Automated Device
     Enrollment). Opening this file in System Settings does not grant access.
 
-    The LaunchDaemon wrappers are {{ chia_darwin_interpreter }} scripts. TCC
+    The LaunchDaemon wrappers are {{ chia_darwin_interpreter | e }} scripts. TCC
     attributes their file access to that interpreter, so the identifier is the
     interpreter path, not the script path. Granting Full Disk Access to
-    {{ chia_darwin_interpreter }} is broad: other jobs that start via the same
+    {{ chia_darwin_interpreter | e }} is broad: other jobs that start via the same
     interpreter inherit it. That is the deployment that has been running.
   -->
   <key>PayloadContent</key>
   <array>
     <dict>
       <key>PayloadDescription</key>
-      <string>Full Disk Access for the Chia timelord LaunchDaemon interpreter ({{ chia_darwin_interpreter }}).</string>
+      <string>Full Disk Access for the Chia timelord LaunchDaemon interpreter ({{ chia_darwin_interpreter | e }}).</string>
       <key>PayloadDisplayName</key>
       <string>Chia timelord Full Disk Access</string>
       <key>PayloadIdentifier</key>
-      <string>{{ chia_darwin_pppc_identifier }}.payload</string>
+      <string>{{ chia_darwin_pppc_identifier | e }}.payload</string>
       <key>PayloadType</key>
       <string>com.apple.TCC.configuration-profile-policy</string>
       <key>PayloadUUID</key>
-      <string>{{ chia_darwin_pppc_payload_uuid }}</string>
+      <string>{{ chia_darwin_pppc_payload_uuid | e }}</string>
       <key>PayloadVersion</key>
       <integer>1</integer>
       <key>Services</key>
@@ -40,11 +40,11 @@
             <key>Allowed</key>
             <true/>
             <key>CodeRequirement</key>
-            <string>{{ chia_darwin_pppc_code_requirement }}</string>
+            <string>{{ chia_darwin_pppc_code_requirement | e }}</string>
             <key>Comment</key>
             <string>Shebang interpreter for net.chia timelord LaunchDaemons. Required to read an external CHIA_ROOT volume.</string>
             <key>Identifier</key>
-            <string>{{ chia_darwin_interpreter }}</string>
+            <string>{{ chia_darwin_interpreter | e }}</string>
             <key>IdentifierType</key>
             <string>path</string>
             <key>StaticCode</key>
@@ -59,7 +59,7 @@
   <key>PayloadDisplayName</key>
   <string>Chia timelord Full Disk Access</string>
   <key>PayloadIdentifier</key>
-  <string>{{ chia_darwin_pppc_identifier }}</string>
+  <string>{{ chia_darwin_pppc_identifier | e }}</string>
   <key>PayloadOrganization</key>
   <string>Chia Network</string>
   <key>PayloadRemovalDisallowed</key>
@@ -69,7 +69,7 @@
   <key>PayloadType</key>
   <string>Configuration</string>
   <key>PayloadUUID</key>
-  <string>{{ chia_darwin_pppc_profile_uuid }}</string>
+  <string>{{ chia_darwin_pppc_profile_uuid | e }}</string>
   <key>PayloadVersion</key>
   <integer>1</integer>
 </dict>
