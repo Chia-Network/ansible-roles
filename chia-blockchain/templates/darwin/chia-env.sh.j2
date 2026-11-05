@@ -22,22 +22,22 @@ log() { echo "$(date '+%Y-%m-%dT%H:%M:%S%z') [$(basename "${ZSH_ARGZERO:-$0}")] 
 # the interpreter ({{ chia_darwin_interpreter }}) needs FDA, and this role cannot grant it.
 wait_for_db_volume() {
 {% if chia_darwin_topology == 'local-external' %}
-  local n=0
-  until /sbin/mount | /usr/bin/grep -q " on ${CHIA_DB_VOLUME} " && [ -r "$CHIA_DB_MARKER" ]; do
-    [ $((n % {{ chia_darwin_wait_log_every | int }})) -eq 0 ] && log "mount=$(/sbin/mount | /usr/bin/grep -c " on ${CHIA_DB_VOLUME} ") ls=$(/bin/ls "{{ chia_darwin_volume_chia_dir }}" 2>&1 | /usr/bin/head -1) waiting for ${CHIA_DB_VOLUME} / ${CHIA_DB_MARKER} (readable by $(id -un))"
-    n=$((n + 1)); sleep {{ chia_darwin_wait_interval | int }}
-  done
+	local n=0
+	until /sbin/mount | /usr/bin/grep -q " on ${CHIA_DB_VOLUME} " && [ -r "$CHIA_DB_MARKER" ]; do
+		[ $((n % {{ chia_darwin_wait_log_every | int }})) -eq 0 ] && log "mount=$(/sbin/mount | /usr/bin/grep -c " on ${CHIA_DB_VOLUME} ") ls=$(/bin/ls "{{ chia_darwin_volume_chia_dir }}" 2>&1 | /usr/bin/head -1) waiting for ${CHIA_DB_VOLUME} / ${CHIA_DB_MARKER} (readable by $(id -un))"
+		n=$((n + 1)); sleep {{ chia_darwin_wait_interval | int }}
+	done
 {% else %}
-  return 0
+	return 0
 {% endif %}
 }
 
 # Block until something is LISTENing on localhost TCP port $1 (netstat, so we
 # do NOT open a connection to the Chia ports and upset the daemon/timelord).
 wait_for_listen() {
-  local port=$1 n=0
-  until /usr/sbin/netstat -an -p tcp | /usr/bin/grep -E "[.:]${port} .*LISTEN" >/dev/null; do
-    [ $((n % {{ chia_darwin_wait_log_every | int }})) -eq 0 ] && log "waiting for a listener on tcp/$port"
-    n=$((n + 1)); sleep {{ chia_darwin_wait_interval | int }}
-  done
+	local port=$1 n=0
+	until /usr/sbin/netstat -an -p tcp | /usr/bin/grep -E "[.:]${port} .*LISTEN" >/dev/null; do
+		[ $((n % {{ chia_darwin_wait_log_every | int }})) -eq 0 ] && log "waiting for a listener on tcp/$port"
+		n=$((n + 1)); sleep {{ chia_darwin_wait_interval | int }}
+	done
 }
