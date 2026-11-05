@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    PPPC (Privacy Preferences Policy Control) template.
+    This role writes the file and stops. It does not run `profiles`, does not
+    edit TCC.db, and does not toggle Full Disk Access.
+
+    On modern macOS a SystemPolicyAllFiles grant is applied only when the
+    profile is delivered by MDM (user-approved MDM or Automated Device
+    Enrollment). Opening this file in System Settings does not grant access.
+
+    The LaunchDaemon wrappers are {{ chia_darwin_interpreter }} scripts. TCC
+    attributes their file access to that interpreter, so the identifier is the
+    interpreter path, not the script path. Granting Full Disk Access to
+    {{ chia_darwin_interpreter }} is broad: other jobs that start via the same
+    interpreter inherit it. That is the deployment that has been running.
+  -->
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>PayloadDescription</key>
+      <string>Full Disk Access for the Chia timelord LaunchDaemon interpreter ({{ chia_darwin_interpreter }}).</string>
+      <key>PayloadDisplayName</key>
+      <string>Chia timelord Full Disk Access</string>
+      <key>PayloadIdentifier</key>
+      <string>{{ chia_darwin_pppc_identifier }}.payload</string>
+      <key>PayloadType</key>
+      <string>com.apple.TCC.configuration-profile-policy</string>
+      <key>PayloadUUID</key>
+      <string>{{ chia_darwin_pppc_payload_uuid }}</string>
+      <key>PayloadVersion</key>
+      <integer>1</integer>
+      <key>Services</key>
+      <dict>
+        <key>SystemPolicyAllFiles</key>
+        <array>
+          <dict>
+            <key>Allowed</key>
+            <true/>
+            <key>CodeRequirement</key>
+            <string>{{ chia_darwin_pppc_code_requirement }}</string>
+            <key>Comment</key>
+            <string>Shebang interpreter for net.chia timelord LaunchDaemons. Required to read an external CHIA_ROOT volume.</string>
+            <key>Identifier</key>
+            <string>{{ chia_darwin_interpreter }}</string>
+            <key>IdentifierType</key>
+            <string>path</string>
+            <key>StaticCode</key>
+            <false/>
+          </dict>
+        </array>
+      </dict>
+    </dict>
+  </array>
+  <key>PayloadDescription</key>
+  <string>MDM profile so Chia timelord LaunchDaemons can read an external CHIA_ROOT. Do not install by double-click. Does not modify TCC.db.</string>
+  <key>PayloadDisplayName</key>
+  <string>Chia timelord Full Disk Access</string>
+  <key>PayloadIdentifier</key>
+  <string>{{ chia_darwin_pppc_identifier }}</string>
+  <key>PayloadOrganization</key>
+  <string>Chia Network</string>
+  <key>PayloadRemovalDisallowed</key>
+  <false/>
+  <key>PayloadScope</key>
+  <string>System</string>
+  <key>PayloadType</key>
+  <string>Configuration</string>
+  <key>PayloadUUID</key>
+  <string>{{ chia_darwin_pppc_profile_uuid }}</string>
+  <key>PayloadVersion</key>
+  <integer>1</integer>
+</dict>
+</plist>

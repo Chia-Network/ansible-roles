@@ -1,0 +1,13 @@
+#!{{ chia_darwin_venv }}/bin/python3
+"""Read stdin, write to a size-rotated log file: rotpipe.py PATH [MAX_BYTES] [BACKUPS]"""
+import logging
+import sys
+from logging.handlers import RotatingFileHandler
+
+path = sys.argv[1]
+max_bytes = int(sys.argv[2]) if len(sys.argv) > 2 else 50 * 1024 * 1024
+backups = int(sys.argv[3]) if len(sys.argv) > 3 else 5
+handler = RotatingFileHandler(path, maxBytes=max_bytes, backupCount=backups)
+handler.terminator = ""
+for line in sys.stdin:
+    handler.emit(logging.LogRecord("x", 20, "", 0, line, None, None))

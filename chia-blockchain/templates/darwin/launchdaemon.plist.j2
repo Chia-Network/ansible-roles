@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>{{ chia_job.label }}</string>
+  <key>UserName</key><string>{{ user }}</string>
+  <key>GroupName</key><string>{{ chia_darwin_group }}</string>
+  <key>ProgramArguments</key>
+  <array><string>{{ chia_job.wrapper }}</string></array>
+  <key>WorkingDirectory</key><string>{{ chia_darwin_home }}</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key><string>{{ chia_darwin_home }}</string>
+    <key>CHIA_ROOT</key><string>{{ chia_root }}</string>
+  </dict>
+  <key>RunAtLoad</key>{% if chia_darwin_start_on_boot | bool %}<true/>{% else %}<false/>{% endif %}
+
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>{{ chia_job.throttle | int }}</integer>
+  <key>ExitTimeOut</key><integer>{{ chia_job.exit_timeout | int }}</integer>
+  <key>ProcessType</key><string>{{ chia_darwin_process_type }}</string>
+  <key>SoftResourceLimits</key><dict><key>NumberOfFiles</key><integer>{{ chia_darwin_nofile | int }}</integer></dict>
+  <key>HardResourceLimits</key><dict><key>NumberOfFiles</key><integer>{{ chia_darwin_nofile | int }}</integer></dict>
+  <key>StandardOutPath</key><string>{{ chia_darwin_log_dir }}/{{ chia_job.name }}.out.log</string>
+  <key>StandardErrorPath</key><string>{{ chia_darwin_log_dir }}/{{ chia_job.name }}.err.log</string>
+</dict>
+</plist>

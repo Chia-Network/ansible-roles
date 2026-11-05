@@ -1,0 +1,82 @@
+---
+# One LaunchDaemon. Included once per entry in chia_darwin_launchd_jobs.
+# launchd has no Requires/After, so start order is whatever bootstraps first;
+# the zsh wrappers wait for the daemon port and the timelord VDF port.
+- name: Install LaunchDaemon plist {{ chia_job.label }}
+  become: true
+  ansible.builtin.template:
+    src: darwin/launchdaemon.plist.j2
+    dest: "/Library/LaunchDaemons/{{ chia_job.label }}.plist"
+    owner: root
+    group: wheel
+    mode: "0644"
+  when: chia_job.enabled | bool
+  register: chia_darwin_plist
+
+- name: Check whether LaunchDaemon is loaded {{ chia_job.label }}
+  become: true
+  ansible.builtin.command:
+    argv:
+      - launchctl
+      - print
+      - "system/{{ chia_job.label }}"
+  register: chia_darwin_launchd_loaded
+  changed_when: false
+  failed_when: false
+
+- name: Bootout LaunchDaemon {{ chia_job.label }}
+  become: true
+  ansible.builtin.command:
+    argv:
+      - launchctl
+      - bootout
+      - "system/{{ chia_job.label }}"
+  when:
+    - chia_darwin_launchd_loaded.rc == 0
+    - (not (chia_job.enabled | bool)) or (not (chia_darwin_start_now | bool)) or (chia_darwin_plist.changed | default(false) | bool)
+  register: chia_darwin_bootout
+  changed_when: chia_darwin_bootout.rc == 0
+  failed_when: false
+
+- name: Remove retired LaunchDaemon plist {{ chia_job.label }}
+  become: true
+  ansible.builtin.file:
+    path: "/Library/LaunchDaemons/{{ chia_job.label }}.plist"
+    state: absent
+  when: not (chia_job.enabled | bool)
+
+- name: Bootstrap LaunchDaemon {{ chia_job.label }}
+  become: true
+  ansible.builtin.command:
+    argv:
+      - launchctl
+      - bootstrap
+      - system
+      - "/Library/LaunchDaemons/{{ chia_job.label }}.plist"
+  changed_when: true
+  when:
+    - chia_job.enabled | bool
+    - chia_darwin_start_now | bool
+    - (chia_darwin_launchd_loaded.rc != 0) or (chia_darwin_plist.changed | default(false) | bool) or (chia_darwin_bootout.changed | default(false) | bool)
+
+- name: Enable LaunchDaemon at boot {{ chia_job.label }}
+  become: true
+  ansible.builtin.command:
+    argv:
+      - launchctl
+      - enable
+      - "system/{{ chia_job.label }}"
+  when:
+    - chia_job.enabled | bool
+    - chia_darwin_start_on_boot | bool
+  changed_when: false
+
+- name: Disable LaunchDaemon at boot {{ chia_job.label }}
+  become: true
+  ansible.builtin.command:
+    argv:
+      - launchctl
+      - disable
+      - "system/{{ chia_job.label }}"
+  when: not ((chia_job.enabled | bool) and (chia_darwin_start_on_boot | bool))
+  changed_when: false

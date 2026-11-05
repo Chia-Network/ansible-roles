@@ -292,3 +292,125 @@ chia_periodic_connect_peers: []
 
 # Set to false to limit connections to trusted nodes only (like localhost)
 chia_wallet_connect_to_unknown_peers: true
+
+# ---------------------------------------------------------------------------
+# Darwin (Apple Silicon) ASIC timelord. Unused on Linux.
+#
+# Linux keeps its own hw_vdf defaults and the systemd argv in
+# templates/systemd/chia-hw-vdf.service.j2 (freq 1100, 16 vdf threads, 14 proof
+# threads, no --voltage, --retain-asic-values, --checkpoint-threshold, or
+# --expected-serial). Do not point the Linux unit at the chia_darwin_hw_vdf_*
+# variables.
+#
+# chia_darwin_topology:
+#   local-internal   Local full node and timelord. CHIA_ROOT is a real directory
+#                    on the internal disk. Wrappers do not wait for a volume.
+#   local-external   Local full node and timelord. ~/.chia is a symlink to
+#                    <chia_darwin_db_volume>/dot-chia (the reference M6 layout,
+#                    /Volumes/Chia-DB). Wrappers wait until the volume is
+#                    mounted and the config file is readable. The wrapper
+#                    interpreter needs Full Disk Access; see the note this role
+#                    writes under the service user's etc directory. This role
+#                    does not edit TCC.db and does not install the profile.
+#   remote-node      No local full node (Apple internal storage is the wrong
+#                    place for a blockchain DB). Timelord still runs locally and
+#                    peers with chia_timelord_full_node_peer_host:full_node_port.
+#                    CHIA_ROOT stays on the internal disk. On chia 2.7.1 and
+#                    later the remote full node accepts inbound timelords only
+#                    from localhost or exempt_peer_networks, so that node must
+#                    list this Mac.
+#
+# Network: the same `network` variable as Linux (mainnet or testnet11). Darwin
+# CHIA_ROOT defaults to ~/.chia/<network>, so the two networks do not share a
+# directory. testnet11 full nodes listen on 58444; set full_node_port and
+# introducer_peer in inventory. Those Linux defaults are intentionally not
+# overridden here. Run a second network under a different
+# chia_darwin_launchd_prefix so the LaunchDaemon labels do not collide.
+#
+# Connection: SSH as an admin who can sudo and who owns the Homebrew prefix.
+# `user` is the dedicated non-admin service account the LaunchDaemons run as
+# (the reference uses timelord). Leaving `user` at the Linux default `ubuntu`
+# is refused. Homebrew itself is not installed by this role.
+#
+# chia_darwin_enable_hw_vdf is independent of chia_enable_hw_vdf. The Linux
+# flag still selects apt chiavdf-hw and monit, and stays false by default.
+# ---------------------------------------------------------------------------
+chia_darwin_topology: local-external
+chia_darwin_enable_hw_vdf: true
+chia_darwin_group: staff
+chia_darwin_home: "/Users/{{ user }}"
+chia_darwin_root: "{{ chia_darwin_home }}/.chia/{{ network }}"
+chia_darwin_homebrew_prefix: /opt/homebrew
+chia_darwin_brew: "{{ chia_darwin_homebrew_prefix }}/bin/brew"
+chia_darwin_python_formula: python@3.13
+chia_darwin_python: "{{ chia_darwin_homebrew_prefix }}/opt/python@3.13/bin/python3.13"
+chia_darwin_venv: "{{ chia_darwin_home }}/chia-venv"
+chia_darwin_bin_dir: "{{ chia_darwin_home }}/bin"
+chia_darwin_etc_dir: "{{ chia_darwin_home }}/etc"
+chia_darwin_log_dir: "{{ chia_darwin_home }}/Library/Logs/chia"
+chia_darwin_env_script: "{{ chia_darwin_bin_dir }}/chia-env.sh"
+chia_darwin_pip_package: chia-blockchain
+# Empty installs the current release. Pin this on a production timelord.
+chia_darwin_pip_version: ""
+chia_darwin_pip_extra_index: https://pypi.chia.net/simple
+# brew tap name for github.com/Chia-Network/homebrew-chia
+chia_darwin_chiavdf_tap: Chia-Network/chia
+chia_darwin_chiavdf_formula: chiavdf
+# Empty skips the version assert. 1.2.2 is the formula the reference host runs.
+chia_darwin_chiavdf_version: "1.2.2"
+chia_darwin_hw_vdf_client: "{{ chia_darwin_homebrew_prefix }}/bin/hw_vdf_client"
+chia_darwin_db_volume: /Volumes/Chia-DB
+chia_darwin_volume_chia_dir: "{{ chia_darwin_db_volume }}/dot-chia"
+chia_darwin_db_marker: "{{ chia_darwin_volume_chia_dir }}/{{ network }}/config/config.yaml"
+chia_darwin_wait_interval: 5
+chia_darwin_wait_log_every: 12
+chia_darwin_launchd_prefix: net.chia.timelord
+chia_darwin_process_type: Interactive
+chia_darwin_nofile: 60000
+chia_darwin_start_now: "{{ start_now }}"
+chia_darwin_start_on_boot: "{{ start_on_boot }}"
+chia_darwin_daemon_throttle_interval: 15
+chia_darwin_daemon_exit_timeout: 60
+chia_darwin_full_node_throttle_interval: 30
+chia_darwin_full_node_exit_timeout: 300
+chia_darwin_timelord_throttle_interval: 15
+chia_darwin_timelord_exit_timeout: 60
+chia_darwin_hw_vdf_throttle_interval: 15
+chia_darwin_hw_vdf_exit_timeout: 30
+# Software VDF launcher is not installed. Zero keeps a manual launcher from
+# spawning CPU clients next to the ASIC.
+chia_darwin_process_count: 0
+chia_darwin_interpreter: /bin/zsh
+# hw_vdf_client argv. Linux does not use these.
+chia_darwin_hw_vdf_freq: 1540
+chia_darwin_hw_vdf_voltage: "1.0"
+chia_darwin_hw_vdf_vdf_threads: 12
+chia_darwin_hw_vdf_proof_threads: 11
+chia_darwin_hw_vdf_checkpoint_threshold: 500000
+chia_darwin_hw_vdf_mask: 7
+chia_darwin_hw_num_vdfs: "{{ '1' if (chia_darwin_hw_vdf_mask | int) in [1, 2, 4] else ('2' if (chia_darwin_hw_vdf_mask | int) in [3, 5, 6] else '3') }}"
+chia_darwin_hw_vdf_retain_asic_values: true
+# Per-board. Required when the ASIC client is enabled. Not given a default
+# because the reference serial belongs to one board.
+chia_darwin_hw_vdf_expected_serial: ""
+chia_darwin_hw_vdf_ip: 127.0.0.1
+chia_darwin_hw_vdf_port: "{{ chia_timelord_launcher_port }}"
+chia_darwin_hw_vdf_settle_seconds: 3
+chia_darwin_rotpipe_max_bytes: 52428800
+chia_darwin_rotpipe_backups: 5
+chia_darwin_pmset_apply: true
+chia_darwin_pmset_sleep: 0
+chia_darwin_pmset_disksleep: 0
+chia_darwin_pmset_womp: 1
+chia_darwin_pmset_autorestart: 1
+chia_darwin_pmset_tcpkeepalive: 1
+chia_darwin_emit_pppc: true
+chia_darwin_pppc_dest: "{{ chia_darwin_etc_dir }}/chia-timelord-fda.mobileconfig"
+chia_darwin_fda_note_dest: "{{ chia_darwin_etc_dir }}/FULL-DISK-ACCESS.txt"
+chia_darwin_pppc_identifier: net.chia.timelord.fda
+chia_darwin_pppc_payload_uuid: 6f2c1a84-7b3e-4d19-9c5a-1e8d4f0a7b22
+chia_darwin_pppc_profile_uuid: c4a91e57-2d08-4f6b-b731-9a0e5c8d14f6
+chia_darwin_pppc_code_requirement: 'identifier "com.apple.zsh" and anchor apple'
+# The blockchain DB is large and the reference host already has one on the
+# external volume. Linux still defaults download_blockchain_db to true.
+chia_darwin_download_blockchain_db: false

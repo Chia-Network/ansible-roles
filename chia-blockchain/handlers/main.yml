@@ -22,3 +22,17 @@
   register: systemd_action
   retries: 10
   until: systemd_action is success
+
+- name: restart-chia-darwin
+  become: true
+  ansible.builtin.command:
+    argv:
+      - launchctl
+      - kickstart
+      - -k
+      - "system/{{ item.label }}"
+  loop: "{{ chia_darwin_launchd_jobs }}"
+  changed_when: true
+  when:
+    - chia_darwin_start_now | bool
+    - item.enabled | bool

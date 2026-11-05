@@ -1,14 +1,18 @@
 ---
 dependencies:
+  # Darwin installs with Homebrew and launchd, and does not use these Linux roles.
+  # On Linux the extra os_family test is true, so the conditions match the previous ones.
   - role: awscli
+    when: ansible_os_family != "Darwin"
   - role: logrotate
+    when: ansible_os_family != "Darwin"
   - role: disable-resolvd
-    when: '"crawler" in chia_enabled_services or "seeder" in chia_enabled_services'
+    when: ansible_os_family != "Darwin" and ("crawler" in chia_enabled_services or "seeder" in chia_enabled_services)
   - role: monit
-    when: add_monit_config or chia_add_hw_vdf_monit_config
+    when: ansible_os_family != "Darwin" and (add_monit_config or chia_add_hw_vdf_monit_config)
   - role: chia-apt-key
-    when: 'chia_installation_method == "apt" or chia_enable_hw_vdf'
+    when: ansible_os_family != "Darwin" and (chia_installation_method == "apt" or chia_enable_hw_vdf)
   - role: git
-    when: chia_installation_method == "source"
+    when: ansible_os_family != "Darwin" and chia_installation_method == "source"
   - role: chia-healthcheck
-    when: chia_add_healthcheck_service
+    when: ansible_os_family != "Darwin" and chia_add_healthcheck_service
