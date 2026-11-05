@@ -337,7 +337,7 @@
           - "{{ chia_darwin_chiavdf_tap }}"
       when:
         - chia_darwin_enable_hw_vdf | bool
-        - chia_darwin_chiavdf_tap not in chia_darwin_brew_taps.stdout_lines
+        - (chia_darwin_chiavdf_tap | lower) not in (chia_darwin_brew_taps.stdout_lines | map('lower') | list)
       changed_when: true
 
     - name: Check whether chiavdf is installed
@@ -423,7 +423,7 @@
     version: "{{ chia_darwin_pip_version }}"
     state: present
     virtualenv: "{{ chia_darwin_venv }}"
-    extra_args: "--extra-index-url {{ chia_darwin_pip_extra_index }}"
+    extra_args: "--index-url {{ chia_darwin_pip_extra_index }}"
   environment:
     HOME: "{{ chia_darwin_home }}"
     CHIA_ROOT: "{{ chia_root }}"
@@ -464,56 +464,20 @@
 
 - name: Create the custom CA directory
   become: true
+  become_user: "{{ user }}"
   ansible.builtin.file:
     path: "{{ chia_darwin_home }}/chia-ca"
     state: directory
-    owner: "{{ user }}"
-    group: "{{ chia_darwin_group }}"
     mode: "0700"
-  when:
-    - chia_ca_crt | length > 0
-    - chia_ca_key | length > 0
-    - chia_private_ca_crt | length > 0
-    - chia_private_ca_key | length > 0
-
-- name: Read the installed custom CA certificate checksums
-  become: true
-  become_user: "{{ user }}"
-  ansible.builtin.stat:
-    path: "{{ item }}"
-    get_checksum: true
-    checksum_algorithm: sha1
-  loop:
-    - "{{ chia_root }}/config/ssl/ca/chia_ca.crt"
-    - "{{ chia_root }}/config/ssl/ca/private_ca.crt"
-  register: chia_darwin_ca_stat
-  when:
-    - chia_ca_crt | length > 0
-    - chia_ca_key | length > 0
-    - chia_private_ca_crt | length > 0
-    - chia_private_ca_key | length > 0
-
-- name: Compare the installed custom CA certificates with the configured CA
-  ansible.builtin.set_fact:
-    chia_darwin_ca_needs_update: >-
-      {{ (not (chia_darwin_ca_stat.results[0].stat.exists | default(false))) or
-          ((chia_darwin_ca_stat.results[0].stat.checksum | default('')) != (chia_ca_crt | hash('sha1'))) or
-          (not (chia_darwin_ca_stat.results[1].stat.exists | default(false))) or
-          ((chia_darwin_ca_stat.results[1].stat.checksum | default('')) != (chia_private_ca_crt | hash('sha1'))) }}
-  when:
-    - chia_ca_crt | length > 0
-    - chia_ca_key | length > 0
-    - chia_private_ca_crt | length > 0
-    - chia_private_ca_key | length > 0
+  when: chia_darwin_custom_ca | bool
 
 - name: Write custom CA files
   become: true
+  become_user: "{{ user }}"
   no_log: true
   ansible.builtin.copy:
     content: "{{ item.content }}"
     dest: "{{ chia_darwin_home }}/chia-ca/{{ item.filename }}"
-    owner: "{{ user }}"
-    group: "{{ chia_darwin_group }}"
     mode: "{{ item.mode }}"
   loop:
     - content: "{{ chia_ca_crt }}"
@@ -529,7 +493,7 @@
       filename: private_ca.key
       mode: "0600"
   register: chia_darwin_ca_content
-  when: chia_darwin_ca_needs_update | default(false) | bool
+  when: chia_darwin_custom_ca | bool
 
 - name: Initialize with the custom CA
   become: true
@@ -546,17 +510,6 @@
   when: chia_darwin_ca_content.changed | default(false)
   changed_when: true
   notify: restart-chia-darwin
-
-- name: Remove the custom CA private keys
-  become: true
-  no_log: true
-  ansible.builtin.file:
-    path: "{{ chia_darwin_home }}/chia-ca/{{ item }}"
-    state: absent
-  loop:
-    - chia_ca.key
-    - private_ca.key
-  when: chia_darwin_ca_content.changed | default(false)
 
 - name: Write the chia config
   become: true
@@ -643,6 +596,12 @@
   when: keys | length > 0
   register: chia_darwin_key_add
   changed_when: "'already' not in (chia_darwin_key_add.stdout | lower)"
+
+- name: Remove the retired hw-vdf env file
+  become: true
+  ansible.builtin.file:
+    path: "{{ chia_darwin_etc_dir }}/hw-vdf.env"
+    state: absent
 
 - name: Install LaunchDaemon wrapper scripts
   become: true
