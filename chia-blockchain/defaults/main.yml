@@ -56,6 +56,7 @@ chia_ca_crt: ""
 chia_ca_key: ""
 chia_private_ca_crt: ""
 chia_private_ca_key: ""
+chia_darwin_custom_ca: "{{ chia_ca_crt | length > 0 and chia_ca_key | length > 0 and chia_private_ca_crt | length > 0 and chia_private_ca_key | length > 0 }}"
 
 # The name of the bucket that blockchain backups can be found in
 blockchain_backup_bucket: ""

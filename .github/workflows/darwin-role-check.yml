@@ -25,7 +25,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y zsh shellcheck
-          python3 -m pip install --user ansible-core jinja2 pyyaml
+          python3 -m pip install --user ansible-core
 
       - name: Syntax check
         env:
@@ -33,7 +33,7 @@ jobs:
         run: ansible-playbook --syntax-check .github/ci/darwin-syntax-check.yml
 
       - name: Render Darwin templates
-        run: python3 .github/scripts/render_darwin_templates.py "$RUNNER_TEMP/darwin"
+        run: ansible-playbook -e render_out="$RUNNER_TEMP/darwin" .github/ci/darwin-render-templates.yml
 
       - name: Lint rendered output
         working-directory: ${{ runner.temp }}/darwin

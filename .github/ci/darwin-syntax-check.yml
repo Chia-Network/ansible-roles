@@ -1,5 +1,13 @@
 ---
 # Used by .github/workflows/darwin-role-check.yml for ansible-playbook --syntax-check.
+- name: Syntax check the Darwin tasks
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin.yml
+    - ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-launchd-job.yml
+    - ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-restart-job.yml
+
 - name: Syntax check the chia-blockchain role on Darwin
   hosts: localhost
   gather_facts: false

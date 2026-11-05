@@ -6,16 +6,16 @@
 # The FTDI D2XX driver is not installed by this role; the board will not enumerate without it.
 . {{ chia_darwin_env_script | quote }}
 
-FREQ={{ chia_darwin_hw_vdf_freq | string | quote }}
+FREQ={{ chia_darwin_hw_vdf_freq | quote }}
 VOLTAGE={{ chia_darwin_hw_vdf_voltage | quote }}
-VDF_THREADS={{ chia_darwin_hw_vdf_vdf_threads | string | quote }}
-PROOF_THREADS={{ chia_darwin_hw_vdf_proof_threads | string | quote }}
-CHECKPOINT_THRESHOLD={{ chia_darwin_hw_vdf_checkpoint_threshold | string | quote }}
-VDFS_MASK={{ chia_darwin_hw_vdf_mask | string | quote }}
+VDF_THREADS={{ chia_darwin_hw_vdf_vdf_threads | quote }}
+PROOF_THREADS={{ chia_darwin_hw_vdf_proof_threads | quote }}
+CHECKPOINT_THRESHOLD={{ chia_darwin_hw_vdf_checkpoint_threshold | quote }}
+VDFS_MASK={{ chia_darwin_hw_vdf_mask | quote }}
 N_VDFS={{ chia_darwin_hw_num_vdfs | quote }}
 SERIAL={{ chia_darwin_hw_vdf_expected_serial | quote }}
 IP={{ chia_darwin_hw_vdf_ip | quote }}
-PORT={{ chia_darwin_hw_vdf_port | string | quote }}
+PORT={{ chia_darwin_hw_vdf_port | quote }}
 RETAIN_ASIC_VALUES={{ 1 if chia_darwin_hw_vdf_retain_asic_values | bool else 0 }}
 HW_VDF_CLIENT={{ chia_darwin_hw_vdf_client | quote }}
 
@@ -39,4 +39,4 @@ cmd+=(
 	"$N_VDFS"
 )
 # exec keeps hw_vdf_client as the launchd-tracked PID (SIGTERM goes straight to it).
-exec "${cmd[@]}" > >({{ chia_darwin_bin_dir | quote }}/rotpipe.py "$LOG" {{ chia_darwin_rotpipe_max_bytes | string | quote }} {{ chia_darwin_rotpipe_backups | string | quote }}) 2>&1
+exec "${cmd[@]}" > >({{ chia_darwin_bin_dir | quote }}/rotpipe.py "$LOG" {{ chia_darwin_rotpipe_max_bytes | quote }} {{ chia_darwin_rotpipe_backups | quote }}) 2>&1
