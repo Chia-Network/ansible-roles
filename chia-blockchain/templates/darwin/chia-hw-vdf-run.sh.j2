@@ -22,23 +22,23 @@ HW_VDF_ENV="{{ chia_darwin_etc_dir }}/hw-vdf.env"
 [ -r "$HW_VDF_ENV" ] && . "$HW_VDF_ENV"
 
 wait_for_db_volume
-wait_for_listen "$PORT"   # timelord vdf_server must be up (hw_vdf_client exits if it can't connect)
+wait_for_listen "$PORT" # timelord vdf_server must be up (hw_vdf_client exits if it can't connect)
 sleep {{ chia_darwin_hw_vdf_settle_seconds | int }}
 
 LOG="{{ chia_darwin_log_dir }}/hw-vdf.log"
-log "starting hw_vdf_client freq=$FREQ voltage=$VOLTAGE vdf-threads=$VDF_THREADS proof-threads=$PROOF_THREADS mask=$VDFS_MASK serial=$SERIAL -> $IP:$PORT x$N_VDFS" >> "$LOG"
+log "starting hw_vdf_client freq=$FREQ voltage=$VOLTAGE vdf-threads=$VDF_THREADS proof-threads=$PROOF_THREADS mask=$VDFS_MASK serial=$SERIAL -> $IP:$PORT x$N_VDFS" >>"$LOG"
 
 cmd=("{{ chia_darwin_hw_vdf_client }}" --freq "$FREQ")
 [ -n "$VOLTAGE" ] && cmd+=(--voltage "$VOLTAGE")
 cmd+=(--vdf-threads "$VDF_THREADS" --proof-threads "$PROOF_THREADS")
 [ "$RETAIN_ASIC_VALUES" = "1" ] && cmd+=(--retain-asic-values)
 cmd+=(
-  --checkpoint-threshold "$CHECKPOINT_THRESHOLD"
-  --vdfs-mask "$VDFS_MASK"
-  --expected-serial "$SERIAL"
-  --ip "$IP"
-  "$PORT"
-  "$N_VDFS"
+	--checkpoint-threshold "$CHECKPOINT_THRESHOLD"
+	--vdfs-mask "$VDFS_MASK"
+	--expected-serial "$SERIAL"
+	--ip "$IP"
+	"$PORT"
+	"$N_VDFS"
 )
 # exec keeps hw_vdf_client as the launchd-tracked PID (SIGTERM goes straight to it).
 exec "${cmd[@]}" > >("{{ chia_darwin_bin_dir }}/rotpipe.py" "$LOG" "{{ chia_darwin_rotpipe_max_bytes }}" "{{ chia_darwin_rotpipe_backups }}") 2>&1
