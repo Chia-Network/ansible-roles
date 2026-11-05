@@ -1,0 +1,46 @@
+#!/bin/zsh
+# Managed by the chia-blockchain Ansible role.
+# Common environment + helpers for the Chia timelord LaunchDaemon wrappers.
+# Sourced by chia-*-run.sh. Mirrors the Linux units (CHIA_ROOT + venv PATH).
+# launchd has no unit dependencies, so each wrapper waits for what it needs.
+export HOME={{ chia_darwin_home | quote }}
+export CHIA_ROOT={{ chia_root | quote }}
+export PATH={{ chia_darwin_venv | quote }}/bin:{{ chia_darwin_homebrew_prefix | quote }}/bin:/usr/bin:/bin:/usr/sbin:/sbin
+export PYTHONUNBUFFERED=1
+cd "$HOME" || exit 1
+CHIA_WAIT_LOG_EVERY={{ chia_darwin_wait_log_every | int }}
+
+log() { echo "$(date '+%Y-%m-%dT%H:%M:%S%z') [$(basename "${ZSH_ARGZERO:-$0}")] $*"; }
+
+{% if chia_darwin_topology == 'local-external' %}
+CHIA_DB_VOLUME={{ chia_darwin_db_volume | quote }}
+CHIA_DB_MARKER={{ chia_darwin_db_marker | quote }}
+
+# Block until the external DB volume is mounted AND the config is readable.
+# (~/.chia is a symlink into it.) Keeps launchd from crash-looping at boot.
+# A mounted volume that is not readable is the usual Full Disk Access failure:
+# the interpreter ({{ chia_darwin_interpreter }}) needs FDA, and this role cannot grant it.
+wait_for_db_volume() {
+	local n=0
+	until /sbin/mount | /usr/bin/grep -q " on ${CHIA_DB_VOLUME} " && [ -r "$CHIA_DB_MARKER" ]; do
+		[ $((n % CHIA_WAIT_LOG_EVERY)) -eq 0 ] && log "mount=$(/sbin/mount | /usr/bin/grep -c " on ${CHIA_DB_VOLUME} ") ls=$(/bin/ls {{ chia_darwin_volume_chia_dir | quote }} 2>&1 | /usr/bin/head -1) waiting for ${CHIA_DB_VOLUME} / ${CHIA_DB_MARKER} (readable by $(id -un))"
+		n=$((n + 1))
+		sleep {{ chia_darwin_wait_interval | int }}
+	done
+}
+{% else %}
+wait_for_db_volume() {
+	return 0
+}
+{% endif %}
+
+# Block until something is LISTENing on localhost TCP port $1 (netstat, so we
+# do NOT open a connection to the Chia ports and upset the daemon/timelord).
+wait_for_listen() {
+	local port=$1 n=0
+	until /usr/sbin/netstat -an -p tcp | /usr/bin/grep -E "[.:]${port} .*LISTEN" >/dev/null; do
+		[ $((n % CHIA_WAIT_LOG_EVERY)) -eq 0 ] && log "waiting for a listener on tcp/$port"
+		n=$((n + 1))
+		sleep {{ chia_darwin_wait_interval | int }}
+	done
+}

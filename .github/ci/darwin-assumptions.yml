@@ -1,0 +1,67 @@
+---
+# Regression checks for the Darwin restart budget and the virtualenv pip
+# install. These read the role; they do not talk to launchd.
+- name: Check Darwin restart and pip assumptions
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+  tasks:
+    - name: Read the Darwin task files
+      ansible.builtin.command:
+        argv: [cat, "{{ item }}"]
+      loop:
+        - "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-restart-job.yml"
+        - "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin.yml"
+      register: darwin_sources
+      changed_when: false
+
+    - name: Name the loaded sources
+      ansible.builtin.set_fact:
+        restart_text: "{{ darwin_sources.results[0].stdout }}"
+        darwin_text: "{{ darwin_sources.results[1].stdout }}"
+
+    - name: The unload wait lasts through ExitTimeOut plus a short margin
+      vars:
+        unload_task: "{{ restart_text.split('Wait until LaunchDaemon')[1].split('Enable LaunchDaemon')[0] }}"
+      ansible.builtin.assert:
+        that:
+          - (chia_darwin_full_node_exit_timeout | int) >= 300
+          - (chia_darwin_restart_unload_margin | int) >= 15
+          - (chia_darwin_restart_unload_margin | int) <= 120
+          - >-
+            '(chia_job.exit_timeout | int) + (chia_darwin_restart_unload_margin | int)'
+            in unload_task
+          - "'failed_when: false' in unload_task"
+          - "'retries: 10' not in unload_task"
+          - "'delay: 1' in unload_task"
+          - restart_text.index('Stop if LaunchDaemon') < restart_text.index('Start LaunchDaemon')
+          - "'Bootstrap was not attempted' in restart_text"
+          - "'retries: 10' in restart_text.split('Start LaunchDaemon')[1]"
+          - "'delay: 3' in restart_text.split('Start LaunchDaemon')[1]"
+        fail_msg: >-
+          The restart handler must poll for each job's ExitTimeOut plus
+          chia_darwin_restart_unload_margin before bootstrap, and must fail
+          if the job is still loaded. The full-node timeout is
+          {{ chia_darwin_full_node_exit_timeout }}s.
+
+    - name: Packages are installed with the virtualenv pip and both indexes
+      ansible.builtin.assert:
+        that:
+          - "'ansible.builtin.pip:' not in darwin_text"
+          - "'--index-url' not in darwin_text"
+          - "'--extra-index-url' in darwin_text.split('Install pinned chia-blockchain')[1]"
+          - chia_darwin_pip_extra_index == "https://pypi.chia.net/simple"
+          - "'chia_darwin_pip_extra_index' in darwin_text.split('Install pinned chia-blockchain')[1]"
+          - >-
+            ('chia_darwin_pip_package }}==' ~ '{' ~ '{ chia_darwin_pip_version')
+            in darwin_text
+          - darwin_text.count('Successfully installed') == 2
+          - darwin_text.count("-m\n      - pip\n      - install") == 2
+          - "'chia_darwin_venv }}/bin/python' in darwin_text"
+        fail_msg: >-
+          Darwin installs must run chia_darwin_venv/bin/python -m pip.
+          Keep PyPI and add {{ chia_darwin_pip_extra_index }} with
+          --extra-index-url. Do not use the pip module; it imports
+          packaging from the interpreter discovery selected.

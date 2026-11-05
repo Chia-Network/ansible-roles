@@ -22,3 +22,10 @@
   register: systemd_action
   retries: 10
   until: systemd_action is success
+
+- name: restart-chia-darwin
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/darwin-restart-job.yml"
+  loop: "{{ chia_darwin_launchd_jobs }}"
+  loop_control:
+    loop_var: chia_job
+    label: "{{ chia_job.label }}"

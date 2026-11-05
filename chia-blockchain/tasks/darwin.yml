@@ -1,0 +1,699 @@
+---
+- name: Require an Apple Silicon Mac
+  ansible.builtin.assert:
+    that:
+      - ansible_architecture in ["arm64", "aarch64"]
+    fail_msg: >-
+      chia-blockchain Darwin support targets Apple Silicon
+      (arm64). This host reports {{ ansible_architecture }}.
+
+- name: Require a known Darwin topology
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_topology in ["local-internal", "local-external", "remote-node"]
+    fail_msg: >-
+      chia_darwin_topology must be local-internal, local-external, or
+      remote-node. Got {{ chia_darwin_topology }}.
+
+- name: Require a pinned chia-blockchain version
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_pip_version | length > 0
+    fail_msg: Pin chia_darwin_pip_version to the chia-blockchain release to run
+
+- name: Refuse the Linux default service account on Darwin
+  ansible.builtin.assert:
+    that:
+      - user | length > 0
+      - user != "ubuntu"
+    fail_msg: >-
+      Set user to the dedicated non-admin account the LaunchDaemons run as
+      (the reference host uses timelord). The Linux default user ubuntu is
+      refused on Darwin. SSH as an admin; user is not the SSH login.
+
+- name: Require a remote full node when this Mac does not run one
+  ansible.builtin.assert:
+    that:
+      - chia_timelord_full_node_peer_host | length > 0
+      - chia_timelord_full_node_peer_host not in ["localhost", "127.0.0.1", "::1"]
+    fail_msg: >-
+      remote-node has no local full node. Set chia_timelord_full_node_peer_host
+      to the LAN full node. On chia 2.7.1 and later that node must list this
+      Mac in exempt_peer_networks.
+  when: chia_darwin_topology == "remote-node"
+
+- name: Require the external database volume for local-external
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_db_volume | length > 0
+      - chia_darwin_volume_chia_dir | length > 0
+    fail_msg: Set chia_darwin_db_volume for the local-external topology.
+  when: chia_darwin_topology == "local-external"
+
+- name: Require an ASIC serial and a sane hw_vdf_client argv
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_hw_vdf_expected_serial | length > 0
+      - (chia_darwin_hw_vdf_proof_threads | int) < (chia_darwin_hw_vdf_vdf_threads | int)
+      - (chia_darwin_hw_vdf_proof_threads | int) >= 1
+      - (chia_darwin_hw_vdf_freq | int) >= 200
+      - (chia_darwin_hw_vdf_freq | int) <= 2200
+      - (chia_darwin_hw_vdf_mask | int) >= 1
+      - (chia_darwin_hw_vdf_mask | int) <= 7
+      - (chia_darwin_hw_num_vdfs | int) >= 1
+      - (chia_darwin_hw_num_vdfs | int) <= 3
+    fail_msg: >-
+      Set chia_darwin_hw_vdf_expected_serial to this board's serial.
+      proof-threads must be lower than vdf-threads, freq must be 200-2200,
+      and the VDF mask must be 1-7.
+  when: chia_darwin_enable_hw_vdf | bool
+
+- name: Use the Darwin CHIA_ROOT and skip software VDF clients
+  ansible.builtin.set_fact:
+    chia_root: "{{ chia_darwin_root }}"
+    process_count: "{{ chia_darwin_process_count }}"
+
+- name: Build the LaunchDaemon job list
+  ansible.builtin.set_fact:
+    chia_darwin_launchd_jobs:
+      - name: daemon
+        label: "{{ chia_darwin_launchd_prefix }}.daemon"
+        wrapper: "{{ chia_darwin_bin_dir }}/chia-daemon-run.sh"
+        throttle: "{{ chia_darwin_daemon_throttle_interval }}"
+        exit_timeout: "{{ chia_darwin_daemon_exit_timeout }}"
+        enabled: true
+      - name: full-node
+        label: "{{ chia_darwin_launchd_prefix }}.full-node"
+        wrapper: "{{ chia_darwin_bin_dir }}/chia-full-node-run.sh"
+        throttle: "{{ chia_darwin_full_node_throttle_interval }}"
+        exit_timeout: "{{ chia_darwin_full_node_exit_timeout }}"
+        enabled: "{{ chia_darwin_topology != 'remote-node' }}"
+      - name: timelord
+        label: "{{ chia_darwin_launchd_prefix }}.timelord"
+        wrapper: "{{ chia_darwin_bin_dir }}/chia-timelord-run.sh"
+        throttle: "{{ chia_darwin_timelord_throttle_interval }}"
+        exit_timeout: "{{ chia_darwin_timelord_exit_timeout }}"
+        enabled: true
+      - name: hw-vdf
+        label: "{{ chia_darwin_launchd_prefix }}.hw-vdf"
+        wrapper: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+        throttle: "{{ chia_darwin_hw_vdf_throttle_interval }}"
+        exit_timeout: "{{ chia_darwin_hw_vdf_exit_timeout }}"
+        enabled: "{{ chia_darwin_enable_hw_vdf | bool }}"
+
+- name: Ensure the timelord service user exists
+  become: true
+  ansible.builtin.user:
+    name: "{{ user }}"
+    comment: Chia timelord
+    home: "{{ chia_darwin_home }}"
+    shell: "{{ chia_darwin_interpreter }}"
+    group: "{{ chia_darwin_group }}"
+    create_home: true
+
+- name: Check the service user is not an administrator
+  become: true
+  ansible.builtin.command:
+    argv:
+      - dseditgroup
+      - -o
+      - checkmember
+      - -m
+      - "{{ user }}"
+      - admin
+  register: chia_darwin_admin_check
+  changed_when: false
+  failed_when: false
+
+- name: Refuse to run the timelord as an administrator
+  ansible.builtin.assert:
+    that:
+      - (chia_darwin_admin_check.stdout | default('')) is search('is NOT a member')
+    fail_msg: >-
+      dseditgroup did not confirm that {{ user }} is outside the admin group
+      (output: {{ chia_darwin_admin_check.stdout | default('') | trim }}). The
+      ASIC timelord account must be a dedicated non-admin local user.
+
+- name: Apply pmset so the host stays awake
+  when: chia_darwin_pmset_apply | bool
+  become: true
+  block:
+    - name: Read the current power settings
+      ansible.builtin.command:
+        argv: [pmset, -g, custom]
+      register: chia_darwin_pmset_custom
+      changed_when: false
+
+    - name: Clear the pmset drift flag
+      ansible.builtin.set_fact:
+        chia_darwin_pmset_needs_update: false
+
+    # pmset -a corrects every profile, so check every profile line for each key.
+    - name: Flag a pmset key that differs in any power profile
+      ansible.builtin.set_fact:
+        chia_darwin_pmset_needs_update: true
+      when: >-
+        (chia_darwin_pmset_custom.stdout | regex_findall('(?m)^[ \t]+' ~ item.key ~ '[ \t]+(\S+)')) is falsy or
+        (chia_darwin_pmset_custom.stdout | regex_findall('(?m)^[ \t]+' ~ item.key ~ '[ \t]+(\S+)')
+          | reject('eq', item.value | string) | list) is truthy
+      loop: "{{ chia_darwin_pmset | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Keep the Mac awake for the timelord
+      ansible.builtin.command:
+        argv: "{{ ['pmset', '-a'] + (chia_darwin_pmset | dict2items | map(attribute='key') | zip(chia_darwin_pmset.values() | map('string')) | flatten) }}"
+      when: chia_darwin_pmset_needs_update | bool
+      changed_when: true
+
+- name: Ensure service directories exist
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ chia_darwin_bin_dir }}"
+    - "{{ chia_darwin_etc_dir }}"
+    - "{{ chia_darwin_log_dir }}"
+
+- name: Inspect ~/.chia before choosing where CHIA_ROOT lives
+  ansible.builtin.stat:
+    path: "{{ chia_darwin_home }}/.chia"
+  register: chia_darwin_dot_chia
+
+- name: Refuse to replace a real ~/.chia with the external-volume symlink
+  ansible.builtin.assert:
+    that:
+      - >-
+        (not chia_darwin_dot_chia.stat.exists) or
+        (chia_darwin_dot_chia.stat.islnk | default(false) and
+        chia_darwin_dot_chia.stat.lnk_target == chia_darwin_volume_chia_dir)
+    fail_msg: >-
+      {{ chia_darwin_home }}/.chia exists and is not a symlink to
+      {{ chia_darwin_volume_chia_dir }}. Move it aside before using
+      local-external. This role will not delete an existing CHIA_ROOT.
+  when: chia_darwin_topology == "local-external"
+
+- name: Refuse to follow an external-volume symlink for an internal CHIA_ROOT
+  ansible.builtin.assert:
+    that:
+      - not (chia_darwin_dot_chia.stat.islnk | default(false))
+    fail_msg: >-
+      {{ chia_darwin_home }}/.chia is a symlink
+      ({{ chia_darwin_dot_chia.stat.lnk_target | default('') }}).
+      local-internal and remote-node keep CHIA_ROOT on the internal disk.
+      Remove the symlink manually before switching topology.
+  when: chia_darwin_topology != "local-external"
+
+- name: Read mounted filesystems
+  ansible.builtin.command:
+    argv: [/sbin/mount]
+  register: chia_darwin_mounts
+  changed_when: false
+  when: chia_darwin_topology == "local-external"
+
+- name: Require the database volume to be mounted now
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_mounts.stdout is search(' on ' ~ (chia_darwin_db_volume | regex_escape) ~ ' ')
+    fail_msg: >-
+      {{ chia_darwin_db_volume }} is not mounted. Mount it before running
+      local-external. The role does not format or mount disks.
+  when: chia_darwin_topology == "local-external"
+
+- name: Ensure the on-volume chia directory exists
+  become: true
+  ansible.builtin.file:
+    path: "{{ chia_darwin_volume_chia_dir }}/{{ network }}"
+    state: directory
+    owner: "{{ user }}"
+    group: "{{ chia_darwin_group }}"
+    mode: "0755"
+  when: chia_darwin_topology == "local-external"
+
+- name: Link ~/.chia at the external volume
+  become: true
+  ansible.builtin.file:
+    src: "{{ chia_darwin_volume_chia_dir }}"
+    dest: "{{ chia_darwin_home }}/.chia"
+    state: link
+    owner: "{{ user }}"
+    group: "{{ chia_darwin_group }}"
+    force: false
+  when: chia_darwin_topology == "local-external"
+
+- name: Ensure the internal CHIA_ROOT directory exists
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.file:
+    path: "{{ chia_root }}"
+    state: directory
+    mode: "0755"
+  when: chia_darwin_topology != "local-external"
+
+- name: Install Homebrew packages as the connecting user
+  become: false
+  block:
+    - name: Require Homebrew
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_brew }}"
+      register: chia_darwin_brew_stat
+
+    - name: Fail when Homebrew is not installed
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_brew_stat.stat.exists | default(false)
+          - chia_darwin_brew_stat.stat.executable | default(false)
+        fail_msg: >-
+          Homebrew was not found at {{ chia_darwin_brew }}. Install it for the
+          connecting admin (https://brew.sh) before running this role. The role
+          does not run the Homebrew installer.
+
+    - name: Check whether Homebrew Python is installed
+      ansible.builtin.command:
+        argv:
+          - "{{ chia_darwin_brew }}"
+          - list
+          - --versions
+          - "{{ chia_darwin_python_formula }}"
+      register: chia_darwin_python_list
+      changed_when: false
+      failed_when: false
+
+    - name: Install Homebrew Python
+      ansible.builtin.command:
+        argv:
+          - "{{ chia_darwin_brew }}"
+          - install
+          - "{{ chia_darwin_python_formula }}"
+      when: chia_darwin_python_list.rc != 0
+      changed_when: true
+
+    - name: Require the Homebrew Python binary
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_python }}"
+      register: chia_darwin_python_stat
+
+    - name: Fail when the expected Python is missing
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_python_stat.stat.exists | default(false)
+        fail_msg: >-
+          {{ chia_darwin_python }} does not exist after installing
+          {{ chia_darwin_python_formula }}. Set chia_darwin_python if the
+          formula layout differs.
+
+    - name: List the Homebrew taps
+      ansible.builtin.command:
+        argv:
+          - "{{ chia_darwin_brew }}"
+          - tap
+      register: chia_darwin_brew_taps
+      changed_when: false
+      when: chia_darwin_enable_hw_vdf | bool
+
+    - name: Tap the Chia Homebrew repository
+      ansible.builtin.command:
+        argv:
+          - "{{ chia_darwin_brew }}"
+          - tap
+          - "{{ chia_darwin_chiavdf_tap }}"
+      when:
+        - chia_darwin_enable_hw_vdf | bool
+        - >-
+          chia_darwin_chiavdf_tap | lower not in
+          (chia_darwin_brew_taps.stdout_lines | default([]) | map('lower') | list)
+      changed_when: true
+
+    - name: Check whether chiavdf is installed
+      ansible.builtin.command:
+        argv:
+          - "{{ chia_darwin_brew }}"
+          - list
+          - --versions
+          - "{{ chia_darwin_chiavdf_formula }}"
+      register: chia_darwin_chiavdf_list
+      changed_when: false
+      failed_when: false
+      when: chia_darwin_enable_hw_vdf | bool
+
+- name: Install chiavdf from the Chia Homebrew tap
+  become: false
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_brew }}"
+      - install
+      - "{{ chia_darwin_chiavdf_tap }}/{{ chia_darwin_chiavdf_formula }}"
+  when:
+    - chia_darwin_enable_hw_vdf | bool
+    - (chia_darwin_chiavdf_list.rc | default(1) | int) != 0
+  changed_when: true
+
+- name: Read hw_vdf_client version
+  become: false
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_hw_vdf_client }}"
+      - --version
+  register: chia_darwin_hw_vdf_client_version
+  changed_when: false
+  when: chia_darwin_enable_hw_vdf | bool
+
+- name: Require the pinned hw_vdf_client version
+  become: false
+  ansible.builtin.assert:
+    that:
+      - >-
+        chia_darwin_hw_vdf_client_version.stdout is regex('(^|\s)' ~
+        (chia_darwin_chiavdf_version | regex_escape) ~ '(\s|$)')
+    fail_msg: >-
+      {{ chia_darwin_hw_vdf_client }} reports
+      {{ chia_darwin_hw_vdf_client_version.stdout | trim }}, which does not
+      match chia_darwin_chiavdf_version {{ chia_darwin_chiavdf_version }}.
+  when:
+    - chia_darwin_enable_hw_vdf | bool
+    - chia_darwin_chiavdf_version | length > 0
+
+- name: Create the chia virtualenv
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_python }}"
+      - -m
+      - venv
+      - "{{ chia_darwin_venv }}"
+    creates: "{{ chia_darwin_venv }}/bin/python"
+  environment:
+    HOME: "{{ chia_darwin_home }}"
+
+# The pip module imports packaging or setuptools from the interpreter that
+# runs Ansible modules. A fresh Homebrew python@3.13 has neither. Call this
+# virtualenv's pip instead. PyPI remains the default index.
+- name: Ensure pip, setuptools, and wheel are in the virtualenv
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_venv }}/bin/python"
+      - -m
+      - pip
+      - install
+      - pip
+      - setuptools
+      - wheel
+  environment:
+    HOME: "{{ chia_darwin_home }}"
+  register: chia_darwin_pip_bootstrap
+  changed_when: "'Successfully installed' in chia_darwin_pip_bootstrap.stdout"
+
+- name: Install pinned chia-blockchain into the virtualenv
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_venv }}/bin/python"
+      - -m
+      - pip
+      - install
+      - --extra-index-url
+      - "{{ chia_darwin_pip_extra_index }}"
+      - "{{ chia_darwin_pip_package }}=={{ chia_darwin_pip_version }}"
+  environment:
+    HOME: "{{ chia_darwin_home }}"
+    CHIA_ROOT: "{{ chia_root }}"
+  register: chia_darwin_pip_pinned
+  changed_when: "'Successfully installed' in chia_darwin_pip_pinned.stdout"
+
+- name: Ensure CHIA_ROOT config and db directories exist
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.file:
+    path: "{{ chia_root }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - config
+    - db
+
+- name: Check for an existing chia config
+  ansible.builtin.stat:
+    path: "{{ chia_root }}/config/config.yaml"
+  register: chia_darwin_config_stat
+
+- name: Initialize CHIA_ROOT
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_venv }}/bin/chia"
+      - init
+      - --fix-ssl-permissions
+  environment:
+    HOME: "{{ chia_darwin_home }}"
+    CHIA_ROOT: "{{ chia_root }}"
+  when: >-
+    (chia_darwin_pip_pinned.changed | default(false)) or
+    (chia_force_init | bool) or
+    (not (chia_darwin_config_stat.stat.exists | default(false)))
+  changed_when: true
+
+- name: Create the custom CA directory
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.file:
+    path: "{{ chia_darwin_home }}/chia-ca"
+    state: directory
+    mode: "0700"
+  when: chia_darwin_custom_ca | bool
+
+- name: Write custom CA files
+  become: true
+  become_user: "{{ user }}"
+  no_log: true
+  ansible.builtin.copy:
+    content: "{{ item.content }}"
+    dest: "{{ chia_darwin_home }}/chia-ca/{{ item.filename }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - content: "{{ chia_ca_crt }}"
+      filename: chia_ca.crt
+      mode: "0644"
+    - content: "{{ chia_ca_key }}"
+      filename: chia_ca.key
+      mode: "0600"
+    - content: "{{ chia_private_ca_crt }}"
+      filename: private_ca.crt
+      mode: "0644"
+    - content: "{{ chia_private_ca_key }}"
+      filename: private_ca.key
+      mode: "0600"
+  register: chia_darwin_ca_content
+  when: chia_darwin_custom_ca | bool
+
+- name: Initialize with the custom CA
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_venv }}/bin/chia"
+      - init
+      - -c
+      - "{{ chia_darwin_home }}/chia-ca"
+  environment:
+    HOME: "{{ chia_darwin_home }}"
+    CHIA_ROOT: "{{ chia_root }}"
+  when: chia_darwin_ca_content.changed | default(false)
+  changed_when: true
+  notify: restart-chia-darwin
+
+- name: Write the chia config
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ chia_root }}/config/config.yaml"
+    mode: "0644"
+
+- name: Write the reference chia config used to detect restarts
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ chia_root }}/config/.config.yaml"
+    mode: "0644"
+  notify: restart-chia-darwin
+
+- name: Read the installed chia version
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_venv }}/bin/chia"
+      - version
+  environment:
+    HOME: "{{ chia_darwin_home }}"
+    CHIA_ROOT: "{{ chia_root }}"
+  register: chia_version_output
+  changed_when: false
+
+- name: Record the installed chia version # noqa: var-naming[pattern]
+  ansible.builtin.set_fact:
+    # version.j2 expects this name; it matches the Linux tasks.
+    CHIA_DETECTED_VERSION: "{{ chia_version_output.stdout }}"
+
+- name: Write the reference chia version used to detect restarts
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.template:
+    src: version.j2
+    dest: "{{ chia_root }}/.last-version"
+    mode: "0644"
+  notify: restart-chia-darwin
+
+- name: Export CHIA_ROOT for interactive zsh
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.lineinfile:
+    path: "{{ chia_darwin_home }}/.zshenv"
+    regexp: "^export CHIA_ROOT="
+    line: "export CHIA_ROOT={{ chia_root }}"
+    create: true
+    mode: "0644"
+  when: chia_root_to_env | bool
+
+- name: Put the chia virtualenv on PATH for interactive zsh
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.lineinfile:
+    path: "{{ chia_darwin_home }}/.zshenv"
+    regexp: "^export PATH=.*chia-venv/bin"
+    line: "export PATH={{ chia_darwin_venv }}/bin:{{ chia_darwin_homebrew_prefix }}/bin:$PATH"
+    create: true
+    mode: "0644"
+  when: chia_root_to_env | bool
+
+- name: Add Chia keys
+  become: true
+  become_user: "{{ user }}"
+  no_log: true
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_venv }}/bin/chia"
+      - keys
+      - add
+      - "-l"
+      - ""
+    stdin: "{{ item }}"
+  environment:
+    HOME: "{{ chia_darwin_home }}"
+    CHIA_ROOT: "{{ chia_root }}"
+  loop: "{{ keys }}"
+  when: keys | length > 0
+  register: chia_darwin_key_add
+  changed_when: "'already' not in (chia_darwin_key_add.stdout | lower)"
+
+- name: Remove the retired hw-vdf env file
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.file:
+    path: "{{ chia_darwin_etc_dir }}/hw-vdf.env"
+    state: absent
+
+- name: Install LaunchDaemon wrapper scripts
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "0755"
+  loop:
+    - src: darwin/chia-env.sh.j2
+      dest: "{{ chia_darwin_env_script }}"
+    - src: darwin/chia-daemon-run.sh.j2
+      dest: "{{ chia_darwin_bin_dir }}/chia-daemon-run.sh"
+    - src: darwin/chia-full-node-run.sh.j2
+      dest: "{{ chia_darwin_bin_dir }}/chia-full-node-run.sh"
+    - src: darwin/chia-timelord-run.sh.j2
+      dest: "{{ chia_darwin_bin_dir }}/chia-timelord-run.sh"
+    - src: darwin/chia-hw-vdf-run.sh.j2
+      dest: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+    - src: darwin/rotpipe.py.j2
+      dest: "{{ chia_darwin_bin_dir }}/rotpipe.py"
+  loop_control:
+    label: "{{ item.dest }}"
+  notify: restart-chia-darwin
+
+- name: Write the Full Disk Access note
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.template:
+    src: darwin/FULL-DISK-ACCESS.txt.j2
+    dest: "{{ chia_darwin_fda_note_dest }}"
+    mode: "0644"
+  when: chia_darwin_emit_pppc | bool
+
+- name: Write the PPPC profile template for MDM
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.template:
+    src: darwin/pppc.mobileconfig.j2
+    dest: "{{ chia_darwin_pppc_dest }}"
+    mode: "0644"
+  when: chia_darwin_emit_pppc | bool
+
+- name: Confirm the service user can read CHIA_ROOT
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.stat:
+    path: "{{ chia_root }}/config/config.yaml"
+  register: chia_darwin_root_stat
+  failed_when: false
+
+- name: Fail when the service user cannot read CHIA_ROOT
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_root_stat.stat.exists | default(false)
+      - chia_darwin_root_stat.stat.readable | default(false)
+    fail_msg: >-
+      {{ user }} cannot read {{ chia_root }}/config/config.yaml.
+      For local-external, {{ chia_darwin_interpreter }} needs Full Disk
+      Access before launchd can read {{ chia_darwin_db_volume }}. Grant it
+      in System Settings, or install {{ chia_darwin_pppc_dest }} with MDM.
+      See {{ chia_darwin_fda_note_dest }}. This role does not edit TCC.db.
+      An SSH session being able to read the volume does not mean launchd can.
+
+- name: Install and load LaunchDaemons
+  ansible.builtin.include_tasks: darwin-launchd-job.yml
+  loop: "{{ chia_darwin_launchd_jobs }}"
+  loop_control:
+    loop_var: chia_job
+    label: "{{ chia_job.label }}"
+
+- name: Note the testnet full node port
+  ansible.builtin.debug:
+    msg: >-
+      network is {{ network }} but full_node_port is still {{ full_node_port }}.
+      testnet11 full nodes listen on 58444 unless this peer is intentionally
+      on another port. Also set introducer_peer for the testnet.
+  when:
+    - network == "testnet11"
+    - (full_node_port | int) == 8444
+
+- name: Summarize the Darwin timelord
+  ansible.builtin.debug:
+    msg: >-
+      topology={{ chia_darwin_topology }} network={{ network }}
+      CHIA_ROOT={{ chia_root }}
+      full_node_peer={{ chia_timelord_full_node_peer_host }}:{{ full_node_port }}
+      jobs={{ chia_darwin_launchd_jobs | selectattr('enabled', 'truthy') | map(attribute='label') | list | join(', ') }}
+      {% if chia_darwin_topology == 'local-external' %}
+      Full Disk Access for {{ chia_darwin_interpreter }} is required before
+      launchd can read {{ chia_darwin_db_volume }}. See {{ chia_darwin_fda_note_dest }}.
+      An SSH read of that volume does not prove launchd can read it.
+      {% elif chia_darwin_topology == 'remote-node' %}
+      The remote full node must accept this timelord (exempt_peer_networks on
+      chia 2.7.1 and later).
+      {% endif %}
