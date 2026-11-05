@@ -25,7 +25,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y zsh shellcheck
-          python3 -m pip install --user ansible-core
+          python3 -m pip install --user 'ansible-core>=2.18,<2.23'
 
       - name: Syntax check
         env:

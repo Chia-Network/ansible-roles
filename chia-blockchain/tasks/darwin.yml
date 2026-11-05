@@ -148,40 +148,21 @@
       ansible.builtin.set_fact:
         chia_darwin_pmset_needs_update: false
 
-    # dict() keeps only the last profile. A laptop has Battery and AC, and
-    # pmset -a must correct every profile, so flag a key if any line differs.
+    # pmset -a corrects every profile, so check every profile line for each key.
     - name: Flag a pmset key that differs in any power profile
       ansible.builtin.set_fact:
         chia_darwin_pmset_needs_update: true
       when: >-
-        (
-          chia_darwin_pmset_custom.stdout is not regex(
-            '(?m)^[ \t]+' ~ item.key ~ '[ \t]+' ~ (item.value | string) ~ '[ \t]*$'
-          )
-        ) or (
-          chia_darwin_pmset_custom.stdout is regex(
-            '(?m)^[ \t]+' ~ item.key ~ '[ \t]+(?!' ~ (item.value | string) ~ '[ \t]*$).*$'
-          )
-        )
+        (chia_darwin_pmset_custom.stdout | regex_findall('(?m)^[ \t]+' ~ item.key ~ '[ \t]+(\S+)')) is falsy or
+        (chia_darwin_pmset_custom.stdout | regex_findall('(?m)^[ \t]+' ~ item.key ~ '[ \t]+(\S+)')
+          | reject('eq', item.value | string) | list) is truthy
       loop: "{{ chia_darwin_pmset | dict2items }}"
       loop_control:
         label: "{{ item.key }}"
 
     - name: Keep the Mac awake for the timelord
       ansible.builtin.command:
-        argv:
-          - pmset
-          - -a
-          - sleep
-          - "{{ chia_darwin_pmset.sleep }}"
-          - disksleep
-          - "{{ chia_darwin_pmset.disksleep }}"
-          - womp
-          - "{{ chia_darwin_pmset.womp }}"
-          - autorestart
-          - "{{ chia_darwin_pmset.autorestart }}"
-          - tcpkeepalive
-          - "{{ chia_darwin_pmset.tcpkeepalive }}"
+        argv: "{{ ['pmset', '-a'] + (chia_darwin_pmset | dict2items | map(attribute='key') | zip(chia_darwin_pmset.values() | map('string')) | flatten) }}"
       when: chia_darwin_pmset_needs_update | bool
       changed_when: true
 
@@ -429,7 +410,7 @@
     version: "{{ chia_darwin_pip_version }}"
     state: present
     virtualenv: "{{ chia_darwin_venv }}"
-    extra_args: "--index-url {{ chia_darwin_pip_extra_index }}"
+    extra_args: "--extra-index-url {{ chia_darwin_pip_extra_index }}"
   environment:
     HOME: "{{ chia_darwin_home }}"
     CHIA_ROOT: "{{ chia_root }}"
@@ -605,6 +586,7 @@
 
 - name: Remove the retired hw-vdf env file
   become: true
+  become_user: "{{ user }}"
   ansible.builtin.file:
     path: "{{ chia_darwin_etc_dir }}/hw-vdf.env"
     state: absent
