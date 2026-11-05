@@ -1,6 +1,8 @@
 ---
 # Restart one LaunchDaemon from the restart-chia-darwin handler. bootout plus
 # bootstrap (rather than kickstart) so a changed plist is picked up too.
+# launchctl bootout returns before the job is fully unregistered, so wait
+# until print fails and retry bootstrap.
 - name: Restart LaunchDaemon {{ chia_job.label }}
   when:
     - chia_job.enabled | bool
@@ -15,6 +17,17 @@
       changed_when: chia_darwin_restart_bootout.rc == 0
       failed_when: false
 
+    - name: Wait until LaunchDaemon is unloaded {{ chia_job.label }}
+      ansible.builtin.command:
+        argv: [launchctl, print, "system/{{ chia_job.label }}"]
+      register: chia_darwin_restart_gone
+      changed_when: false
+      failed_when: false
+      retries: 10
+      delay: 1
+      until: chia_darwin_restart_gone.rc != 0
+      when: chia_darwin_restart_bootout.rc == 0
+
     - name: Enable LaunchDaemon before starting {{ chia_job.label }}
       ansible.builtin.command:
         argv: [launchctl, enable, "system/{{ chia_job.label }}"]
@@ -23,13 +36,15 @@
     - name: Start LaunchDaemon {{ chia_job.label }}
       ansible.builtin.command:
         argv:
-          [
-            launchctl,
-            bootstrap,
-            system,
-            "/Library/LaunchDaemons/{{ chia_job.label }}.plist",
-          ]
-      changed_when: true
+          - launchctl
+          - bootstrap
+          - system
+          - "/Library/LaunchDaemons/{{ chia_job.label }}.plist"
+      register: chia_darwin_restart_bootstrap
+      changed_when: chia_darwin_restart_bootstrap.rc == 0
+      retries: 5
+      delay: 1
+      until: chia_darwin_restart_bootstrap.rc == 0
 
     - name: Disable LaunchDaemon at boot {{ chia_job.label }}
       ansible.builtin.command:
