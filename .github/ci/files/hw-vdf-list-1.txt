@@ -1,0 +1,4 @@
+# Example hw_vdf_client --list output for tests only.
+# Not captured from real hardware. Serials and locations are made up.
+List of available devices:
+Device 0: 'Example Chia ASIC A', loc 21001, serial 'EXAMPLE00000001A'

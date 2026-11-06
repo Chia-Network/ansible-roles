@@ -1,0 +1,6 @@
+---
+- name: Install the fake hw_vdf_client
+  ansible.builtin.template:
+    src: fake-hw-vdf-client-wrapper.sh.j2
+    dest: "{{ chia_darwin_hw_vdf_client }}"
+    mode: "0755"

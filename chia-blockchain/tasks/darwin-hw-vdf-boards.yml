@@ -1,118 +1,14 @@
 ---
 # One hw_vdf_client per board. A non-zero --vdfs-mask selects engines; N_VDFS
 # does not change that mask, so it is just the mask's popcount. Masks by count,
-# in ID order: 1 -> 7, 2 -> 3 then 1, 3 -> 1, 1, 1. An empty board list is one
-# legacy row: ID 1, chia_darwin_hw_vdf_mask, and no --device-loc.
-- name: Clear derived ASIC board state
-  ansible.builtin.set_fact:
-    chia_darwin_hw_vdf_active: []
-    chia_darwin_hw_vdf_jobs: []
-  changed_when: false
+# in ID order: 1 -> 7, 2 -> 3 then 1, 3 -> 1, 1, 1. An empty board list with a
+# serial is one legacy row: ID 1, chia_darwin_hw_vdf_mask, and no --device-loc.
+# With both empty, boards come from hw_vdf_client --list.
+- name: Validate ASIC board inventory
+  ansible.builtin.include_tasks: darwin-hw-vdf-validate.yml
 
-- name: Require shared hw_vdf_client options and one inventory source
-  when: chia_darwin_enable_hw_vdf | bool
-  ansible.builtin.assert:
-    that:
-      - chia_darwin_hw_vdf_freq | string is match('^[0-9]+$')
-      - (chia_darwin_hw_vdf_freq | int) >= 200
-      - (chia_darwin_hw_vdf_freq | int) <= 2200
-      - chia_darwin_hw_vdf_voltage | string is match('^[0-9]+(\\.[0-9]+)?$')
-      - (chia_darwin_hw_vdf_voltage | float) >= 0.7
-      - (chia_darwin_hw_vdf_voltage | float) <= 1.0
-      - chia_darwin_hw_vdf_vdf_threads | string is match('^[0-9]+$')
-      - (chia_darwin_hw_vdf_vdf_threads | int) >= 2
-      - (chia_darwin_hw_vdf_vdf_threads | int) <= 64
-      - chia_darwin_hw_vdf_proof_threads | string is match('^[0-9]+$')
-      - (chia_darwin_hw_vdf_proof_threads | int) >= 1
-      - (chia_darwin_hw_vdf_proof_threads | int) < (chia_darwin_hw_vdf_vdf_threads | int)
-      - chia_darwin_hw_vdf_checkpoint_threshold | string is match('^[0-9]+$')
-      - (chia_darwin_hw_vdf_checkpoint_threshold | int) >= 8000
-      - (chia_darwin_hw_vdf_checkpoint_threshold | int) <= 4294967295
-      - (chia_darwin_hw_vdf_open_stagger | int) >= 0
-      - chia_darwin_hw_vdf_boards is sequence
-      - chia_darwin_hw_vdf_boards is not string
-      - chia_darwin_hw_vdf_boards is not mapping
-      - (chia_darwin_hw_vdf_boards | length > 0) or (chia_darwin_hw_vdf_expected_serial | length > 0)
-      - not ((chia_darwin_hw_vdf_boards | length > 0) and (chia_darwin_hw_vdf_expected_serial | length > 0))
-    fail_msg: >-
-      Set chia_darwin_hw_vdf_boards or chia_darwin_hw_vdf_expected_serial, not
-      both. chia_darwin_hw_vdf_boards must be a list. Shared options are out
-      of range when freq is outside 200-2200, voltage is outside 0.70-1.00,
-      vdf_threads are outside 2-64, proof_threads are not lower than
-      vdf_threads, or checkpoint_threshold is below 8000. An empty board list
-      uses chia_darwin_hw_vdf_mask (1-7) and does not pass --device-loc.
-
-- name: Require a legacy serial and mask
-  when:
-    - chia_darwin_enable_hw_vdf | bool
-    - chia_darwin_hw_vdf_boards | length == 0
-  ansible.builtin.assert:
-    that:
-      - chia_darwin_hw_vdf_expected_serial is string
-      - chia_darwin_hw_vdf_expected_serial is match('^[!-~]{1,15}$')
-      - chia_darwin_hw_vdf_mask | string is match('^[1-7]$')
-    fail_msg: >-
-      chia_darwin_hw_vdf_expected_serial must be 1-15 printable non-space
-      characters, and chia_darwin_hw_vdf_mask must be 1-7.
-
-- name: Check each inventoried board
-  when:
-    - chia_darwin_enable_hw_vdf | bool
-    - chia_darwin_hw_vdf_boards | length > 0
-  vars:
-    allowed_keys:
-      - id
-      - device_loc
-      - expected_serial
-      - vdf_threads
-      - proof_threads
-    board_vdf_threads: "{{ item.vdf_threads | default(chia_darwin_hw_vdf_vdf_threads) }}"
-    board_proof_threads: "{{ item.proof_threads | default(chia_darwin_hw_vdf_proof_threads) }}"
-  ansible.builtin.assert:
-    that:
-      - item is mapping
-      - item.keys() | difference(allowed_keys) | length == 0
-      - item.id is defined
-      - item.id | string is match('^[123]$')
-      - item.device_loc is defined
-      - item.device_loc | string is match('^[0-9]+$')
-      - (item.device_loc | int) <= 4294967295
-      - chia_darwin_hw_vdf_boards | length == 1 or (item.device_loc | int) > 0
-      - item.expected_serial is defined
-      - item.expected_serial is string
-      - item.expected_serial is match('^[!-~]{1,15}$')
-      - board_vdf_threads | string is match('^[0-9]+$')
-      - (board_vdf_threads | int) >= 2
-      - (board_vdf_threads | int) <= 64
-      - board_proof_threads | string is match('^[0-9]+$')
-      - (board_proof_threads | int) >= 1
-      - (board_proof_threads | int) < (board_vdf_threads | int)
-    fail_msg: >-
-      Board {{ item.id | default('?') }} only allows id, device_loc,
-      expected_serial, vdf_threads, and proof_threads. id must be 1, 2, or 3.
-      expected_serial is 1-15 printable non-space characters. device_loc is the
-      decimal location from hw_vdf_client --list, with no leading zeros.
-      device_loc 0 is allowed only for a single board. proof_threads must be lower than
-      vdf_threads (2-64).
-  loop: "{{ chia_darwin_hw_vdf_boards }}"
-  loop_control:
-    label: "{{ item.id | default('missing-id') }}"
-
-- name: Reject duplicate IDs, serials, or device locations
-  when:
-    - chia_darwin_enable_hw_vdf | bool
-    - chia_darwin_hw_vdf_boards | length > 0
-  vars:
-    board_ids: "{{ chia_darwin_hw_vdf_boards | map(attribute='id') | map('string') | list }}"
-    board_serials: "{{ chia_darwin_hw_vdf_boards | map(attribute='expected_serial') | list }}"
-    board_locs: "{{ chia_darwin_hw_vdf_boards | map(attribute='device_loc') | map('int') | list }}"
-  ansible.builtin.assert:
-    that:
-      - board_ids | unique | length == board_ids | length
-      - board_serials | unique | length == board_serials | length
-      - board_locs | unique | length == board_locs | length
-    fail_msg: >-
-      id, expected_serial, and device_loc must be unique. Got IDs {{ board_ids }}.
+- name: Discover attached ASIC boards
+  ansible.builtin.include_tasks: darwin-hw-vdf-discover.yml
 
 - name: List the boards in ID order
   when: chia_darwin_enable_hw_vdf | bool
@@ -123,8 +19,10 @@
         expected_serial: "{{ chia_darwin_hw_vdf_expected_serial }}"
         vdf_threads: "{{ chia_darwin_hw_vdf_vdf_threads | int }}"
         proof_threads: "{{ chia_darwin_hw_vdf_proof_threads | int }}"
+    use_legacy: "{{ (chia_darwin_hw_vdf_boards | length == 0) and (chia_darwin_hw_vdf_expected_serial | length > 0) }}"
   ansible.builtin.set_fact:
-    chia_darwin_hw_vdf_input: "{{ chia_darwin_hw_vdf_boards | sort(attribute='id') if chia_darwin_hw_vdf_boards | length > 0 else legacy_row }}"
+    chia_darwin_hw_vdf_legacy: "{{ use_legacy | bool }}"
+    chia_darwin_hw_vdf_input: "{{ chia_darwin_hw_vdf_boards | sort(attribute='id') if chia_darwin_hw_vdf_boards | length > 0 else (legacy_row if (use_legacy | bool) else chia_darwin_hw_vdf_discovered_boards) }}"
   changed_when: false
 
 - name: Assign one mask per board
@@ -135,7 +33,7 @@
       - [7]
       - [3, 1]
       - [1, 1, 1]
-    use_legacy_mask: "{{ chia_darwin_hw_vdf_boards | length == 0 }}"
+    use_legacy_mask: "{{ chia_darwin_hw_vdf_legacy | bool }}"
     mask: "{{ (chia_darwin_hw_vdf_mask | int) if (use_legacy_mask | bool) else hw_vdf_masks[chia_darwin_hw_vdf_input | length][ansible_loop.index0] }}"
     slot_name: "{{ 'hw-vdf' if (item.id | int) == 1 else 'hw-vdf-' ~ (item.id | int) }}"
     row:

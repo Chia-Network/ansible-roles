@@ -7,19 +7,47 @@ lowest ID and 1 on the other, and three boards use 1 each. `N_VDFS` is the
 popcount of that mask. Frequency stays 1540 and voltage stays 1.0. `vdf_threads`
 and `proof_threads` stay 12 and 11 unless that board sets them.
 
-This role does not discover USB devices. Copy each `device_loc` and
-`expected_serial` from `hw_vdf_client --list`. Location IDs change when cables
-or hubs change. `--expected-serial` checks the board opened at `--device-loc`
-and the client exits before it writes clock or voltage on a mismatch. `0` means
-the first interface-A device and is allowed only for one board. Each entry may
-contain only `id`, `device_loc`, `expected_serial`, `vdf_threads`, and
-`proof_threads`.
+## Where the board list comes from
+
+With `chia_darwin_enable_hw_vdf` true, precedence is:
+
+1. A non-empty `chia_darwin_hw_vdf_boards` list is used as written. It pins
+   each board and skips discovery.
+2. An empty list with a non-empty `chia_darwin_hw_vdf_expected_serial` keeps
+   the legacy single-board path: mask from `chia_darwin_hw_vdf_mask`, no
+   `--device-loc`, and no discovery.
+3. An empty list with both unset auto-discovers attached boards with
+   `hw_vdf_client --list` after chiavdf is installed.
+
+`hw_vdf_client --list` is the same source chiavdf uses for `--device-loc`.
+Only interface-A rows are printed. Auto-discovery sorts the rows by printed
+serial, assigns IDs 1..N in that order, and looks up the current `loc` on every
+run, so IDs stay stable when cables or hubs change. For `--expected-serial` it
+strips one trailing interface letter (A/B/C/D) when present, otherwise it uses
+the printed serial as-is. Discovery fails clearly when it finds 0 boards, more
+than 3 boards, or when `--list` fails or cannot be parsed.
+
+Example `--list` output (example only, not captured from a real host):
+
+```
+List of available devices:
+Device 0: 'Example Chia ASIC A', loc 1101, serial 'EXAMPLE00000001A'
+Device 1: 'Example Chia ASIC A', loc 1102, serial 'EXAMPLE00000002A'
+```
+
+For an explicit list, copy each `device_loc` and `expected_serial` from
+`hw_vdf_client --list`. Location IDs change when cables or hubs change.
+`--expected-serial` checks the board opened at `--device-loc` and the client
+exits before it writes clock or voltage on a mismatch. `0` means the first
+interface-A device and is allowed only for one board. Each entry may contain
+only `id`, `device_loc`, `expected_serial`, `vdf_threads`, and `proof_threads`.
 
 An empty list keeps one LaunchDaemon, `<prefix>.hw-vdf`, with
-`chia_darwin_hw_vdf_mask` (default 7) and no `--device-loc`. Do not set that
-scalar serial and the list together. ID 1 is `<prefix>.hw-vdf`. IDs 2 and 3 are
-`<prefix>.hw-vdf-2` and `<prefix>.hw-vdf-3`. IDs do not have to be contiguous.
-With IDs 1 and 3, ID 1 still runs two engines.
+`chia_darwin_hw_vdf_mask` (default 7) and no `--device-loc` when the legacy
+serial is set. Do not set that scalar serial and the list together. ID 1 is
+`<prefix>.hw-vdf`. IDs 2 and 3 are `<prefix>.hw-vdf-2` and
+`<prefix>.hw-vdf-3`. IDs do not have to be contiguous. With IDs 1 and 3, ID 1
+still runs two engines.
 
 ```yaml
 chia_darwin_hw_vdf_expected_serial: ""
@@ -69,12 +97,15 @@ already has some other plist, the run fails until
 apply to every enabled board. The restart handler waits for each job's
 `ExitTimeOut` plus `chia_darwin_restart_unload_margin` before bootstrap.
 
-Rollout: run `hw_vdf_client --list`, set `chia_darwin_hw_vdf_boards`, and clear
-`chia_darwin_hw_vdf_expected_serial`. ID 1 keeps `<prefix>.hw-vdf`. Confirm
-three client connections on `chia_timelord_launcher_port` (8000 unless you
-changed it). Rollback to one board by leaving a single inventory entry, or by
-clearing the list and setting only the scalar serial, which omits
-`--device-loc`. `remote-node` still has no local full node, and every ASIC
+Rollout: leave `chia_darwin_hw_vdf_boards` empty and clear
+`chia_darwin_hw_vdf_expected_serial` to let the role discover boards with
+`hw_vdf_client --list`. To pin locations, run `hw_vdf_client --list`, set
+`chia_darwin_hw_vdf_boards`, and clear `chia_darwin_hw_vdf_expected_serial`.
+ID 1 keeps `<prefix>.hw-vdf`. Confirm three client connections on
+`chia_timelord_launcher_port` (8000 unless you changed it). Rollback to one
+board by leaving a single inventory entry, by clearing the list and setting
+only the scalar serial (which omits `--device-loc`), or by attaching one board
+for auto-discovery. `remote-node` still has no local full node, and every ASIC
 client still connects to the local timelord.
 
 This role does not install or change an external watchdog. A watchdog that

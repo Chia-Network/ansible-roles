@@ -1,0 +1,3 @@
+# Example hw_vdf_client --list output for tests only.
+# Not captured from real hardware. Serials and locations are made up.
+List of available devices:

@@ -24,7 +24,7 @@
         - expect: not both
           serial: FIX-BOARD-0001
           boards: "{{ fixture_boards }}"
-        - expect: "Set chia_darwin_hw_vdf_boards or"
+        - expect: "Auto-discovery"
           boards: []
         - expect: must be a list
           boards: not-a-list
