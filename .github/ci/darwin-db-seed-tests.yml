@@ -54,6 +54,21 @@
         - fail-publish
         - launchctl.log
 
+    - name: Check the publish include applies the service-user directives
+      ansible.builtin.command:
+        argv:
+          - "{{ ansible_playbook_python }}"
+          - "{{ playbook_dir }}/check_darwin_db_seed_publish_become.py"
+          - --tasks
+          - "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+          - --defaults
+          - "{{ playbook_dir }}/../../chia-blockchain/defaults/main.yml"
+          - --service-user
+          - "{{ test_user }}-publish-service"
+          - --remote-user
+          - "{{ test_user }}"
+      changed_when: false
+
     - name: Prepare the scenario directories
       ansible.builtin.file:
         path: "{{ item }}"

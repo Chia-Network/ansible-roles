@@ -220,7 +220,11 @@
         # never at the final path. The include stops at the first failed
         # rename, so no later file, especially the main database, is published.
         - name: Publish the snapshot files with the main database last
-          ansible.builtin.include_tasks: darwin-db-seed-publish.yml
+          ansible.builtin.include_tasks:
+            file: darwin-db-seed-publish.yml
+            apply:
+              become: "{{ chia_darwin_db_seed_become | bool }}"
+              become_user: "{{ user }}"
           loop: "{{ chia_darwin_db_seed_files }}"
           loop_control:
             label: "{{ item }}"
