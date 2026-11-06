@@ -105,10 +105,11 @@ not wait for the others. Set the stagger to 0 to open every board after the
 shared settle.
 
 Adding a board, or retrying when an enabled board is not loaded, stops the
-loaded role-owned hw-vdf jobs and waits until they have exited. The restart
-handler then starts every enabled board that is down, in ID order, after the
-timelord. A loaded label this role does not own does not block that start,
-and a second run does not bootstrap boards that are already loaded.
+loaded role-owned hw-vdf jobs and waits until they have exited. The launchd
+loop then starts every enabled board that is down, in ID order. That does
+not restart the daemon, full node, or timelord. Those jobs restart only when
+their own files change. A loaded label this role does not own does not block
+the start, and a second run does not bootstrap boards that are already loaded.
 `--device-loc` is an option before the port and `N_VDFS` arguments.
 
 ## Logs, plists, and wrappers

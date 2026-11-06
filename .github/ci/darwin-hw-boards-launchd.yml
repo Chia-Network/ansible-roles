@@ -400,3 +400,76 @@
           - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf-2') is file
           - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf-3') is file
           - (launch_state ~ '/loaded/com.example.keep') is file
+
+    - name: Remember running service jobs
+      ansible.builtin.set_fact:
+        hw_service_jobs:
+          - name: daemon
+            label: net.chia.timelord.daemon
+            wrapper: "{{ chia_darwin_bin_dir }}/chia-daemon-run.sh"
+            throttle: 15
+            exit_timeout: 60
+            enabled: true
+          - name: full-node
+            label: net.chia.timelord.full-node
+            wrapper: "{{ chia_darwin_bin_dir }}/chia-full-node-run.sh"
+            throttle: 30
+            exit_timeout: 300
+            enabled: true
+          - name: timelord
+            label: net.chia.timelord.timelord
+            wrapper: "{{ chia_darwin_bin_dir }}/chia-timelord-run.sh"
+            throttle: 15
+            exit_timeout: 60
+            enabled: true
+    - name: Apply two boards while the service jobs are running
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards: "{{ fixture_two_boards }}"
+        hw_apply_service_jobs: "{{ hw_service_jobs }}"
+    - name: Mark the service jobs loaded
+      ansible.builtin.file:
+        path: "{{ launch_state }}/loaded/{{ item.label }}"
+        state: touch
+        mode: "0644"
+      loop: "{{ hw_service_jobs }}"
+      loop_control:
+        label: "{{ item.label }}"
+    - name: Drop hw-vdf-2 while the service jobs stay loaded
+      ansible.builtin.file:
+        path: "{{ launch_state }}/loaded/net.chia.timelord.hw-vdf-2"
+        state: absent
+    - name: Clear the launchctl log before the service-job retry
+      ansible.builtin.copy:
+        dest: "{{ launch_log }}"
+        mode: "0644"
+        content: ""
+    - name: Retry the down board without restarting service jobs
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards: "{{ fixture_two_boards }}"
+        hw_apply_service_jobs: "{{ hw_service_jobs }}"
+    - name: Read the service-job retry log
+      ansible.builtin.slurp:
+        src: "{{ launch_log }}"
+      register: service_retry_log
+    - name: The down board starts and the running service jobs stay up
+      vars:
+        log_text: "{{ service_retry_log.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf-2') is file
+          - (launch_state ~ '/loaded/net.chia.timelord.daemon') is file
+          - (launch_state ~ '/loaded/net.chia.timelord.full-node') is file
+          - (launch_state ~ '/loaded/net.chia.timelord.timelord') is file
+          - (launch_state ~ '/loaded/com.example.keep') is file
+          - log_text.split('bootstrap system')[0] is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf$')
+          - log_text.split('hw-vdf-2.plist')[0] is search('hw-vdf.plist')
+          - "'bootout system/net.chia.timelord.daemon' not in log_text"
+          - "'bootout system/net.chia.timelord.full-node' not in log_text"
+          - "'bootout system/net.chia.timelord.timelord' not in log_text"
+          - "'daemon.plist' not in log_text"
+          - "'full-node.plist' not in log_text"
+          - "'timelord.plist' not in log_text"

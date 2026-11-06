@@ -29,3 +29,12 @@
   loop_control:
     loop_var: chia_job
     label: "{{ chia_job.label }}"
+  when: chia_job.board is not defined
+
+- name: restart-chia-darwin-hw-vdf
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/darwin-restart-job.yml"
+  loop: "{{ chia_darwin_launchd_jobs }}"
+  loop_control:
+    loop_var: chia_job
+    label: "{{ chia_job.label }}"
+  when: chia_job.board is defined

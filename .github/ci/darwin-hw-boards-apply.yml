@@ -9,6 +9,7 @@
     chia_darwin_start_now: "{{ hw_apply_start_now | default(true) }}"
     chia_darwin_start_on_boot: "{{ hw_apply_start_on_boot | default(true) }}"
     chia_darwin_hw_vdf_claim_existing: "{{ hw_apply_claim | default(false) }}"
+    chia_darwin_service_jobs: "{{ hw_apply_service_jobs | default([]) }}"
 
 - name: Resolve the inventory
   ansible.builtin.include_role:

@@ -14,4 +14,4 @@
   loop_control:
     label: "{{ item.wrapper }}"
   when: item.enabled | bool
-  notify: restart-chia-darwin
+  notify: restart-chia-darwin-hw-vdf

@@ -76,7 +76,8 @@
 
 # When an enabled board is not loaded, stop the loaded role-owned jobs
 # first. The launchd loop then starts every enabled board that is down,
-# in ID order. A loaded label this role does not own does not block that.
+# in ID order. That path does not notify the service restart handler.
+# A loaded label this role does not own does not block the start.
 - name: Clear the board-count change flag
   ansible.builtin.set_fact:
     chia_darwin_hw_vdf_regroup: false
@@ -127,10 +128,3 @@
       loop_control:
         extended: true
         label: "{{ item.label }}"
-
-    - name: Let the restart handler start the hw-vdf set
-      when: chia_darwin_hw_vdf_regroup | bool
-      ansible.builtin.debug:
-        msg: An enabled hw-vdf job is down, so the restart handler will start the set.
-      changed_when: true
-      notify: restart-chia-darwin
