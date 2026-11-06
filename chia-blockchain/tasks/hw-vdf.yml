@@ -18,6 +18,38 @@
   retries: 100
   until: hwvdf_install is success or ('Failed to lock apt for exclusive operation' not in hwvdf_install.msg and '/var/lib/dpkg/lock' not in hwvdf_install.msg)
 
+# The package's udev rule must also be applied to ASICs attached before install.
+# Run on every deployment to repair hosts where the package is already present.
+- name: Reload udev rules for HW VDF ASICs
+  become: true
+  ansible.builtin.command:
+    argv:
+      - udevadm
+      - control
+      - --reload-rules
+  changed_when: false
+
+- name: Apply udev rules to connected HW VDF ASICs
+  become: true
+  ansible.builtin.command:
+    argv:
+      - udevadm
+      - trigger
+      - --action=change
+      - --subsystem-match=usb
+      - --attr-match=idVendor=0403
+      - --attr-match=idProduct=601c
+  changed_when: false
+
+- name: Wait for HW VDF ASIC permission updates
+  become: true
+  ansible.builtin.command:
+    argv:
+      - udevadm
+      - settle
+      - --timeout=30
+  changed_when: false
+
 - name: Install iproute2 for HW VDF ASIC connection checks
   become: true
   ansible.builtin.apt:
