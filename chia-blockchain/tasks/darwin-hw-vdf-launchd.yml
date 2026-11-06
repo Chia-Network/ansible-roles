@@ -44,63 +44,18 @@
     - not (chia_darwin_hw_vdf_claim_existing | bool)
     - (item.rc | default(2) | int) == 1
 
-- name: Clear the hw-vdf removal list
+- name: Build the LaunchDaemon list
   ansible.builtin.set_fact:
-    chia_darwin_hw_vdf_owned_labels: []
+    chia_darwin_launchd_jobs: >-
+      {{
+        (chia_darwin_service_jobs | default([]))
+        + (chia_darwin_hw_vdf_jobs | selectattr('enabled', 'truthy') | list)
+        + (
+          chia_darwin_hw_plist_owner.results
+          | selectattr('rc', 'equalto', 0)
+          | map(attribute='item')
+          | rejectattr('enabled', 'truthy')
+          | list
+        )
+      }}
   changed_when: false
-
-- name: Record hw-vdf jobs this role will remove
-  ansible.builtin.set_fact:
-    chia_darwin_hw_vdf_owned_labels: "{{ chia_darwin_hw_vdf_owned_labels + [item.item.label] }}"
-  loop: "{{ chia_darwin_hw_plist_owner.results }}"
-  loop_control:
-    label: "{{ item.item.label }}"
-  when:
-    - not (item.item.enabled | bool)
-    - (item.rc | default(2) | int) == 0
-  changed_when: false
-
-- name: Start the LaunchDaemon list with the non-ASIC jobs
-  ansible.builtin.set_fact:
-    chia_darwin_launchd_jobs: "{{ chia_darwin_service_jobs | default([]) }}"
-  changed_when: false
-
-- name: Add enabled or role-owned hw-vdf jobs
-  ansible.builtin.set_fact:
-    chia_darwin_launchd_jobs: "{{ chia_darwin_launchd_jobs + [item] }}"
-  loop: "{{ chia_darwin_hw_vdf_jobs }}"
-  loop_control:
-    label: "{{ item.label }}"
-  when: (item.enabled | bool) or (item.label in chia_darwin_hw_vdf_owned_labels)
-  changed_when: false
-
-# A down board asks the ordered restart handler to start it. Loaded
-# siblings stay up unless their own files changed, or a service restart
-# stops every board first.
-- name: See which hw-vdf jobs are loaded
-  when: chia_darwin_start_now | bool
-  become: "{{ chia_darwin_launchd_become | bool }}"
-  ansible.builtin.command:
-    argv:
-      - "{{ chia_darwin_launchctl }}"
-      - print
-      - "system/{{ item.label }}"
-  register: chia_darwin_hw_vdf_running
-  changed_when: false
-  failed_when: false
-  loop: "{{ chia_darwin_hw_vdf_jobs }}"
-  loop_control:
-    label: "{{ item.label }}"
-
-- name: Start the handler when an enabled hw-vdf job is down
-  when:
-    - chia_darwin_start_now | bool
-    - item.item.enabled | bool
-    - item.rc | int != 0
-  ansible.builtin.debug:
-    msg: "{{ item.item.label }} is not loaded."
-  loop: "{{ chia_darwin_hw_vdf_running.results | default([]) }}"
-  loop_control:
-    label: "{{ item.item.label }}"
-  changed_when: true
-  notify: restart-chia-darwin

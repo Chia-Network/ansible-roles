@@ -2,6 +2,13 @@
 - name: Reset inputs before applying boards
   ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
 
+- name: Clear the launchctl log for this apply
+  when: launch_log is defined
+  ansible.builtin.copy:
+    dest: "{{ launch_log }}"
+    mode: "0644"
+    content: ""
+
 - name: Set the inventory to apply
   ansible.builtin.set_fact:
     chia_darwin_hw_vdf_expected_serial: "{{ hw_apply_serial }}"
@@ -44,3 +51,9 @@
 
 - name: Run pending LaunchDaemon restarts
   ansible.builtin.meta: flush_handlers
+
+- name: Read the launchctl log for this apply
+  when: launch_log is defined
+  ansible.builtin.slurp:
+    src: "{{ launch_log }}"
+  register: hw_apply_log

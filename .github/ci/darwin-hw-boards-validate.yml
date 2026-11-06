@@ -11,153 +11,82 @@
     chia_darwin_log_dir: /tmp/chia-darwin-hw/home/Library/Logs/chia
     chia_root: /tmp/chia-darwin-hw/home/.chia/mainnet
   tasks:
-    - name: Reject a board list and a legacy serial together
+    - name: Reject invalid inventories
       ansible.builtin.include_tasks: darwin-hw-boards-case.yml
       vars:
-        hw_case_serial: FIX-BOARD-0001
-        hw_case_boards: "{{ fixture_boards }}"
-        hw_case_expect: not both
-
-    - name: Reject neither a serial nor a board list
-      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
-      vars:
-        hw_case_serial: ""
-        hw_case_boards: []
-        hw_case_expect: "Set chia_darwin_hw_vdf_boards or"
-
-    - name: Reject a board list that is not a list
-      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
-      vars:
-        hw_case_serial: ""
-        hw_case_boards: "not-a-list"
-        hw_case_expect: must be a list
-
-    - name: Reject duplicate board IDs
-      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
-      vars:
-        hw_case_serial: ""
-        hw_case_boards:
-          - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
-          - { id: 1, device_loc: 1102, expected_serial: FIX-BOARD-0002 }
-        hw_case_expect: must be unique
-
-    - name: Reject a board ID outside 1, 2, and 3
-      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
-      vars:
-        hw_case_serial: ""
-        hw_case_boards:
-          - { id: 4, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
-        hw_case_expect: "1, 2, or 3"
-
-    - name: Reject an unknown per-board key
-      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
-      vars:
-        hw_case_serial: ""
-        hw_case_boards:
-          - {
-              id: 1,
-              device_loc: 1101,
-              expected_serial: FIX-BOARD-0001,
-              mask: 1,
-            }
-        hw_case_expect: only allows
-
-    - name: Reject duplicate serials
-      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
-      vars:
-        hw_case_serial: ""
-        hw_case_boards:
-          - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
-          - { id: 2, device_loc: 1102, expected_serial: FIX-BOARD-0001 }
-        hw_case_expect: must be unique
-
-    - name: Reject duplicate device locations
-      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
-      vars:
-        hw_case_serial: ""
-        hw_case_boards:
-          - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
-          - { id: 2, device_loc: 1101, expected_serial: FIX-BOARD-0002 }
-        hw_case_expect: must be unique
-
-    - name: Reject device_loc 0 when more than one board is configured
-      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
-      vars:
-        hw_case_serial: ""
-        hw_case_boards:
-          - { id: 1, device_loc: 0, expected_serial: FIX-BOARD-0001 }
-          - { id: 2, device_loc: 1102, expected_serial: FIX-BOARD-0002 }
-        hw_case_expect: device_loc 0
-
-    - name: Reject a serial the client would reject
-      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
-      vars:
-        hw_case_serial: ""
-        hw_case_boards:
-          - { id: 1, device_loc: 1101, expected_serial: "FIX BOARD 00001" }
-        hw_case_expect: expected_serial
-
-    - name: Reject a 16 character serial
-      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
-      vars:
-        hw_case_serial: ""
-        hw_case_boards:
-          - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-000001 }
-        hw_case_expect: expected_serial
-
-    - name: Reject a non-numeric device location
-      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
-      vars:
-        hw_case_serial: ""
-        hw_case_boards:
-          - { id: 1, device_loc: abc, expected_serial: FIX-BOARD-0001 }
-        hw_case_expect: device_loc
-
-    - name: Reject a device location above 32 bits
-      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
-      vars:
-        hw_case_serial: ""
-        hw_case_boards:
-          - { id: 1, device_loc: 4294967296, expected_serial: FIX-BOARD-0001 }
-        hw_case_expect: device_loc
-
-    - name: Reject per-board proof threads that are not lower than vdf threads
-      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
-      vars:
-        hw_case_serial: ""
-        hw_case_boards:
-          - {
-              id: 1,
-              device_loc: 1101,
-              expected_serial: FIX-BOARD-0001,
-              vdf_threads: 8,
-              proof_threads: 8,
-            }
-        hw_case_expect: proof_threads
-
-    - name: Reject frequency outside the client range
-      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
-      vars:
-        hw_case_serial: FIX-BOARD-0001
-        hw_case_boards: []
-        hw_case_freq: 199
-        hw_case_expect: out of range
-
-    - name: Reject voltage above 1.0
-      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
-      vars:
-        hw_case_serial: FIX-BOARD-0001
-        hw_case_boards: []
-        hw_case_voltage: "1.01"
-        hw_case_expect: out of range
-
-    - name: Reject a checkpoint threshold the client rejects
-      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
-      vars:
-        hw_case_serial: FIX-BOARD-0001
-        hw_case_boards: []
-        hw_case_checkpoint: 7999
-        hw_case_expect: out of range
+        hw_case_serial: "{{ item.serial | default('') }}"
+        hw_case_boards: "{{ item.boards | default([]) }}"
+        hw_case_expect: "{{ item.expect }}"
+        hw_case_freq: "{{ item.freq | default(1540) }}"
+        hw_case_voltage: "{{ item.voltage | default('1.0') }}"
+        hw_case_checkpoint: "{{ item.checkpoint | default(500000) }}"
+      loop:
+        - expect: not both
+          serial: FIX-BOARD-0001
+          boards: "{{ fixture_boards }}"
+        - expect: "Set chia_darwin_hw_vdf_boards or"
+          boards: []
+        - expect: must be a list
+          boards: not-a-list
+        - expect: must be unique
+          boards:
+            - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
+            - { id: 1, device_loc: 1102, expected_serial: FIX-BOARD-0002 }
+        - expect: "1, 2, or 3"
+          boards:
+            - { id: 4, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
+        - expect: only allows
+          boards:
+            - {
+                id: 1,
+                device_loc: 1101,
+                expected_serial: FIX-BOARD-0001,
+                mask: 1,
+              }
+        - expect: must be unique
+          boards:
+            - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
+            - { id: 2, device_loc: 1102, expected_serial: FIX-BOARD-0001 }
+        - expect: must be unique
+          boards:
+            - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
+            - { id: 2, device_loc: 1101, expected_serial: FIX-BOARD-0002 }
+        - expect: device_loc 0
+          boards:
+            - { id: 1, device_loc: 0, expected_serial: FIX-BOARD-0001 }
+            - { id: 2, device_loc: 1102, expected_serial: FIX-BOARD-0002 }
+        - expect: expected_serial
+          boards:
+            - { id: 1, device_loc: 1101, expected_serial: "FIX BOARD 00001" }
+        - expect: expected_serial
+          boards:
+            - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-000001 }
+        - expect: device_loc
+          boards:
+            - { id: 1, device_loc: abc, expected_serial: FIX-BOARD-0001 }
+        - expect: device_loc
+          boards:
+            - { id: 1, device_loc: 4294967296, expected_serial: FIX-BOARD-0001 }
+        - expect: proof_threads
+          boards:
+            - {
+                id: 1,
+                device_loc: 1101,
+                expected_serial: FIX-BOARD-0001,
+                vdf_threads: 8,
+                proof_threads: 8,
+              }
+        - expect: out of range
+          serial: FIX-BOARD-0001
+          freq: 199
+        - expect: out of range
+          serial: FIX-BOARD-0001
+          voltage: "1.01"
+        - expect: out of range
+          serial: FIX-BOARD-0001
+          checkpoint: 7999
+      loop_control:
+        label: "{{ item.expect }}"
 
     - name: Accept the legacy single-board settings
       ansible.builtin.include_tasks: darwin-hw-boards-reset.yml

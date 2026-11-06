@@ -12,15 +12,7 @@
     mode: "0644"
   when: chia_job.enabled | bool
   register: chia_darwin_plist_written
-  notify: restart-chia-darwin
-
-- name: A service plist change restarts the shared runtime
-  ansible.builtin.set_fact:
-    chia_darwin_restart_boards_only: false
-  when:
-    - chia_darwin_plist_written is changed
-    - chia_job.board is not defined
-  changed_when: false
+  notify: "{{ 'restart-chia-darwin-boards' if chia_job.board is defined else 'restart-chia-darwin' }}"
 
 - name: A board plist change restarts that board
   ansible.builtin.set_fact:
@@ -90,6 +82,17 @@
     - chia_darwin_launchd_loaded.rc != 0
     # Boards start from the ordered restart handler, after any service restart.
     - chia_job.board is not defined
+
+- name: Start ASIC board {{ chia_job.label }} from the ordered restart
+  ansible.builtin.debug:
+    msg: "{{ chia_job.label }} is not loaded."
+  when:
+    - chia_job.board is defined
+    - chia_job.enabled | bool
+    - chia_darwin_start_now | bool
+    - chia_darwin_launchd_loaded.rc != 0
+  changed_when: true
+  notify: restart-chia-darwin-boards
 
 - name: Record freshly bootstrapped LaunchDaemons
   ansible.builtin.set_fact:

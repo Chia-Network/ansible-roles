@@ -15,7 +15,7 @@
     label: "{{ item.wrapper }}"
   when: item.enabled | bool
   register: chia_darwin_hw_vdf_wrappers
-  notify: restart-chia-darwin
+  notify: restart-chia-darwin-boards
 
 - name: Remember hw-vdf wrappers that changed
   ansible.builtin.set_fact:

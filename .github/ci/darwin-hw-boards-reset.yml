@@ -16,5 +16,5 @@
     chia_darwin_start_on_boot: true
     chia_darwin_service_jobs: []
     chia_darwin_fresh_bootstraps: []
-    chia_darwin_restart_boards_only: true
+    chia_darwin_restart_services: false
     chia_darwin_hw_vdf_changed_labels: []
