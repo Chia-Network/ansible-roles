@@ -1,0 +1,60 @@
+---
+# Two role-managed wrappers claim the same board with base/full spellings.
+# Discovery must reject either order without letting the serial pattern pick
+# an identity.
+- name: Reset inputs before the {{ hw_alias_order }} alias order
+  ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+
+- name: Create the wrapper directory for the {{ hw_alias_order }} alias order
+  ansible.builtin.file:
+    path: "{{ chia_darwin_bin_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Remove any wrappers at the alias test slots
+  ansible.builtin.file:
+    path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf{{ '' if item == 1 else '-' ~ item }}-run.sh"
+    state: absent
+  loop: [1, 2]
+
+- name: Plant the two alias wrappers in {{ hw_alias_order }} order
+  ansible.builtin.copy:
+    dest: "{{ chia_darwin_bin_dir }}/chia-hw-vdf{{ '' if item.id == 1 else '-' ~ item.id }}-run.sh"
+    mode: "0644"
+    content: |
+      #!/bin/zsh
+      # Managed by the chia-blockchain Ansible role.
+      SERIAL={{ item.serial }}
+      DEVICE_LOC={{ item.loc }}
+  loop: "{{ hw_alias_rows }}"
+  loop_control:
+    label: "{{ item.id }}"
+
+- name: Install a header-only --list fixture for the {{ hw_alias_order }} alias order
+  ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+  vars:
+    hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-header.txt"
+
+- name: Expect duplicate alias claims to fail ({{ hw_alias_order }})
+  block:
+    - name: Resolve two alias spellings of the same board
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: Discovery accepted two alias spellings of one board
+      ansible.builtin.fail:
+        msg: discovery accepted alias claims
+  rescue:
+    - name: The alias failure names the duplicate serial
+      vars:
+        failure_text: "{{ ansible_failed_result | to_json }}"
+      ansible.builtin.assert:
+        that:
+          - failure_text is search('same board serial CHIA9999999001')
+          - "'discovery accepted alias claims' not in failure_text"
+
+- name: Remove the alias test wrappers
+  ansible.builtin.file:
+    path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf{{ '' if item == 1 else '-' ~ item }}-run.sh"
+    state: absent
+  loop: [1, 2]

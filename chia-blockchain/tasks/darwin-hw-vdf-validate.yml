@@ -1,6 +1,6 @@
 ---
-# Inventory validation only. The board list is validated once, after discovery
-# and selection, so explicit, legacy, and discovered rows share these checks.
+# Shared inventory checks that do not need the selected board list. darwin.yml
+# includes this before it creates the user, changes pmset, or installs anything.
 - name: Require shared hw_vdf_client options and one inventory source
   when: chia_darwin_enable_hw_vdf | bool
   ansible.builtin.assert:
@@ -47,70 +47,3 @@
     fail_msg: >-
       chia_darwin_hw_vdf_expected_serial must be 1-15 printable non-space
       characters, and chia_darwin_hw_vdf_mask must be 1-7.
-
-- name: Check each selected board
-  when:
-    - chia_darwin_enable_hw_vdf | bool
-    - not (chia_darwin_hw_vdf_legacy | default(false) | bool)
-    - chia_darwin_hw_vdf_input is sequence
-    - chia_darwin_hw_vdf_input is not string
-    - chia_darwin_hw_vdf_input is not mapping
-    - chia_darwin_hw_vdf_input | length > 0
-  vars:
-    allowed_keys:
-      - id
-      - device_loc
-      - expected_serial
-      - vdf_threads
-      - proof_threads
-    board_vdf_threads: "{{ item.vdf_threads | default(chia_darwin_hw_vdf_vdf_threads) }}"
-    board_proof_threads: "{{ item.proof_threads | default(chia_darwin_hw_vdf_proof_threads) }}"
-  ansible.builtin.assert:
-    that:
-      - item is mapping
-      - item.keys() | difference(allowed_keys) | length == 0
-      - item.id is defined
-      - item.id | string is match('^[123]$')
-      - item.device_loc is defined
-      - item.device_loc | string is match('^[0-9]+$')
-      - (item.device_loc | int) <= 4294967295
-      - chia_darwin_hw_vdf_input | length == 1 or (item.device_loc | int) > 0
-      - item.expected_serial is defined
-      - item.expected_serial is string
-      - item.expected_serial is match('^[!-~]{1,15}$')
-      - board_vdf_threads | string is match('^[0-9]+$')
-      - (board_vdf_threads | int) >= 2
-      - (board_vdf_threads | int) <= 64
-      - board_proof_threads | string is match('^[0-9]+$')
-      - (board_proof_threads | int) >= 1
-      - (board_proof_threads | int) < (board_vdf_threads | int)
-    fail_msg: >-
-      Board {{ item.id | default('?') }} only allows id, device_loc,
-      expected_serial, vdf_threads, and proof_threads. id must be 1, 2, or 3.
-      expected_serial is 1-15 printable non-space characters. device_loc is the
-      decimal location from hw_vdf_client --list, with no leading zeros.
-      device_loc 0 is allowed only for a single board. proof_threads must be lower than
-      vdf_threads (2-64).
-  loop: "{{ chia_darwin_hw_vdf_input }}"
-  loop_control:
-    label: "{{ item.id | default('missing-id') }}"
-
-- name: Reject duplicate IDs, serials, or device locations
-  when:
-    - chia_darwin_enable_hw_vdf | bool
-    - not (chia_darwin_hw_vdf_legacy | default(false) | bool)
-    - chia_darwin_hw_vdf_input is sequence
-    - chia_darwin_hw_vdf_input is not string
-    - chia_darwin_hw_vdf_input is not mapping
-    - chia_darwin_hw_vdf_input | length > 0
-  vars:
-    board_ids: "{{ chia_darwin_hw_vdf_input | map(attribute='id') | map('string') | list }}"
-    board_serials: "{{ chia_darwin_hw_vdf_input | map(attribute='expected_serial') | list }}"
-    board_locs: "{{ chia_darwin_hw_vdf_input | map(attribute='device_loc') | map('int') | list }}"
-  ansible.builtin.assert:
-    that:
-      - board_ids | unique | length == board_ids | length
-      - board_serials | unique | length == board_serials | length
-      - board_locs | unique | length == board_locs | length
-    fail_msg: >-
-      id, expected_serial, and device_loc must be unique. Got IDs {{ board_ids }}.

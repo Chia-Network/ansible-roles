@@ -83,6 +83,9 @@
         exit_timeout: "{{ chia_darwin_timelord_exit_timeout }}"
         enabled: true
 
+- name: Validate shared ASIC options before changing the host
+  ansible.builtin.include_tasks: darwin-hw-vdf-validate.yml
+
 - name: Ensure the timelord service user exists
   become: true
   ansible.builtin.user:

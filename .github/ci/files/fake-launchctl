@@ -35,6 +35,10 @@ print)
 	;;
 bootout)
 	label=${1#system/}
+	if [ -f "$STATE/fail/$label" ]; then
+		echo "bootout failed $label" >&2
+		exit 5
+	fi
 	if [ ! -f "$STATE/loaded/$label" ]; then
 		echo "not loaded $label" >&2
 		exit 3

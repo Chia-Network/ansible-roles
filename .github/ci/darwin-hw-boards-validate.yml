@@ -39,6 +39,21 @@
             - id: 4
               device_loc: 1101
               expected_serial: FIX-BOARD-0001
+        - expect: "1, 2, or 3"
+          boards:
+            - id: "01"
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
+        - expect: "1, 2, or 3"
+          boards:
+            - id: 1.0
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
+        - expect: "1, 2, or 3"
+          boards:
+            - id: "1.0"
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
         - expect: only allows
           boards:
             - id: 1
@@ -295,3 +310,23 @@
         that:
           - chia_darwin_hw_vdf_active | map(attribute='n_vdfs') | map('int') | sum == 3
           - not ((chia_darwin_bin_dir ~ '/chia-hw-vdf-run.sh') is file)
+
+- name: Check ASIC validation order
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Read the Darwin role tasks
+      ansible.builtin.slurp:
+        src: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin.yml"
+      register: darwin_tasks
+    - name: Shared ASIC validation runs before the host changes
+      vars:
+        text: "{{ darwin_tasks.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - "text.count('include_tasks: darwin-hw-vdf-validate.yml') == 1"
+          - "text.index('include_tasks: darwin-hw-vdf-validate.yml') < text.index('Ensure the timelord service user exists')"
+          - "text.index('include_tasks: darwin-hw-vdf-validate.yml') < text.index('Apply pmset so the host stays awake')"
+          - "text.index('include_tasks: darwin-hw-vdf-validate.yml') < text.index('Install Homebrew packages as the connecting user')"
+          - "text.index('include_tasks: darwin-hw-vdf-validate.yml') < text.index('Install chiavdf from the Chia Homebrew tap')"

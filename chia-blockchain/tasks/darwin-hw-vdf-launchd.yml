@@ -2,16 +2,8 @@
 # Ownership is the plist text. A plist that runs this role's wrapper is ours.
 # Anything else with the same label is left alone unless
 # chia_darwin_hw_vdf_claim_existing is true.
-- name: Require the system launchctl when the role becomes root
-  when: chia_darwin_launchd_become | bool
-  ansible.builtin.assert:
-    that:
-      - chia_darwin_launchctl in ["launchctl", "/bin/launchctl"]
-      - chia_darwin_launchd_dir == "/Library/LaunchDaemons"
-    fail_msg: >-
-      chia_darwin_launchd_become is true, so chia_darwin_launchctl must be
-      launchctl or /bin/launchctl and chia_darwin_launchd_dir must be
-      /Library/LaunchDaemons.
+- name: Check privileged launchctl settings
+  ansible.builtin.include_tasks: darwin-hw-vdf-launchd-guard.yml
 
 - name: Read each board enabled flag as a boolean
   ansible.builtin.set_fact:

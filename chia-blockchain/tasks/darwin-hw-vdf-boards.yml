@@ -31,7 +31,7 @@
   changed_when: false
 
 - name: Validate ASIC board inventory
-  ansible.builtin.include_tasks: darwin-hw-vdf-validate.yml
+  ansible.builtin.include_tasks: darwin-hw-vdf-validate-boards.yml
 
 - name: Assign one mask per board
   when: chia_darwin_enable_hw_vdf | bool
@@ -79,10 +79,7 @@
       board: "{{ matched[0] if (slot_on | bool) else {} }}"
   ansible.builtin.set_fact:
     chia_darwin_hw_vdf_jobs: "{{ chia_darwin_hw_vdf_jobs + [slot_job] }}"
-  loop:
-    - 1
-    - 2
-    - 3
+  loop: "{{ chia_darwin_hw_vdf_slots }}"
   loop_control:
     label: "{{ chia_darwin_launchd_prefix }}.{{ 'hw-vdf' if item == 1 else 'hw-vdf-' ~ item }}"
   changed_when: false

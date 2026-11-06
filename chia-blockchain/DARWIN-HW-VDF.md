@@ -20,52 +20,77 @@ With `chia_darwin_enable_hw_vdf` true, precedence is:
    `hw_vdf_client --list` after chiavdf is installed.
 
 `hw_vdf_client --list` is the same source chiavdf uses for `--device-loc`.
-It enumerates every FT4222 interface, not only Chia boards. Auto-discovery
-keeps only interface-A Chia ASIC serials that match `^CHIA[0-9]{10}A$`: the
-`CHIA` prefix, ten digits, and a trailing `A`. Rows for other FT4222 devices,
+chiavdf 1.2.2 `FtdiDriver::List()` prints only FT4222H interfaces whose
+description ends in `A`, in the row format
+`Device N: '<description>', loc <id>, serial '<serial>'`
+([source](https://github.com/Chia-Network/chiavdf/blob/1.2.2/src/hw/ftdi_driver.cpp)).
+It does not filter serial numbers to Chia boards. Auto-discovery keeps only
+serials matching `^CHIA[0-9]{10}A$`: the `CHIA` prefix, ten digits, and a
+trailing `A`. That serial pattern is the owner-confirmed factory format for
+these boards; chiavdf does not enforce it. Rows for other FT4222 devices,
 including rows with an empty serial, are valid output and are ignored.
 `--expected-serial` accepts either the printed `CHIA...A` form or the base
 form without that final `A`.
 
-Claimed wrappers and `--list` rows are compared by one canonical interface-A
-identity. A serial gains a final `A` only when the result matches the Chia
-pattern; no other suffix is stripped or rewritten. Newly discovered boards
-keep the base form that earlier releases wrote, and an already claimed
-wrapper keeps the SERIAL spelling it already has. That keeps existing
-wrappers stable while a wrapper written from an explicit full `CHIA...A`
-inventory still matches the same visible board instead of being counted
-twice.
+Claimed wrappers and `--list` rows are matched directly, without the serial
+pattern deciding identity. A stored serial and a listed serial match when they
+are equal or one equals the other with its final letter dropped, in either
+order. The pattern only selects which visible rows are Chia boards. Newly
+discovered boards keep the base form, and an already claimed wrapper keeps the
+SERIAL spelling it already has. That keeps existing wrappers stable while a
+wrapper written from an explicit full `CHIA...A` inventory still matches the
+same visible board instead of being counted twice.
 
 A board held open by a running `hw_vdf_client` does not appear in `--list`.
-Discovery therefore treats this role's installed wrappers at the three
-role-owned slot paths as the persisted board inventory. It reads them as text;
-it never sources or executes them. A wrapper is reused only when it is at one
-of those exact paths and carries the role's management marker. Merge is by
-serial:
+Discovery therefore treats this role's installed wrappers at the role-owned
+slot paths as the persisted board inventory. It reads them as text; it never
+sources or executes them. A wrapper is a claim when it is at one of those exact
+paths and carries the role's management marker and a `DEVICE_LOC` assignment.
+Merge is by serial:
 
 - A claimed board keeps its existing ID. If `--list` can see it, the printed
   `loc` replaces the stored one. If it is hidden, the stored location is kept.
 - A new serial takes the next free ID, in serial order when several boards are
   new. Existing IDs are not renumbered.
-- Adding or removing a board changes the board count, so masks can change
-  naturally. IDs do not move.
+- A board that is removed or detached stays claimed by its wrapper, so the
+  board count and masks do not change until an explicit board list retires it.
+  Adding a board increases the count and can change masks naturally. IDs do not
+  move.
+
+Auto-discovery also takes over legacy and hand-written wrappers. With an empty
+board list and an empty legacy serial, any readable wrapper at a role slot
+that is not a managed per-board claim is stopped first: the role boots out
+that slot's LaunchDaemon and waits for it to unload before running `--list`,
+so a board the old client was holding becomes visible. The old plist and
+wrapper are removed only after enumeration and merge succeed; an enumeration
+failure leaves them in place, although the old client remains stopped. The run
+does not preserve or fail on a hand-made wrapper; interrupting its job is
+intentional. A managed per-board claim is left running and keeps its ID, which
+is how held-board reruns stay stable. Explicit `chia_darwin_hw_vdf_boards` and
+the legacy serial path do not take anything over and keep the existing
+ownership refusal.
 
 This preserves IDs, masks, wrappers, and loaded jobs when every board is held
 (header-only `--list`) or only some are held. Discovery fails when the merged
-set is empty or has more than 3 boards, when `--list` exits non-zero (including
-`No FTDI devices connected.`), or when its output cannot be parsed. A zero exit
-with only the header is success when wrappers already claim boards; with no
-claimed boards it fails as an empty merged set. It also fails if a role-owned
-wrapper cannot be read or a per-board wrapper has an invalid SERIAL or
-DEVICE_LOC, so a partial read cannot silently retire a board. A legacy wrapper
-without DEVICE_LOC is ignored.
+set is empty or has more than the allowed slots, when `--list` exits non-zero
+(including `No FTDI devices connected.`), or when its output cannot be parsed.
+A zero exit with only the header is success when wrappers already claim
+boards; with no claimed boards it fails as an empty merged set. It also fails
+if a role-owned wrapper cannot be read or a per-board wrapper has an invalid
+SERIAL or DEVICE_LOC, so a partial read cannot silently retire a board.
 
 Limitations: a held board's location cannot be refreshed because `--list`
 cannot see it, so it keeps the location from its wrapper. A claimed board that
 is no longer attached also stays in the set; remove it intentionally with an
-explicit `chia_darwin_hw_vdf_boards` list.
+explicit `chia_darwin_hw_vdf_boards` list. If a retained claim blocks a new
+board at the same location or leaves no free slot, discovery names the hidden
+claim and says to use an explicit list. Those hidden claims may be running
+boards, not only removed ones.
 
-Example `--list` output (example only, not captured from a real host):
+Example `--list` output in the format printed by chiavdf 1.2.2
+(`Chia-Network/chiavdf`, `src/hw/ftdi_driver.cpp`, `FtdiDriver::List()`, after
+`src/hw/hw_vdf_client.cpp` prints the header). Serials and locations are
+synthetic; this is example-format output, not a capture from real hardware:
 
 ```text
 List of available devices:
@@ -119,9 +144,9 @@ before the port and `N_VDFS` arguments.
 Retrying one board that is not loaded starts that board and leaves the daemon,
 full node, timelord, and the other boards running. A change to those service
 files, or to the shared runtime scripts, stops the ASIC boards first, restarts
-the service jobs, and then starts the boards again in ID order. A loaded label
-this role does not own is left alone. A second run does not bootstrap boards
-that are already loaded.
+the service jobs, and then starts the boards again in ID order. Outside the
+auto-discovery takeover above, a loaded label this role does not own is left
+alone. A second run does not bootstrap boards that are already loaded.
 
 | ID  | Label suffix | Wrapper                | Client log     |
 | --- | ------------ | ---------------------- | -------------- |
@@ -131,8 +156,12 @@ that are already loaded.
 
 The prefix is `chia_darwin_launchd_prefix` (`net.chia.timelord` by default).
 Launchd also writes `<name>.out.log` and `<name>.err.log`. Client logs are under
-`chia_darwin_log_dir`. Removing a board stops its job and deletes the plist and
-wrapper only when that plist runs this role's wrapper. If an enabled label
+`chia_darwin_log_dir`. Removing a board from an explicit
+`chia_darwin_hw_vdf_boards` list, or switching back to the legacy single-board
+path, retires that role-owned slot: it stops the job and deletes the plist and
+wrapper only when that plist runs this role's wrapper. A managed board that is
+only physically detached remains claimed by its wrapper, so auto-discovery
+keeps it and its masks until an explicit list retires it. If an enabled label
 already has some other plist, the run fails until
 `chia_darwin_hw_vdf_claim_existing` is true. `start_now` and `start_on_boot`
 apply to every enabled board. The restart handler waits for each job's
@@ -140,16 +169,22 @@ apply to every enabled board. The restart handler waits for each job's
 
 Rollout: leave `chia_darwin_hw_vdf_boards` empty and clear
 `chia_darwin_hw_vdf_expected_serial` to let the role discover boards with
-`hw_vdf_client --list` and its installed wrappers. To pin locations, run
-`hw_vdf_client --list`, set `chia_darwin_hw_vdf_boards`, and clear
-`chia_darwin_hw_vdf_expected_serial`. Use an explicit list to remove a board
-that discovery still sees in a retained wrapper. ID 1 keeps
-`<prefix>.hw-vdf`. Confirm three client connections on
-`chia_timelord_launcher_port` (8000 unless you changed it). Rollback to one
-board by leaving a single inventory entry, by clearing the list and setting
-only the scalar serial (which omits `--device-loc`), or by attaching one board
-for auto-discovery. `remote-node` still has no local full node, and every ASIC
-client still connects to the local timelord.
+`hw_vdf_client --list` and its installed wrappers. A first auto-discovery run
+from the legacy single-board path takes over slot 1: it stops the old job,
+re-enumerates, and removes the legacy wrapper and plist only after the merge
+succeeds, so slot 1 goes to whichever board discovery assigns. It also takes
+over hand-written wrappers at the other role slots. To pin locations, run
+`hw_vdf_client --list`, set
+`chia_darwin_hw_vdf_boards`, and clear `chia_darwin_hw_vdf_expected_serial`.
+Use an explicit list to remove a board that discovery still sees in a retained
+wrapper. ID 1 keeps `<prefix>.hw-vdf`. Confirm three client connections on
+`chia_timelord_launcher_port` (8000 unless you changed it). Roll back to one
+board by leaving a single explicit inventory entry, or by clearing the list
+and setting only the scalar serial (which omits `--device-loc` and retires the
+other role-owned wrappers). Attaching one board for auto-discovery is not a
+rollback: the other wrappers still claim their boards, so the set stays
+larger. `remote-node` still has no local full node, and every ASIC client
+still connects to the local timelord.
 
 This role does not install or change an external watchdog. A watchdog that
 expects three VDF connections and only restarts the ID 1 job keeps doing only

@@ -422,14 +422,24 @@ chia_darwin_hw_vdf_retain_asic_values: true
 # empty and this is empty, the role discovers boards with
 # hw_vdf_client --list (the same source chiavdf uses for --device-loc).
 chia_darwin_hw_vdf_expected_serial: ""
-# hw_vdf_client --list enumerates every FT4222 interface, not only Chia ASIC
-# boards. Discovery keeps only interface-A Chia serials: a CHIA prefix, ten
-# digits, and a trailing A. The owner confirmed this factory format for the
-# boards this role runs; the trailing A is the only interface letter.
-# --expected-serial accepts the printed form or the base form without that
-# final A. Discovery matches wrappers and --list rows by canonical interface-A
-# identity and preserves the SERIAL spelling already stored in a wrapper.
+# hw_vdf_client --list prints rows in the format documented for chiavdf 1.2.2
+# (https://github.com/Chia-Network/chiavdf/blob/1.2.2/src/hw/ftdi_driver.cpp,
+# FtdiDriver::List()). That source also prints only FT4222H interfaces whose
+# description ends in A; it does not filter serial numbers to Chia ASIC
+# boards. Discovery keeps only serials matching the owner-confirmed factory
+# format for these boards: a CHIA prefix, ten digits, and a trailing A.
+# chiavdf does not enforce that serial pattern, so adjust this pattern if your
+# boards print something else. --expected-serial accepts the printed form or
+# the base form without that final A. Discovery matches wrappers and --list
+# rows directly and preserves the SERIAL spelling already stored in a wrapper.
 chia_darwin_hw_vdf_serial_pattern: "^CHIA[0-9]{10}A$"
+# The role-owned board slots. ID 1 is <prefix>.hw-vdf; IDs 2 and 3 are
+# <prefix>.hw-vdf-2 and <prefix>.hw-vdf-3. Discovery reads only these wrappers,
+# and the merge filter refuses more boards than there are slots.
+chia_darwin_hw_vdf_slots:
+  - 1
+  - 2
+  - 3
 # One to three boards. A non-empty list overrides auto-discovery and pins each
 # board's location and serial. Empty with chia_darwin_hw_vdf_expected_serial
 # set keeps the legacy single-board path (no --device-loc). Empty with both
