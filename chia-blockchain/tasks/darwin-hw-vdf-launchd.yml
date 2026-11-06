@@ -73,3 +73,40 @@
     label: "{{ item.label }}"
   when: (item.enabled | bool) or (item.label in chia_darwin_hw_vdf_owned_labels)
   changed_when: false
+
+# A new board must not open USB while an older hw-vdf job is still loaded.
+# The restart handler stops the loaded jobs first, then starts the set in
+# ID order, and the per-board stagger spaces those opens.
+- name: Start the hw-vdf hold flag clear
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_hold_new: false
+  changed_when: false
+
+- name: Hold new hw-vdf jobs while a sibling is loaded
+  when: chia_darwin_start_now | bool
+  block:
+    - name: See which hw-vdf jobs are loaded
+      become: "{{ chia_darwin_launchd_become | bool }}"
+      ansible.builtin.command:
+        argv:
+          - "{{ chia_darwin_launchctl }}"
+          - print
+          - "system/{{ item.label }}"
+      register: chia_darwin_hw_vdf_running
+      changed_when: false
+      failed_when: false
+      loop: "{{ chia_darwin_hw_vdf_jobs }}"
+      loop_control:
+        label: "{{ item.label }}"
+
+    - name: Remember that a new hw-vdf job must wait
+      when:
+        - chia_darwin_hw_vdf_running.results | selectattr('rc', 'equalto', 0) | list | length > 0
+        - item.item.enabled | bool
+        - (item.rc | int) != 0
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_hold_new: true
+      loop: "{{ chia_darwin_hw_vdf_running.results }}"
+      loop_control:
+        label: "{{ item.item.label }}"
+      changed_when: false

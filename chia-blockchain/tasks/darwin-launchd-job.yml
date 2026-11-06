@@ -71,6 +71,11 @@
     - chia_job.enabled | bool
     - chia_darwin_start_now | bool
     - chia_darwin_launchd_loaded.rc != 0
+    # New hw-vdf jobs wait for the handler when a sibling is already loaded.
+    - not (
+      (chia_darwin_hw_vdf_hold_new | default(false) | bool)
+      and (chia_job.name is match('^hw-vdf(-[23])?$'))
+      )
 
 - name: Record freshly bootstrapped LaunchDaemons
   ansible.builtin.set_fact:

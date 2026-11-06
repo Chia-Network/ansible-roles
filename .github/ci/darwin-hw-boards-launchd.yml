@@ -154,6 +154,9 @@
         that:
           - names == ['com.example.keep', 'net.chia.timelord.hw-vdf', 'net.chia.timelord.hw-vdf-2', 'net.chia.timelord.hw-vdf-3']
           - (chia_darwin_bin_dir ~ '/chia-hw-vdf-3-run.sh') is file
+          - (three_log.content | b64decode).split('bootstrap system')[0] is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf$')
+          - (three_log.content | b64decode).split('hw-vdf-2.plist')[0] is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf-2$')
+          - (three_log.content | b64decode).split('hw-vdf-3.plist')[0] is search('hw-vdf-2.plist')
 
     - name: Clear the launchctl log before the second run
       ansible.builtin.copy:

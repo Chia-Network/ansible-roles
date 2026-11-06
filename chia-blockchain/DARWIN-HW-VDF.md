@@ -100,9 +100,13 @@ Every wrapper waits until the timelord port is listening, then sleeps
 opens USB. Each later board waits another
 `chia_darwin_hw_vdf_open_stagger` seconds (15) before it opens USB. Two
 processes therefore do not enumerate FTDI at the same time on boot or when
-the restart handler starts them together. A board that launchd restarts by
-itself does not wait for the others. Set the stagger to 0 to open every
-board after the shared settle.
+they are started in one pass. A board that launchd restarts by itself does
+not wait for the others. Set the stagger to 0 to open every board after the
+shared settle.
+
+Adding a board while another hw-vdf job is loaded does not bootstrap the new
+job immediately. The restart handler stops the loaded hw-vdf jobs first, then
+starts the set in ID order, and the stagger above spaces those opens.
 
 ## Logs, plists, and wrappers
 
