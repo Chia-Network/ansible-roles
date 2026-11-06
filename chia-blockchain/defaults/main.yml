@@ -426,6 +426,9 @@ chia_darwin_hw_vdf_expected_serial: ""
 # boards. Discovery keeps only interface-A Chia serials: a CHIA prefix, ten
 # digits, and a trailing A. The owner confirmed this factory format for the
 # boards this role runs; the trailing A is the only interface letter.
+# --expected-serial accepts the printed form or the base form without that
+# final A. Discovery matches wrappers and --list rows by canonical interface-A
+# identity and preserves the SERIAL spelling already stored in a wrapper.
 chia_darwin_hw_vdf_serial_pattern: "^CHIA[0-9]{10}A$"
 # One to three boards. A non-empty list overrides auto-discovery and pins each
 # board's location and serial. Empty with chia_darwin_hw_vdf_expected_serial

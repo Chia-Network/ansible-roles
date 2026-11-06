@@ -60,11 +60,29 @@ def _board_id(result: dict[str, Any]) -> int:
         ) from exc
 
 
+def _canonical_serial(serial: str, serial_re: re.Pattern[str]) -> str:
+    """Return the full interface-A identity for a confirmed Chia serial."""
+    if serial_re.match(serial):
+        return serial
+    if serial_re.match(f"{serial}A"):
+        return f"{serial}A"
+    return serial
+
+
+def _base_serial(serial: str, serial_re: re.Pattern[str]) -> str:
+    """Return the base spelling for a confirmed interface-A Chia serial."""
+    base = serial[:-1]
+    if serial and _canonical_serial(base, serial_re) == serial:
+        return base
+    return serial
+
+
 def _wrapper_boards(
     results: list[dict[str, Any]] | None,
-) -> dict[str, dict[str, int]]:
-    """Return claimed boards keyed by serial from persisted wrappers."""
-    boards: dict[str, dict[str, int]] = {}
+    serial_re: re.Pattern[str],
+) -> dict[str, dict[str, int | str]]:
+    """Return claimed boards keyed by canonical serial from persisted wrappers."""
+    boards: dict[str, dict[str, int | str]] = {}
     for result in results or []:
         if not isinstance(result, dict):
             raise AnsibleFilterError("Could not inspect a persisted hw-vdf wrapper.")
@@ -80,20 +98,29 @@ def _wrapper_boards(
             raise AnsibleFilterError(
                 f"Persisted hw-vdf wrapper for board {board_id} has invalid SERIAL or DEVICE_LOC.",
             )
-        if serial in boards:
+        key = _canonical_serial(serial, serial_re)
+        if key in boards:
             raise AnsibleFilterError(
                 "Auto-discovery found duplicate claimed board serial "
-                f"{serial} in {boards[serial]['id']} and {board_id}."
+                f"{serial} in {boards[key]['id']} and {board_id}."
             )
-        boards[serial] = {"id": board_id, "device_loc": int(location)}
+        boards[key] = {
+            "id": board_id,
+            "device_loc": int(location),
+            "serial": serial,
+        }
     return boards
 
 
-def _parse_visible(text: str, pattern: str, client_path: str) -> dict[str, int]:
-    """Return visible Chia boards keyed by serial from --list output."""
+def _parse_visible(
+    text: str,
+    pattern: str,
+    client_path: str,
+) -> dict[str, dict[str, int | str]]:
+    """Return visible Chia boards keyed by canonical serial from --list output."""
     device_lines = [line for line in text.splitlines() if _DEVICE_LINE.match(line)]
     serial_re = re.compile(pattern)
-    boards: dict[str, int] = {}
+    boards: dict[str, dict[str, int | str]] = {}
     for line in device_lines:
         match = _DEVICE_ROW.match(line)
         if not match:
@@ -105,12 +132,15 @@ def _parse_visible(text: str, pattern: str, client_path: str) -> dict[str, int]:
         location, serial = match.groups()
         if not serial_re.match(serial):
             continue
-        expected = serial[:-1]
-        if expected in boards:
+        key = _canonical_serial(serial, serial_re)
+        if key in boards:
             raise AnsibleFilterError(
-                f"Auto-discovery found duplicate Chia board serial {expected}.",
+                f"Auto-discovery found duplicate Chia board serial {serial}.",
             )
-        boards[expected] = int(location)
+        boards[key] = {
+            "device_loc": int(location),
+            "serial": _base_serial(serial, serial_re),
+        }
     return boards
 
 
@@ -118,8 +148,8 @@ def _visible_boards(
     client: dict[str, Any],
     pattern: str,
     client_path: str,
-) -> dict[str, int]:
-    """Return visible Chia boards keyed by serial, or fail clearly."""
+) -> dict[str, dict[str, int | str]]:
+    """Return visible Chia boards keyed by canonical serial, or fail clearly."""
     try:
         rc = int(client.get("rc", 1))
     except (TypeError, ValueError):
@@ -148,14 +178,19 @@ def merge_boards(
     client_path: str,
 ) -> list[dict[str, int | str]]:
     """Merge --list serials with claimed boards and assign stable IDs."""
-    claimed = _wrapper_boards(wrappers)
+    serial_re = re.compile(pattern)
+    claimed = _wrapper_boards(wrappers, serial_re)
     visible = _visible_boards(client, pattern, client_path)
-    used_ids = {board["id"] for board in claimed.values()}
+    used_ids = {int(board["id"]) for board in claimed.values()}
     merged: list[dict[str, int | str]] = [
         {
             "id": board["id"],
-            "device_loc": visible.get(serial, board["device_loc"]),
-            "expected_serial": serial,
+            "device_loc": (
+                visible[serial]["device_loc"]
+                if serial in visible
+                else board["device_loc"]
+            ),
+            "expected_serial": board["serial"],
         }
         for serial, board in claimed.items()
     ]
@@ -169,8 +204,8 @@ def merge_boards(
         merged.append(
             {
                 "id": board_id,
-                "device_loc": visible[serial],
-                "expected_serial": serial,
+                "device_loc": visible[serial]["device_loc"],
+                "expected_serial": visible[serial]["serial"],
             }
         )
     return sorted(merged, key=lambda board: board["id"])

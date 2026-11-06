@@ -4,7 +4,7 @@
 # stderr, so write the fixture there too. Set hw_vdf_list_rc to model failures.
 if [ "${1:-}" = "--list" ]; then
 	cat {{ hw_vdf_list_fixture | quote }} >&2
-	exit {{ hw_vdf_list_rc | default(0) | int }}
+	exit "{{ hw_vdf_list_rc | default(0) | int }}"
 fi
 echo "fake hw_vdf_client only supports --list" >&2
 exit 2

@@ -23,8 +23,18 @@ With `chia_darwin_enable_hw_vdf` true, precedence is:
 It enumerates every FT4222 interface, not only Chia boards. Auto-discovery
 keeps only interface-A Chia ASIC serials that match `^CHIA[0-9]{10}A$`: the
 `CHIA` prefix, ten digits, and a trailing `A`. Rows for other FT4222 devices,
-including rows with an empty serial, are valid output and are ignored. For
-`--expected-serial` discovery strips only that final `A`.
+including rows with an empty serial, are valid output and are ignored.
+`--expected-serial` accepts either the printed `CHIA...A` form or the base
+form without that final `A`.
+
+Claimed wrappers and `--list` rows are compared by one canonical interface-A
+identity. A serial gains a final `A` only when the result matches the Chia
+pattern; no other suffix is stripped or rewritten. Newly discovered boards
+keep the base form that earlier releases wrote, and an already claimed
+wrapper keeps the SERIAL spelling it already has. That keeps existing
+wrappers stable while a wrapper written from an explicit full `CHIA...A`
+inventory still matches the same visible board instead of being counted
+twice.
 
 A board held open by a running `hw_vdf_client` does not appear in `--list`.
 Discovery therefore treats this role's installed wrappers at the three

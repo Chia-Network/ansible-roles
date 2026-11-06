@@ -32,7 +32,7 @@
             throttle: 15
             exit_timeout: 0
             enabled: true
-            board: {}
+            board: "{{ dict() }}"
         chia_darwin_service_jobs:
           - name: daemon
             label: net.chia.timelord.daemon

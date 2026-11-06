@@ -161,7 +161,9 @@
       vars:
         hw_apply_serial: ""
         hw_apply_boards:
-          - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
+          - id: 1
+            device_loc: 1101
+            expected_serial: FIX-BOARD-0001
     - name: List loaded jobs after dropping to one board
       ansible.builtin.find:
         paths: "{{ launch_state }}/loaded"
@@ -231,7 +233,9 @@
       vars:
         hw_apply_serial: ""
         hw_apply_boards:
-          - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
+          - id: 1
+            device_loc: 1101
+            expected_serial: FIX-BOARD-0001
         hw_apply_start_now: false
         hw_apply_start_on_boot: true
     - name: The loaded board is booted out and left enabled for the next boot
@@ -251,7 +255,9 @@
       vars:
         hw_apply_serial: ""
         hw_apply_boards:
-          - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
+          - id: 1
+            device_loc: 1101
+            expected_serial: FIX-BOARD-0001
         hw_apply_start_now: true
         hw_apply_start_on_boot: false
     - name: start_on_boot false still starts now and disables the job at boot
@@ -489,69 +495,15 @@
           - scripts[1] is search('OPEN_DELAY=15')
           - scripts[2] is search('OPEN_DELAY=30')
 
-    - name: Install an all-boards-held --list fixture
-      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
-      vars:
-        hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-header.txt"
-    - name: Re-apply while every board is held by a running client
-      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
-      vars:
-        hw_apply_serial: ""
-        hw_apply_boards: []
-    - name: Read the wrappers after the all-running rerun
-      ansible.builtin.slurp:
-        src: "{{ chia_darwin_bin_dir }}/chia-{{ item }}-run.sh"
+    - name: Re-apply and check reruns while all or some boards are held
+      ansible.builtin.include_tasks: darwin-hw-boards-rerun.yml
       loop:
-        - hw-vdf
-        - hw-vdf-2
-        - hw-vdf-3
-      register: all_running_scripts
-    - name: All-running rerun keeps IDs, masks, wrappers, and jobs
-      vars:
-        log_text: "{{ hw_apply_log.content | b64decode }}"
-        before: "{{ discovered_scripts.results | map(attribute='content') | list }}"
-        after: "{{ all_running_scripts.results | map(attribute='content') | list }}"
-      ansible.builtin.assert:
-        that:
-          - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2, 3]
-          - chia_darwin_hw_vdf_active | map(attribute='vdfs_mask') | map('int') | list == [1, 1, 1]
-          - after == before
-          - "'bootstrap system' not in log_text"
-          - not (log_text is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf'))
-          - not (log_text is search('(?m)^disable system/net\\.chia\\.timelord\\.hw-vdf'))
-
-    - name: Install a partial --list fixture with two boards held
-      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
-      vars:
-        hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-partial.txt"
-    - name: Re-apply while only one board is visible
-      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
-      vars:
-        hw_apply_serial: ""
-        hw_apply_boards: []
-    - name: Read the wrappers after the partial-running rerun
-      ansible.builtin.slurp:
-        src: "{{ chia_darwin_bin_dir }}/chia-{{ item }}-run.sh"
-      loop:
-        - hw-vdf
-        - hw-vdf-2
-        - hw-vdf-3
-      register: partial_running_scripts
-    - name: Partial-running rerun keeps all three IDs, masks, and wrappers
-      vars:
-        log_text: "{{ hw_apply_log.content | b64decode }}"
-        before: "{{ discovered_scripts.results | map(attribute='content') | list }}"
-        after: "{{ partial_running_scripts.results | map(attribute='content') | list }}"
-      ansible.builtin.assert:
-        that:
-          - chia_darwin_hw_vdf_active | length == 3
-          - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2, 3]
-          - chia_darwin_hw_vdf_active | map(attribute='device_loc') | map('int') | list == [23001, 23002, 23003]
-          - chia_darwin_hw_vdf_active | map(attribute='vdfs_mask') | map('int') | list == [1, 1, 1]
-          - after == before
-          - "'bootstrap system' not in log_text"
-          - not (log_text is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf'))
-          - not (log_text is search('(?m)^disable system/net\\.chia\\.timelord\\.hw-vdf'))
+        - label: all-running
+          fixture: hw-vdf-list-header.txt
+        - label: partial-running
+          fixture: hw-vdf-list-partial.txt
+      loop_control:
+        loop_var: hw_rerun
 
     - name: Install a --list fixture with one board at a new location
       ansible.builtin.include_tasks: darwin-hw-boards-client.yml
@@ -584,8 +536,12 @@
       vars:
         hw_apply_serial: ""
         hw_apply_boards:
-          - { id: 1, device_loc: 22001, expected_serial: CHIA9999999001 }
-          - { id: 2, device_loc: 22002, expected_serial: CHIA9999999002 }
+          - id: 1
+            device_loc: 22001
+            expected_serial: CHIA9999999001
+          - id: 2
+            device_loc: 22002
+            expected_serial: CHIA9999999002
     - name: Install a --list fixture with a new lower-serial board
       ansible.builtin.include_tasks: darwin-hw-boards-client.yml
       vars:

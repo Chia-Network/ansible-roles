@@ -121,6 +121,45 @@
           - actual_by_serial == expected_by_serial
           - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == range(1, 4) | list
 
+    - name: Create the wrapper directory for the interface-A serial case
+      ansible.builtin.file:
+        path: "{{ chia_darwin_bin_dir }}"
+        state: directory
+        mode: "0755"
+    - name: Plant a managed wrapper with the full printed interface-A serial
+      ansible.builtin.copy:
+        dest: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-3-run.sh"
+        mode: "0644"
+        content: |
+          #!/bin/zsh
+          # Managed by the chia-blockchain Ansible role.
+          SERIAL=CHIA9999999003A
+          DEVICE_LOC=23003
+    - name: Reset inputs before the full interface-A serial case
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Discover all three boards while one wrapper stores the printed serial
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+      vars:
+        hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-3.txt"
+    - name: Resolve with the full interface-A wrapper present
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: A full interface-A wrapper and the same visible serial are one board
+      vars:
+        board: "{{ chia_darwin_hw_vdf_active | selectattr('expected_serial', 'equalto', 'CHIA9999999003A') | first }}"
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | length == 3
+          - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2, 3]
+          - (board.id | int) == 3
+          - (board.device_loc | int) == 23003
+          - chia_darwin_hw_vdf_active | selectattr('expected_serial', 'equalto', 'CHIA9999999003') | list | length == 0
+    - name: Remove the full interface-A wrapper fixture
+      ansible.builtin.file:
+        path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-3-run.sh"
+        state: absent
+
     - name: Create the wrapper directory for the ownership case
       ansible.builtin.file:
         path: "{{ chia_darwin_bin_dir }}"
