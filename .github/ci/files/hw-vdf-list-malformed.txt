@@ -1,0 +1,4 @@
+# Example hw_vdf_client --list output for tests only.
+# Not captured from real hardware. The device row has no location field.
+List of available devices:
+Device 0: 'Example Chia ASIC A', serial 'CHIA9999999001A'

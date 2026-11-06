@@ -24,58 +24,78 @@
         - expect: not both
           serial: FIX-BOARD-0001
           boards: "{{ fixture_boards }}"
-        - expect: "Set chia_darwin_hw_vdf_boards or"
-          boards: []
         - expect: must be a list
           boards: not-a-list
         - expect: must be unique
           boards:
-            - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
-            - { id: 1, device_loc: 1102, expected_serial: FIX-BOARD-0002 }
+            - id: 1
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
+            - id: 1
+              device_loc: 1102
+              expected_serial: FIX-BOARD-0002
         - expect: "1, 2, or 3"
           boards:
-            - { id: 4, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
+            - id: 4
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
         - expect: only allows
           boards:
-            - {
-                id: 1,
-                device_loc: 1101,
-                expected_serial: FIX-BOARD-0001,
-                mask: 1,
-              }
+            - id: 1
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
+              mask: 1
         - expect: must be unique
           boards:
-            - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
-            - { id: 2, device_loc: 1102, expected_serial: FIX-BOARD-0001 }
+            - id: 1
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
+            - id: 2
+              device_loc: 1102
+              expected_serial: FIX-BOARD-0001
         - expect: must be unique
           boards:
-            - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
-            - { id: 2, device_loc: 1101, expected_serial: FIX-BOARD-0002 }
+            - id: 1
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
+            - id: 2
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0002
         - expect: device_loc 0
           boards:
-            - { id: 1, device_loc: 0, expected_serial: FIX-BOARD-0001 }
-            - { id: 2, device_loc: 1102, expected_serial: FIX-BOARD-0002 }
+            - id: 1
+              device_loc: 0
+              expected_serial: FIX-BOARD-0001
+            - id: 2
+              device_loc: 1102
+              expected_serial: FIX-BOARD-0002
         - expect: expected_serial
           boards:
-            - { id: 1, device_loc: 1101, expected_serial: "FIX BOARD 00001" }
+            - id: 1
+              device_loc: 1101
+              expected_serial: "FIX BOARD 00001"
         - expect: expected_serial
           boards:
-            - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-000001 }
+            - id: 1
+              device_loc: 1101
+              expected_serial: FIX-BOARD-000001
         - expect: device_loc
           boards:
-            - { id: 1, device_loc: abc, expected_serial: FIX-BOARD-0001 }
+            - id: 1
+              device_loc: abc
+              expected_serial: FIX-BOARD-0001
         - expect: device_loc
           boards:
-            - { id: 1, device_loc: 4294967296, expected_serial: FIX-BOARD-0001 }
+            - id: 1
+              device_loc: 4294967296
+              expected_serial: FIX-BOARD-0001
         - expect: proof_threads
           boards:
-            - {
-                id: 1,
-                device_loc: 1101,
-                expected_serial: FIX-BOARD-0001,
-                vdf_threads: 8,
-                proof_threads: 8,
-              }
+            - id: 1
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
+              vdf_threads: 8
+              proof_threads: 8
         - expect: out of range
           serial: FIX-BOARD-0001
           freq: 199
@@ -150,7 +170,9 @@
     - name: Use one board at device_loc 0
       ansible.builtin.set_fact:
         chia_darwin_hw_vdf_boards:
-          - { id: "1", device_loc: 0, expected_serial: FIX-BOARD-0001 }
+          - id: "1"
+            device_loc: 0
+            expected_serial: FIX-BOARD-0001
     - name: Resolve one inventoried board
       ansible.builtin.include_role:
         name: chia-blockchain
@@ -170,8 +192,12 @@
     - name: Use boards 3 and 1
       ansible.builtin.set_fact:
         chia_darwin_hw_vdf_boards:
-          - { id: 3, device_loc: 1103, expected_serial: FIX-BOARD-0003 }
-          - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
+          - id: 3
+            device_loc: 1103
+            expected_serial: FIX-BOARD-0003
+          - id: 1
+            device_loc: 1101
+            expected_serial: FIX-BOARD-0001
     - name: Resolve two boards
       ansible.builtin.include_role:
         name: chia-blockchain

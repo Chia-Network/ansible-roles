@@ -56,9 +56,6 @@
     fail_msg: Set chia_darwin_db_volume for the local-external topology.
   when: chia_darwin_topology == "local-external"
 
-- name: Resolve ASIC boards and hw-vdf LaunchDaemon slots
-  ansible.builtin.include_tasks: darwin-hw-vdf-boards.yml
-
 - name: Use the Darwin CHIA_ROOT and skip software VDF clients
   ansible.builtin.set_fact:
     chia_root: "{{ chia_darwin_root }}"
@@ -360,6 +357,9 @@
   when:
     - chia_darwin_enable_hw_vdf | bool
     - chia_darwin_chiavdf_version | length > 0
+
+- name: Resolve ASIC boards and hw-vdf LaunchDaemon slots
+  ansible.builtin.include_tasks: darwin-hw-vdf-boards.yml
 
 - name: Create the chia virtualenv
   become: true

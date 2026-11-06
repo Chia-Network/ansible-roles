@@ -1,0 +1,5 @@
+# Example hw_vdf_client --list output for tests only.
+# Not captured from real hardware. Location 0 is invalid with two boards.
+List of available devices:
+Device 0: 'Example Chia ASIC A', loc 27001, serial 'CHIA9999999001A'
+Device 1: 'Example Chia ASIC A', loc 0, serial 'CHIA9999999002A'

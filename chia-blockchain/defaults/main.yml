@@ -411,21 +411,38 @@ chia_darwin_hw_vdf_voltage: "1.0"
 chia_darwin_hw_vdf_vdf_threads: 12
 chia_darwin_hw_vdf_proof_threads: 11
 chia_darwin_hw_vdf_checkpoint_threshold: 500000
-# Used only when chia_darwin_hw_vdf_boards is empty. With a board list the role
-# assigns masks: 7 for one board, 3 then 1 for two, and 1 for each of three.
+# Used only on the legacy single-board path (empty board list with a serial).
+# With a board list or auto-discovered boards the role assigns masks: 7 for
+# one board, 3 then 1 for two, and 1 for each of three.
 chia_darwin_hw_vdf_mask: 7
 chia_darwin_hw_num_vdfs: "{{ '1' if (chia_darwin_hw_vdf_mask | int) in [1, 2, 4] else ('2' if (chia_darwin_hw_vdf_mask | int) in [3, 5, 6] else '3') }}"
 chia_darwin_hw_vdf_retain_asic_values: true
-# Legacy single board. Required when the ASIC client is enabled and
-# chia_darwin_hw_vdf_boards is empty. Not given a default because a serial
-# belongs to one board. Do not set this and the board list together.
+# Legacy single board. Not given a default because a serial belongs to one
+# board. Do not set this and the board list together. If the board list is
+# empty and this is empty, the role discovers boards with
+# hw_vdf_client --list (the same source chiavdf uses for --device-loc).
 chia_darwin_hw_vdf_expected_serial: ""
-# One to three boards. Empty keeps the legacy single-board settings above
-# (no --device-loc). Each entry allows only id, device_loc, expected_serial,
-# vdf_threads, and proof_threads. id is 1, 2, or 3. device_loc is the decimal
-# location from hw_vdf_client --list; 0 is allowed only for one board.
-# expected_serial is 1-15 printable non-space characters. This role does not
-# discover USB devices. See DARWIN-HW-VDF.md.
+# hw_vdf_client --list enumerates every FT4222 interface, not only Chia ASIC
+# boards. Discovery keeps only interface-A Chia serials: a CHIA prefix, ten
+# digits, and a trailing A. The owner confirmed this factory format for the
+# boards this role runs; the trailing A is the only interface letter.
+# --expected-serial accepts the printed form or the base form without that
+# final A. Discovery matches wrappers and --list rows by canonical interface-A
+# identity and preserves the SERIAL spelling already stored in a wrapper.
+chia_darwin_hw_vdf_serial_pattern: "^CHIA[0-9]{10}A$"
+# One to three boards. A non-empty list overrides auto-discovery and pins each
+# board's location and serial. Empty with chia_darwin_hw_vdf_expected_serial
+# set keeps the legacy single-board path (no --device-loc). Empty with both
+# unset discovers boards with hw_vdf_client --list. Boards held by running
+# clients are invisible to --list, so discovery also reads this role's
+# installed wrappers: existing IDs are retained, visible boards refresh their
+# location, hidden boards keep the stored one, and new serials take the next
+# free ID. A board removed from --list stays claimed until an explicit board
+# list retires it. Each explicit entry allows only id, device_loc,
+# expected_serial, vdf_threads, and proof_threads. id is 1, 2, or 3. device_loc
+# is the decimal location from hw_vdf_client --list; 0 is allowed only for one
+# board. expected_serial is 1-15 printable non-space characters. See
+# DARWIN-HW-VDF.md.
 chia_darwin_hw_vdf_boards: []
 # Seconds after the timelord port is up before board N in ID order opens USB.
 # Board 0 waits only chia_darwin_hw_vdf_settle_seconds. Later boards wait

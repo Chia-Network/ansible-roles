@@ -4,6 +4,9 @@
 - name: Validate inventory
   ansible.builtin.import_playbook: darwin-hw-boards-validate.yml
 
+- name: Discover boards
+  ansible.builtin.import_playbook: darwin-hw-boards-discover.yml
+
 - name: Render wrappers
   ansible.builtin.import_playbook: darwin-hw-boards-render.yml
 

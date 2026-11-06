@@ -161,7 +161,9 @@
       vars:
         hw_apply_serial: ""
         hw_apply_boards:
-          - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
+          - id: 1
+            device_loc: 1101
+            expected_serial: FIX-BOARD-0001
     - name: List loaded jobs after dropping to one board
       ansible.builtin.find:
         paths: "{{ launch_state }}/loaded"
@@ -231,7 +233,9 @@
       vars:
         hw_apply_serial: ""
         hw_apply_boards:
-          - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
+          - id: 1
+            device_loc: 1101
+            expected_serial: FIX-BOARD-0001
         hw_apply_start_now: false
         hw_apply_start_on_boot: true
     - name: The loaded board is booted out and left enabled for the next boot
@@ -251,7 +255,9 @@
       vars:
         hw_apply_serial: ""
         hw_apply_boards:
-          - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
+          - id: 1
+            device_loc: 1101
+            expected_serial: FIX-BOARD-0001
         hw_apply_start_now: true
         hw_apply_start_on_boot: false
     - name: start_on_boot false still starts now and disables the job at boot
@@ -407,3 +413,173 @@
           - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf') is file
           - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf-2') is file
           - (launch_state ~ '/loaded/com.example.keep') is file
+
+- name: Apply auto-discovered boards with a fake launchctl
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: /tmp/chia-darwin-hw-launchd-discover
+    launch_log: "{{ work }}/launchctl.log"
+    launch_state: "{{ work }}/state"
+    chia_darwin_hw_vdf_client: "{{ work }}/hw_vdf_client"
+    hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-3.txt"
+  tasks:
+    - name: Start from an empty discovery apply tree
+      ansible.builtin.file:
+        path: "{{ work }}"
+        state: absent
+    - name: Point discovery apply paths at the test directory
+      ansible.builtin.set_fact:
+        chia_darwin_home: "{{ work }}/home"
+        chia_darwin_bin_dir: "{{ work }}/home/bin"
+        chia_darwin_log_dir: "{{ work }}/home/Library/Logs/chia"
+        chia_darwin_etc_dir: "{{ work }}/home/etc"
+        chia_root: "{{ work }}/home/.chia/mainnet"
+        chia_darwin_env_script: "{{ work }}/home/bin/chia-env.sh"
+        chia_darwin_launchctl: "{{ work }}/launchctl"
+        chia_darwin_launchd_dir: "{{ work }}/LaunchDaemons"
+        chia_darwin_topology: remote-node
+        chia_darwin_hw_vdf_client: "{{ work }}/hw_vdf_client"
+    - name: Create the discovery apply tree
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ chia_darwin_bin_dir }}"
+        - "{{ chia_darwin_log_dir }}"
+        - "{{ chia_darwin_launchd_dir }}"
+        - "{{ launch_state }}/loaded"
+        - "{{ chia_darwin_home }}"
+    - name: Install the fake launchctl for discovery
+      ansible.builtin.include_tasks: darwin-hw-boards-launchctl.yml
+    - name: Install the fake hw_vdf_client for discovery
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+    - name: Apply boards discovered from hw_vdf_client --list
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards: []
+    - name: Read the discovered wrappers
+      ansible.builtin.slurp:
+        src: "{{ chia_darwin_bin_dir }}/chia-{{ item }}-run.sh"
+      loop:
+        - hw-vdf
+        - hw-vdf-2
+        - hw-vdf-3
+      register: discovered_scripts
+    - name: List loaded discovery jobs
+      ansible.builtin.find:
+        paths: "{{ launch_state }}/loaded"
+        patterns: "*"
+        file_type: file
+      register: discovered_loaded
+    - name: Discovery drives the fake launchctl handler and three board jobs
+      vars:
+        names: "{{ discovered_loaded.files | map(attribute='path') | map('basename') | sort }}"
+        scripts: "{{ discovered_scripts.results | map(attribute='content') | map('b64decode') | list }}"
+      ansible.builtin.assert:
+        that:
+          - names == ['net.chia.timelord.hw-vdf', 'net.chia.timelord.hw-vdf-2', 'net.chia.timelord.hw-vdf-3']
+          - scripts[0] is search('SERIAL=CHIA9999999001')
+          - scripts[1] is search('SERIAL=CHIA9999999002')
+          - scripts[2] is search('SERIAL=CHIA9999999003')
+          - scripts[0] is search('DEVICE_LOC=23001')
+          - scripts[1] is search('DEVICE_LOC=23002')
+          - scripts[2] is search('DEVICE_LOC=23003')
+          - scripts[0] is search('VDFS_MASK=1')
+          - scripts[0] is search('OPEN_DELAY=0')
+          - scripts[1] is search('OPEN_DELAY=15')
+          - scripts[2] is search('OPEN_DELAY=30')
+
+    - name: Re-apply and check reruns while all or some boards are held
+      ansible.builtin.include_tasks: darwin-hw-boards-rerun.yml
+      loop:
+        - label: all-running
+          fixture: hw-vdf-list-header.txt
+        - label: partial-running
+          fixture: hw-vdf-list-partial.txt
+      loop_control:
+        loop_var: hw_rerun
+
+    - name: Install a --list fixture with one board at a new location
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+      vars:
+        hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-partial-newloc.txt"
+    - name: Re-apply while one visible board moved
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards: []
+    - name: Read the wrapper for the moved board
+      ansible.builtin.slurp:
+        src: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-2-run.sh"
+      register: moved_wrapper
+    - name: A visible board refreshes its location without changing ID
+      vars:
+        wrapper: "{{ moved_wrapper.content | b64decode }}"
+        moved: "{{ chia_darwin_hw_vdf_active | selectattr('expected_serial', 'equalto', 'CHIA9999999002') | first }}"
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2, 3]
+          - (moved.id | int) == 2
+          - (moved.device_loc | int) == 23902
+          - chia_darwin_hw_vdf_active | map(attribute='device_loc') | map('int') | list == [23001, 23902, 23003]
+          - wrapper is search('DEVICE_LOC=23902')
+          - wrapper is search('SERIAL=CHIA9999999002')
+
+    - name: Apply two claimed boards before adding a new one
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards:
+          - id: 1
+            device_loc: 22001
+            expected_serial: CHIA9999999001
+          - id: 2
+            device_loc: 22002
+            expected_serial: CHIA9999999002
+    - name: Install a --list fixture with a new lower-serial board
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+      vars:
+        hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-new-lower.txt"
+    - name: Add the new lower-serial board to two claimed boards
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards: []
+    - name: A new lower-serial board takes the free ID
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2, 3]
+          - chia_darwin_hw_vdf_active | map(attribute='expected_serial') | list == ['CHIA9999999001', 'CHIA9999999002', 'CHIA9999999000']
+          - chia_darwin_hw_vdf_active | map(attribute='device_loc') | map('int') | list == [22001, 22002, 24000]
+          - chia_darwin_hw_vdf_active | map(attribute='vdfs_mask') | map('int') | list == [1, 1, 1]
+
+    - name: Install a no-FTDI --list fixture that exits 1
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+      vars:
+        hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-no-ftdi.txt"
+        hw_vdf_list_rc: 1
+    - name: A real --list error fails even when wrappers claim boards
+      block:
+        - name: Re-apply while --list cannot enumerate any FTDI device
+          ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+          vars:
+            hw_apply_serial: ""
+            hw_apply_boards: []
+        - name: A failed --list was accepted with claimed boards
+          ansible.builtin.fail:
+            msg: discovery accepted a failed --list with claimed boards
+      rescue:
+        - name: The failed --list names the command error
+          vars:
+            failure_text: "{{ ansible_failed_result | to_json }}"
+          ansible.builtin.assert:
+            that:
+              - failure_text is search('failed')
+              - failure_text is search('No FTDI devices connected')
+              - "'discovery accepted a failed' not in failure_text"

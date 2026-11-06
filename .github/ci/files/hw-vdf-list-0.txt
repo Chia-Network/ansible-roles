@@ -1,0 +1,5 @@
+# Example hw_vdf_client --list output for tests only.
+# Not captured from real hardware. Serials and locations are made up.
+# There is no Chia ASIC board here, only another FT4222 device.
+List of available devices:
+Device 0: 'Other FT4222 A', loc 20001, serial 'FT4222999999001A'

@@ -1,0 +1,33 @@
+---
+- name: Install the {{ hw_rerun.label }} --list fixture
+  ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+  vars:
+    hw_vdf_list_fixture: "{{ playbook_dir }}/files/{{ hw_rerun.fixture }}"
+- name: Re-apply while the {{ hw_rerun.label }} fixture is active
+  ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+  vars:
+    hw_apply_serial: ""
+    hw_apply_boards: []
+- name: Read the wrappers after the {{ hw_rerun.label }} rerun
+  ansible.builtin.slurp:
+    src: "{{ chia_darwin_bin_dir }}/chia-{{ item }}-run.sh"
+  loop:
+    - hw-vdf
+    - hw-vdf-2
+    - hw-vdf-3
+  register: hw_rerun_scripts
+- name: Assert the {{ hw_rerun.label }} rerun keeps IDs, masks, wrappers, and jobs
+  vars:
+    log_text: "{{ hw_apply_log.content | b64decode }}"
+    before: "{{ discovered_scripts.results | map(attribute='content') | list }}"
+    after: "{{ hw_rerun_scripts.results | map(attribute='content') | list }}"
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_hw_vdf_active | length == 3
+      - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2, 3]
+      - chia_darwin_hw_vdf_active | map(attribute='device_loc') | map('int') | list == [23001, 23002, 23003]
+      - chia_darwin_hw_vdf_active | map(attribute='vdfs_mask') | map('int') | list == [1, 1, 1]
+      - after == before
+      - "'bootstrap system' not in log_text"
+      - not (log_text is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf'))
+      - not (log_text is search('(?m)^disable system/net\\.chia\\.timelord\\.hw-vdf'))

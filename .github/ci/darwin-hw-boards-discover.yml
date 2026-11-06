@@ -1,0 +1,466 @@
+---
+# Auto-discovery with a fake hw_vdf_client. The --list fixtures under files/
+# are example output only, not captured from real hardware.
+- name: Discover Darwin ASIC boards
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: /tmp/chia-darwin-hw-discover
+    chia_darwin_home: "{{ work }}/home"
+    chia_darwin_bin_dir: "{{ work }}/home/bin"
+    chia_darwin_log_dir: "{{ work }}/home/Library/Logs/chia"
+    chia_darwin_etc_dir: "{{ work }}/home/etc"
+    chia_root: "{{ work }}/home/.chia/mainnet"
+    chia_darwin_hw_vdf_client: "{{ work }}/hw_vdf_client"
+    hw_vdf_list_dir: "{{ playbook_dir }}/files"
+  tasks:
+    - name: Create the discovery tree
+      ansible.builtin.file:
+        path: "{{ work }}"
+        state: directory
+        mode: "0755"
+
+    - name: Discover one board
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Use the one-board --list example
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+      vars:
+        hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-1.txt"
+    - name: Resolve one discovered board
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: One Chia board is mask 7 and the non-Chia row is ignored
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | length == 1
+          - not (chia_darwin_hw_vdf_legacy | bool)
+          - (chia_darwin_hw_vdf_active[0].id | int) == 1
+          - (chia_darwin_hw_vdf_active[0].device_loc | int) == 21001
+          - chia_darwin_hw_vdf_active[0].expected_serial == "CHIA9999999001"
+          - (chia_darwin_hw_vdf_active[0].vdfs_mask | int) == 7
+          - (chia_darwin_hw_vdf_active[0].n_vdfs | int) == 3
+          - (chia_darwin_hw_vdf_jobs | selectattr('name', 'equalto', 'hw-vdf') | first).enabled | bool
+          - not ((chia_darwin_hw_vdf_jobs | selectattr('name', 'equalto', 'hw-vdf-2') | first).enabled | bool)
+          - not ((chia_darwin_hw_vdf_jobs | selectattr('name', 'equalto', 'hw-vdf-3') | first).enabled | bool)
+
+    - name: Discover two boards
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Use the two-board --list example in reverse serial order
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+      vars:
+        hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-2.txt"
+    - name: Resolve two discovered boards
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: Two discovered boards are sorted by serial and use masks 3 then 1
+      vars:
+        first: "{{ chia_darwin_hw_vdf_active[0] }}"
+        second: "{{ chia_darwin_hw_vdf_active[1] }}"
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | length == 2
+          - (first.id | int) == 1
+          - first.expected_serial == "CHIA9999999001"
+          - (first.device_loc | int) == 22001
+          - (first.vdfs_mask | int) == 3
+          - (second.id | int) == 2
+          - second.expected_serial == "CHIA9999999002"
+          - (second.device_loc | int) == 22002
+          - (second.vdfs_mask | int) == 1
+          - (second.open_delay | int) == (chia_darwin_hw_vdf_open_stagger | int)
+
+    - name: Discover three boards
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Use the three-board --list example in mixed serial order
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+      vars:
+        hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-3.txt"
+    - name: Resolve three discovered boards
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: Three discovered boards are numbered by serial and use one engine each
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | length == 3
+          - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2, 3]
+          - chia_darwin_hw_vdf_active | map(attribute='expected_serial') | list == ['CHIA9999999001', 'CHIA9999999002', 'CHIA9999999003']
+          - chia_darwin_hw_vdf_active | map(attribute='device_loc') | map('int') | list == [23001, 23002, 23003]
+          - chia_darwin_hw_vdf_active | map(attribute='vdfs_mask') | map('int') | unique | list == [1]
+          - chia_darwin_hw_vdf_active | map(attribute='n_vdfs') | map('int') | unique | list == [1]
+          - chia_darwin_hw_vdf_active | map(attribute='open_delay') | map('int') | list == [0, 15, 30]
+
+    - name: Re-cable the three boards in a different order and at new locations
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Use the same serials at different locations
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+      vars:
+        hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-recable.txt"
+    - name: Resolve the three re-cabled boards
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: IDs follow the serials and the locations are refreshed
+      vars:
+        expected_by_serial:
+          CHIA9999999001: 25001
+          CHIA9999999002: 25002
+          CHIA9999999003: 25003
+        actual_by_serial: >-
+          {{ dict(
+            chia_darwin_hw_vdf_active | map(attribute='expected_serial')
+            | zip(chia_darwin_hw_vdf_active | map(attribute='device_loc') | map('int'))
+          ) }}
+      ansible.builtin.assert:
+        that:
+          - actual_by_serial == expected_by_serial
+          - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == range(1, 4) | list
+
+    - name: Create the wrapper directory for the interface-A serial case
+      ansible.builtin.file:
+        path: "{{ chia_darwin_bin_dir }}"
+        state: directory
+        mode: "0755"
+    - name: Plant a managed wrapper with the full printed interface-A serial
+      ansible.builtin.copy:
+        dest: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-3-run.sh"
+        mode: "0644"
+        content: |
+          #!/bin/zsh
+          # Managed by the chia-blockchain Ansible role.
+          SERIAL=CHIA9999999003A
+          DEVICE_LOC=23003
+    - name: Reset inputs before the full interface-A serial case
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Discover all three boards while one wrapper stores the printed serial
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+      vars:
+        hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-3.txt"
+    - name: Resolve with the full interface-A wrapper present
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: A full interface-A wrapper and the same visible serial are one board
+      vars:
+        board: "{{ chia_darwin_hw_vdf_active | selectattr('expected_serial', 'equalto', 'CHIA9999999003A') | first }}"
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | length == 3
+          - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2, 3]
+          - (board.id | int) == 3
+          - (board.device_loc | int) == 23003
+          - chia_darwin_hw_vdf_active | selectattr('expected_serial', 'equalto', 'CHIA9999999003') | list | length == 0
+    - name: Remove the full interface-A wrapper fixture
+      ansible.builtin.file:
+        path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-3-run.sh"
+        state: absent
+
+    - name: Create the wrapper directory for the ownership case
+      ansible.builtin.file:
+        path: "{{ chia_darwin_bin_dir }}"
+        state: directory
+        mode: "0755"
+    - name: Plant an unowned wrapper at a role slot path
+      ansible.builtin.copy:
+        dest: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-2-run.sh"
+        mode: "0644"
+        content: |
+          #!/bin/zsh
+          # Not managed by this role.
+          SERIAL=CHIA9999999002
+          DEVICE_LOC=29999
+    - name: Reset inputs before the unowned wrapper case
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Discover one board while an unowned wrapper occupies slot 2
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+      vars:
+        hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-1.txt"
+    - name: Resolve with the unowned wrapper present
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: The unowned wrapper is not claimed as a board
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | length == 1
+          - (chia_darwin_hw_vdf_active[0].id | int) == 1
+          - chia_darwin_hw_vdf_active[0].expected_serial == "CHIA9999999001"
+          - chia_darwin_hw_vdf_discovered_boards | map(attribute='expected_serial') | list == ['CHIA9999999001']
+    - name: Remove the unowned wrapper fixture
+      ansible.builtin.file:
+        path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-2-run.sh"
+        state: absent
+
+    - name: Plant a legacy managed wrapper without a device location
+      ansible.builtin.copy:
+        dest: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-2-run.sh"
+        mode: "0644"
+        content: |
+          #!/bin/zsh
+          # Managed by the chia-blockchain Ansible role.
+          SERIAL=CHIA9999999002
+    - name: Reset inputs before the legacy wrapper case
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Discover one board while a legacy wrapper occupies slot 2
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+      vars:
+        hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-1.txt"
+    - name: Resolve with the legacy wrapper present
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: The legacy wrapper remains ignored
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | length == 1
+          - (chia_darwin_hw_vdf_active[0].id | int) == 1
+          - chia_darwin_hw_vdf_active[0].expected_serial == "CHIA9999999001"
+    - name: Remove the legacy wrapper fixture
+      ansible.builtin.file:
+        path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-2-run.sh"
+        state: absent
+
+    - name: Reject a managed wrapper with a malformed device location
+      ansible.builtin.include_tasks: darwin-hw-boards-discover-wrapper-fail.yml
+      vars:
+        hw_wrapper_content: |
+          #!/bin/zsh
+          # Managed by the chia-blockchain Ansible role.
+          SERIAL=CHIA9999999002
+          DEVICE_LOC=not-a-number
+        hw_wrapper_expect: invalid SERIAL or DEVICE_LOC
+    - name: Fail clearly when a managed wrapper cannot be read
+      ansible.builtin.include_tasks: darwin-hw-boards-discover-wrapper-fail.yml
+      vars:
+        hw_wrapper_expect: Could not read persisted hw-vdf wrapper
+
+    - name: Discover zero Chia boards
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Use a --list example with only a non-Chia row
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+      vars:
+        hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-0.txt"
+    - name: Expect zero boards to fail clearly
+      block:
+        - name: Resolve when no board is attached
+          ansible.builtin.include_role:
+            name: chia-blockchain
+            tasks_from: darwin-hw-vdf-boards.yml
+        - name: Discovery accepted an empty board list
+          ansible.builtin.fail:
+            msg: discovery accepted zero boards
+      rescue:
+        - name: The zero-board failure names auto-discovery
+          vars:
+            failure_text: "{{ ansible_failed_result | to_json }}"
+          ansible.builtin.assert:
+            that:
+              - failure_text is search('Auto-discovery found 0')
+              - "'discovery accepted zero boards' not in failure_text"
+
+    - name: Discover four boards
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Use the four-board --list example
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+      vars:
+        hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-4.txt"
+    - name: Expect more than three boards to fail clearly
+      block:
+        - name: Resolve when too many boards are attached
+          ansible.builtin.include_role:
+            name: chia-blockchain
+            tasks_from: darwin-hw-vdf-boards.yml
+        - name: Discovery accepted more than three boards
+          ansible.builtin.fail:
+            msg: discovery accepted too many boards
+      rescue:
+        - name: The too-many failure names the board count
+          vars:
+            failure_text: "{{ ansible_failed_result | to_json }}"
+          ansible.builtin.assert:
+            that:
+              - failure_text is search('found 4')
+              - failure_text is search('at most 3')
+              - "'discovery accepted too many boards' not in failure_text"
+
+    - name: Reject duplicate discovered serials
+      ansible.builtin.include_tasks: darwin-hw-boards-discover-fail.yml
+      vars:
+        hw_discover_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-duplicate-serial.txt"
+        hw_discover_expect: duplicate
+    - name: Reject duplicate discovered locations
+      ansible.builtin.include_tasks: darwin-hw-boards-discover-fail.yml
+      vars:
+        hw_discover_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-duplicate-loc.txt"
+        hw_discover_expect: must be unique
+    - name: Reject location zero when more than one Chia board is attached
+      ansible.builtin.include_tasks: darwin-hw-boards-discover-fail.yml
+      vars:
+        hw_discover_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-multiboard-zero.txt"
+        hw_discover_expect: device_loc 0
+    - name: Reject a location above uint32
+      ansible.builtin.include_tasks: darwin-hw-boards-discover-fail.yml
+      vars:
+        hw_discover_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-loc-overflow.txt"
+        hw_discover_expect: device_loc
+    - name: Reject malformed --list output
+      ansible.builtin.include_tasks: darwin-hw-boards-discover-fail.yml
+      vars:
+        hw_discover_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-malformed.txt"
+        hw_discover_expect: Could not parse
+    - name: Fail clearly when hw_vdf_client --list exits with no FTDI devices
+      ansible.builtin.include_tasks: darwin-hw-boards-discover-fail.yml
+      vars:
+        hw_discover_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-no-ftdi.txt"
+        hw_discover_rc: 1
+        hw_discover_expect: No FTDI devices connected
+
+    - name: Reset inputs before the missing client case
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Point the client at a path that does not exist
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_client: "{{ work }}/missing-hw-vdf-client"
+    - name: Expect an unrunnable client to name the command
+      block:
+        - name: Resolve when the client cannot be executed
+          ansible.builtin.include_role:
+            name: chia-blockchain
+            tasks_from: darwin-hw-vdf-boards.yml
+        - name: Discovery accepted an unrunnable client
+          ansible.builtin.fail:
+            msg: discovery accepted an unrunnable client
+      rescue:
+        - name: The missing-client failure names the command
+          vars:
+            failure_text: "{{ ansible_failed_result | to_json }}"
+          ansible.builtin.assert:
+            that:
+              - failure_text is search('missing-hw-vdf-client')
+              - failure_text is search('failed')
+              - "'discovery accepted an unrunnable client' not in failure_text"
+
+    - name: Explicit inventory wins over discovery
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Point the client at a missing path and set explicit boards
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_client: "{{ work }}/missing-hw-vdf-client"
+        chia_darwin_hw_vdf_boards: "{{ fixture_boards }}"
+    - name: Resolve explicit boards without calling --list
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: Explicit boards are used even when --list is unavailable
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | length == 3
+          - chia_darwin_hw_vdf_active | map(attribute='expected_serial') | list == ['FIX-BOARD-0001', 'FIX-BOARD-0002', 'FIX-BOARD-0003']
+          - chia_darwin_hw_vdf_active | map(attribute='device_loc') | map('int') | list == [1101, 1102, 1103]
+          - not (chia_darwin_hw_vdf_legacy | bool)
+
+    - name: Legacy single-board path skips discovery
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Point the client at a missing path and set the legacy serial
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_client: "{{ work }}/missing-hw-vdf-client"
+        chia_darwin_hw_vdf_expected_serial: FIX-BOARD-0001
+    - name: Resolve the legacy board without calling --list
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: The legacy board keeps its mask and omits --device-loc
+      vars:
+        board: "{{ chia_darwin_hw_vdf_active[0] }}"
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | length == 1
+          - chia_darwin_hw_vdf_legacy | bool
+          - board.legacy | bool
+          - board.expected_serial == "FIX-BOARD-0001"
+          - board.device_loc | string | length == 0
+          - (board.vdfs_mask | int) == 7
+          - (board.n_vdfs | int) == 3
+
+- name: Prepare the discovery become regression
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: /tmp/chia-darwin-hw-discover-become
+    chia_darwin_home: "{{ work }}/home"
+    chia_darwin_bin_dir: "{{ work }}/home/bin"
+    chia_darwin_log_dir: "{{ work }}/home/Library/Logs/chia"
+    chia_darwin_etc_dir: "{{ work }}/home/etc"
+    chia_root: "{{ work }}/home/.chia/mainnet"
+    chia_darwin_hw_vdf_client: "{{ work }}/hw_vdf_client"
+    hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-1.txt"
+  tasks:
+    - name: Start from an empty become regression tree
+      ansible.builtin.file:
+        path: "{{ work }}"
+        state: absent
+    - name: Create the become regression tree
+      ansible.builtin.file:
+        path: "{{ work }}"
+        state: directory
+        mode: "0755"
+    - name: Write a become executable that always fails
+      ansible.builtin.copy:
+        dest: "{{ work }}/failing-become"
+        mode: "0755"
+        content: |
+          #!/bin/sh
+          echo "hw_vdf_client --list must not run through become" >&2
+          exit 97
+    - name: Reset the discovery inputs
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Point the fake client at the become regression tree
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_client: "{{ work }}/hw_vdf_client"
+    - name: Install the fake hw_vdf_client for the become regression
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+
+- name: Discovery --list overrides play-level become
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  become_exe: "{{ work }}/failing-become"
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: /tmp/chia-darwin-hw-discover-become
+    chia_darwin_home: "{{ work }}/home"
+    chia_darwin_bin_dir: "{{ work }}/home/bin"
+    chia_darwin_log_dir: "{{ work }}/home/Library/Logs/chia"
+    chia_darwin_etc_dir: "{{ work }}/home/etc"
+    chia_root: "{{ work }}/home/.chia/mainnet"
+    chia_darwin_hw_vdf_client: "{{ work }}/hw_vdf_client"
+  tasks:
+    - name: Point discovery at the become regression client
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_client: "{{ work }}/hw_vdf_client"
+    - name: Run discovery where any inherited become would fail
+      block:
+        - name: Resolve discovery with play-level become enabled
+          ansible.builtin.include_role:
+            name: chia-blockchain
+            tasks_from: darwin-hw-vdf-boards.yml
+        - name: Discovery completed without invoking become
+          ansible.builtin.assert:
+            that:
+              - (chia_darwin_hw_vdf_list.rc | default(1) | int) == 0
+              - chia_darwin_hw_vdf_active | length == 1
+              - chia_darwin_hw_vdf_active[0].expected_serial == "CHIA9999999001"
+      rescue:
+        - name: --list inherited become instead of overriding it
+          ansible.builtin.fail:
+            msg: >-
+              hw_vdf_client --list ran through the intentionally failing become
+              executable: {{ ansible_failed_result | to_json }}
