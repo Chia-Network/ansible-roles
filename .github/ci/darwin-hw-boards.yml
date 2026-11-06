@@ -1,0 +1,14 @@
+---
+# Role behavior for one, two, or three Darwin ASIC boards.
+# launchctl and the boards are fakes. This does not touch USB or a Mac.
+- name: Validate inventory
+  ansible.builtin.import_playbook: darwin-hw-boards-validate.yml
+
+- name: Render wrappers
+  ansible.builtin.import_playbook: darwin-hw-boards-render.yml
+
+- name: Apply LaunchDaemons
+  ansible.builtin.import_playbook: darwin-hw-boards-launchd.yml
+
+- name: Restart handler
+  ansible.builtin.import_playbook: darwin-hw-boards-restart.yml

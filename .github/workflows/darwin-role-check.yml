@@ -34,6 +34,7 @@ jobs:
           ansible-playbook --syntax-check .github/ci/darwin-syntax-check.yml
           ansible-playbook --syntax-check .github/ci/darwin-assumptions.yml
           ansible-playbook --syntax-check .github/ci/darwin-bare-interpreter.yml
+          ansible-playbook --syntax-check .github/ci/darwin-hw-boards.yml
 
       - name: Check Darwin restart and pip assumptions
         run: ansible-playbook .github/ci/darwin-assumptions.yml
@@ -49,6 +50,9 @@ jobs:
 
       - name: Render Darwin templates
         run: ansible-playbook -e render_out="$RUNNER_TEMP/darwin" .github/ci/darwin-render-templates.yml
+
+      - name: Check Darwin ASIC board inventory
+        run: ansible-playbook -e render_out="$RUNNER_TEMP/darwin" .github/ci/darwin-hw-boards.yml
 
       - name: Lint rendered output
         working-directory: ${{ runner.temp }}/darwin

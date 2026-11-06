@@ -5,6 +5,10 @@
   gather_facts: false
   tasks:
     - ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin.yml
+    - ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-hw-vdf-boards.yml
+    - ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-hw-vdf-install.yml
+    - ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-hw-vdf-launchd.yml
+    - ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-hw-vdf-retire.yml
     - ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-launchd-job.yml
     - ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-restart-job.yml
 

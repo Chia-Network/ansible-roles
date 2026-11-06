@@ -1,0 +1,30 @@
+---
+- name: Reset inputs before {{ hw_case_expect }}
+  ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+
+- name: Set the failing inventory for {{ hw_case_expect }}
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_expected_serial: "{{ hw_case_serial }}"
+    chia_darwin_hw_vdf_boards: "{{ hw_case_boards }}"
+    chia_darwin_hw_vdf_freq: "{{ hw_case_freq | default(1540) }}"
+    chia_darwin_hw_vdf_voltage: "{{ hw_case_voltage | default('1.0') }}"
+    chia_darwin_hw_vdf_checkpoint_threshold: "{{ hw_case_checkpoint | default(500000) }}"
+
+- name: Expect rejection ({{ hw_case_expect }})
+  block:
+    - name: Resolve the rejected inventory
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: The rejected inventory was accepted
+      ansible.builtin.fail:
+        msg: "inventory was accepted, expected {{ hw_case_expect }}"
+  rescue:
+    - name: The rejection mentions {{ hw_case_expect }}
+      vars:
+        failure_text: "{{ ansible_failed_result | to_json }}"
+      ansible.builtin.assert:
+        that:
+          - failure_text is search(hw_case_expect)
+          - "'inventory was accepted' not in failure_text"
+        fail_msg: "{{ ansible_failed_result.msg | default('no failure message') }}"

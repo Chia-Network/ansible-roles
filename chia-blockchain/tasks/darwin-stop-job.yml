@@ -1,0 +1,41 @@
+---
+# Boot out one LaunchDaemon and wait until launchctl print says it is gone.
+# The caller sets chia_job. A job that is still loaded is not bootstrapped.
+- name: Stop LaunchDaemon {{ chia_job.label }}
+  become: "{{ chia_darwin_launchd_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_launchctl }}"
+      - bootout
+      - "system/{{ chia_job.label }}"
+  register: chia_darwin_restart_bootout
+  changed_when: chia_darwin_restart_bootout.rc == 0
+  failed_when: false
+
+# launchctl print returns non-zero once the job is gone. That non-zero
+# status is success here, so ignore the command's own failure.
+- name: Wait until LaunchDaemon is unloaded {{ chia_job.label }}
+  become: "{{ chia_darwin_launchd_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_launchctl }}"
+      - print
+      - "system/{{ chia_job.label }}"
+  register: chia_darwin_restart_gone
+  changed_when: false
+  failed_when: false
+  retries: "{{ (chia_job.exit_timeout | int) + (chia_darwin_restart_unload_margin | int) }}"
+  delay: 1
+  until: chia_darwin_restart_gone.rc != 0
+  when: chia_darwin_restart_bootout.rc == 0
+
+- name: Stop if LaunchDaemon {{ chia_job.label }} is still loaded
+  ansible.builtin.fail:
+    msg: >-
+      {{ chia_job.label }} is still loaded after bootout, past its
+      ExitTimeOut of {{ chia_job.exit_timeout }}s plus
+      {{ chia_darwin_restart_unload_margin }}s.
+      Bootstrap was not attempted.
+  when:
+    - chia_darwin_restart_bootout.rc | default(1) | int == 0
+    - chia_darwin_restart_gone.rc | default(1) | int == 0
