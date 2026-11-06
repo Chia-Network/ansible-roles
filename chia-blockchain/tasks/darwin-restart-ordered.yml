@@ -1,0 +1,45 @@
+---
+# One restart path. A shared-runtime change stops the ASIC boards, restarts
+# the daemon, full node, and timelord, then starts the boards in ID order.
+# chia_darwin_restart_boards_only skips the service jobs and leaves loaded
+# boards alone unless that board's own files changed.
+- name: Stop ASIC boards before the service restart
+  when:
+    - not (chia_darwin_restart_boards_only | default(true) | bool)
+    - chia_darwin_start_now | bool
+    - chia_job.enabled | bool
+  ansible.builtin.include_tasks: darwin-stop-job.yml
+  loop: "{{ chia_darwin_hw_vdf_jobs | default([]) }}"
+  loop_control:
+    loop_var: chia_job
+    label: "{{ chia_job.label }}"
+
+- name: Restart service jobs
+  when: not (chia_darwin_restart_boards_only | default(true) | bool)
+  ansible.builtin.include_tasks: darwin-restart-job.yml
+  loop: "{{ chia_darwin_service_jobs | default([]) }}"
+  loop_control:
+    loop_var: chia_job
+    label: "{{ chia_job.label }}"
+
+- name: Stop an ASIC board whose own files changed
+  when:
+    - chia_darwin_restart_boards_only | default(true) | bool
+    - chia_darwin_start_now | bool
+    - chia_job.enabled | bool
+    - chia_job.label in (chia_darwin_hw_vdf_changed_labels | default([]))
+  ansible.builtin.include_tasks: darwin-stop-job.yml
+  loop: "{{ chia_darwin_hw_vdf_jobs | default([]) }}"
+  loop_control:
+    loop_var: chia_job
+    label: "{{ chia_job.label }}"
+
+- name: Start ASIC boards that are down, in ID order
+  when:
+    - chia_darwin_start_now | bool
+    - chia_job.enabled | bool
+  ansible.builtin.include_tasks: darwin-start-job.yml
+  loop: "{{ chia_darwin_hw_vdf_jobs | default([]) }}"
+  loop_control:
+    loop_var: chia_job
+    label: "{{ chia_job.label }}"

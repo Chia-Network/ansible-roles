@@ -375,8 +375,9 @@
           - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf-3') is file
           - (launch_state ~ '/loaded/com.example.keep') is file
           - leftover_before.stat.checksum == leftover_after.stat.checksum
-          - log_text.split('bootstrap system')[0] is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf$')
-          - log_text.split('hw-vdf-2.plist')[0] is search('hw-vdf.plist')
+          - log_text is search('hw-vdf-2.plist')
+          - not (log_text is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf$'))
+          - "'hw-vdf.plist' not in log_text"
           - "'bootout system/net.chia.timelord.hw-vdf-3' not in log_text"
           - "'disable system/net.chia.timelord.hw-vdf-3' not in log_text"
     - name: Clear the launchctl log before the retry's second run
@@ -465,11 +466,44 @@
           - (launch_state ~ '/loaded/net.chia.timelord.full-node') is file
           - (launch_state ~ '/loaded/net.chia.timelord.timelord') is file
           - (launch_state ~ '/loaded/com.example.keep') is file
-          - log_text.split('bootstrap system')[0] is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf$')
-          - log_text.split('hw-vdf-2.plist')[0] is search('hw-vdf.plist')
+          - log_text is search('hw-vdf-2.plist')
+          - not (log_text is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf$'))
+          - "'hw-vdf.plist' not in log_text"
           - "'bootout system/net.chia.timelord.daemon' not in log_text"
           - "'bootout system/net.chia.timelord.full-node' not in log_text"
           - "'bootout system/net.chia.timelord.timelord' not in log_text"
           - "'daemon.plist' not in log_text"
           - "'full-node.plist' not in log_text"
           - "'timelord.plist' not in log_text"
+    - name: Clear the launchctl log before a service restart
+      ansible.builtin.copy:
+        dest: "{{ launch_log }}"
+        mode: "0644"
+        content: ""
+    - name: Forget bootstraps from the board retry
+      ansible.builtin.set_fact:
+        chia_darwin_fresh_bootstraps: []
+    - name: Request a shared runtime restart
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-note-service-restart.yml
+    - name: Run the ordered restart
+      ansible.builtin.meta: flush_handlers
+    - name: Read the service restart log
+      ansible.builtin.slurp:
+        src: "{{ launch_log }}"
+      register: service_restart_log
+    - name: Boards stop before the timelord and start again after it
+      vars:
+        log_text: "{{ service_restart_log.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - log_text.split('bootout system/net.chia.timelord.daemon')[0] is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf$')
+          - log_text.split('hw-vdf.plist')[0] is search('daemon.plist')
+          - log_text.split('hw-vdf.plist')[0] is search('timelord.plist')
+          - log_text.split('hw-vdf-2.plist')[0] is search('hw-vdf.plist')
+          - (launch_state ~ '/loaded/net.chia.timelord.daemon') is file
+          - (launch_state ~ '/loaded/net.chia.timelord.timelord') is file
+          - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf') is file
+          - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf-2') is file
+          - (launch_state ~ '/loaded/com.example.keep') is file

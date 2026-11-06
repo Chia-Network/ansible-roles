@@ -104,12 +104,13 @@ they are started in one pass. A board that launchd restarts by itself does
 not wait for the others. Set the stagger to 0 to open every board after the
 shared settle.
 
-Adding a board, or retrying when an enabled board is not loaded, stops the
-loaded role-owned hw-vdf jobs and waits until they have exited. The launchd
-loop then starts every enabled board that is down, in ID order. That does
-not restart the daemon, full node, or timelord. Those jobs restart only when
-their own files change. A loaded label this role does not own does not block
-the start, and a second run does not bootstrap boards that are already loaded.
+Retrying one board that is not loaded starts that board and leaves the
+daemon, full node, timelord, and the other boards running. A change to those
+service files, or to the shared runtime scripts, stops the ASIC boards
+first, restarts the service jobs, and then starts the boards again in ID
+order. The per-board stagger still spaces the USB opens. A loaded label this
+role does not own is left alone, and a second run does not bootstrap boards
+that are already loaded.
 `--device-loc` is an option before the port and `N_VDFS` arguments.
 
 ## Logs, plists, and wrappers

@@ -12,6 +12,7 @@
       ansible.builtin.command:
         argv: [cat, "{{ item }}"]
       loop:
+        - "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-stop-job.yml"
         - "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-restart-job.yml"
         - "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin.yml"
       register: darwin_sources
@@ -19,8 +20,8 @@
 
     - name: Name the loaded sources
       ansible.builtin.set_fact:
-        restart_text: "{{ darwin_sources.results[0].stdout }}"
-        darwin_text: "{{ darwin_sources.results[1].stdout }}"
+        restart_text: "{{ darwin_sources.results[0].stdout ~ '\n' ~ darwin_sources.results[1].stdout }}"
+        darwin_text: "{{ darwin_sources.results[2].stdout }}"
 
     - name: The unload wait lasts through ExitTimeOut plus a short margin
       vars:

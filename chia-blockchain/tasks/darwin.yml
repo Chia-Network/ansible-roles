@@ -1,4 +1,10 @@
 ---
+- name: Restart services only when their own files change
+  ansible.builtin.set_fact:
+    chia_darwin_restart_boards_only: true
+    chia_darwin_hw_vdf_changed_labels: []
+  changed_when: false
+
 - name: Require an Apple Silicon Mac
   ansible.builtin.assert:
     that:
@@ -488,6 +494,12 @@
   changed_when: true
   notify: restart-chia-darwin
 
+- name: A custom CA restart includes the service jobs
+  ansible.builtin.set_fact:
+    chia_darwin_restart_boards_only: false
+  when: chia_darwin_ca_content.changed | default(false)
+  changed_when: false
+
 - name: Write the chia config
   become: true
   become_user: "{{ user }}"
@@ -503,7 +515,14 @@
     src: config.yaml.j2
     dest: "{{ chia_root }}/config/.config.yaml"
     mode: "0644"
+  register: chia_darwin_ref_config
   notify: restart-chia-darwin
+
+- name: A config change restarts the service jobs
+  ansible.builtin.set_fact:
+    chia_darwin_restart_boards_only: false
+  when: chia_darwin_ref_config is changed
+  changed_when: false
 
 - name: Read the installed chia version
   become: true
@@ -530,7 +549,14 @@
     src: version.j2
     dest: "{{ chia_root }}/.last-version"
     mode: "0644"
+  register: chia_darwin_ref_version
   notify: restart-chia-darwin
+
+- name: A version change restarts the service jobs
+  ansible.builtin.set_fact:
+    chia_darwin_restart_boards_only: false
+  when: chia_darwin_ref_version is changed
+  changed_when: false
 
 - name: Export CHIA_ROOT for interactive zsh
   become: true
@@ -601,7 +627,14 @@
       dest: "{{ chia_darwin_bin_dir }}/rotpipe.py"
   loop_control:
     label: "{{ item.dest }}"
+  register: chia_darwin_runtime_scripts
   notify: restart-chia-darwin
+
+- name: A runtime script change restarts the service jobs
+  ansible.builtin.set_fact:
+    chia_darwin_restart_boards_only: false
+  when: chia_darwin_runtime_scripts is changed
+  changed_when: false
 
 - name: Write the Full Disk Access note
   become: true

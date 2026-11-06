@@ -74,57 +74,33 @@
   when: (item.enabled | bool) or (item.label in chia_darwin_hw_vdf_owned_labels)
   changed_when: false
 
-# When an enabled board is not loaded, stop the loaded role-owned jobs
-# first. The launchd loop then starts every enabled board that is down,
-# in ID order. That path does not notify the service restart handler.
-# A loaded label this role does not own does not block the start.
-- name: Clear the board-count change flag
-  ansible.builtin.set_fact:
-    chia_darwin_hw_vdf_regroup: false
-  changed_when: false
-
-- name: Stop loaded hw-vdf jobs before the board count changes
+# A down board asks the ordered restart handler to start it. Loaded
+# siblings stay up unless their own files changed, or a service restart
+# stops every board first.
+- name: See which hw-vdf jobs are loaded
   when: chia_darwin_start_now | bool
-  block:
-    - name: See which hw-vdf jobs are loaded
-      become: "{{ chia_darwin_launchd_become | bool }}"
-      ansible.builtin.command:
-        argv:
-          - "{{ chia_darwin_launchctl }}"
-          - print
-          - "system/{{ item.label }}"
-      register: chia_darwin_hw_vdf_running
-      changed_when: false
-      failed_when: false
-      loop: "{{ chia_darwin_hw_vdf_jobs }}"
-      loop_control:
-        label: "{{ item.label }}"
+  become: "{{ chia_darwin_launchd_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_launchctl }}"
+      - print
+      - "system/{{ item.label }}"
+  register: chia_darwin_hw_vdf_running
+  changed_when: false
+  failed_when: false
+  loop: "{{ chia_darwin_hw_vdf_jobs }}"
+  loop_control:
+    label: "{{ item.label }}"
 
-    - name: List the loaded hw-vdf labels
-      ansible.builtin.set_fact:
-        chia_darwin_hw_vdf_loaded_labels: "{{ chia_darwin_hw_vdf_running.results | selectattr('rc', 'equalto', 0) | map(attribute='item.label') | list | sort }}"
-      changed_when: false
-
-    - name: Remember that an enabled hw-vdf job is not loaded
-      ansible.builtin.set_fact:
-        chia_darwin_hw_vdf_regroup: true
-      when:
-        - item.enabled | bool
-        - item.label not in chia_darwin_hw_vdf_loaded_labels
-      loop: "{{ chia_darwin_hw_vdf_jobs }}"
-      loop_control:
-        label: "{{ item.label }}"
-      changed_when: false
-
-    - name: Stop one loaded hw-vdf job before the new set starts
-      when:
-        - chia_darwin_hw_vdf_regroup | bool
-        - chia_darwin_hw_vdf_running.results[ansible_loop.index0].rc | int == 0
-        - >-
-          (chia_darwin_hw_plist_owner.results[ansible_loop.index0].rc | int == 0)
-          or ((item.enabled | bool) and (chia_darwin_hw_vdf_claim_existing | bool))
-      ansible.builtin.include_tasks: darwin-hw-vdf-stop-job.yml
-      loop: "{{ chia_darwin_hw_vdf_jobs }}"
-      loop_control:
-        extended: true
-        label: "{{ item.label }}"
+- name: Start the handler when an enabled hw-vdf job is down
+  when:
+    - chia_darwin_start_now | bool
+    - item.item.enabled | bool
+    - item.rc | int != 0
+  ansible.builtin.debug:
+    msg: "{{ item.item.label }} is not loaded."
+  loop: "{{ chia_darwin_hw_vdf_running.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.label }}"
+  changed_when: true
+  notify: restart-chia-darwin

@@ -11,7 +11,24 @@
     group: "{{ 'wheel' if (chia_darwin_launchd_become | bool) else omit }}"
     mode: "0644"
   when: chia_job.enabled | bool
-  notify: "{{ 'restart-chia-darwin-hw-vdf' if (chia_job.board is defined) else 'restart-chia-darwin' }}"
+  register: chia_darwin_plist_written
+  notify: restart-chia-darwin
+
+- name: A service plist change restarts the shared runtime
+  ansible.builtin.set_fact:
+    chia_darwin_restart_boards_only: false
+  when:
+    - chia_darwin_plist_written is changed
+    - chia_job.board is not defined
+  changed_when: false
+
+- name: A board plist change restarts that board
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_changed_labels: "{{ chia_darwin_hw_vdf_changed_labels | default([]) + [chia_job.label] }}"
+  when:
+    - chia_darwin_plist_written is changed
+    - chia_job.board is defined
+  changed_when: false
 
 - name: Check whether LaunchDaemon is loaded {{ chia_job.label }}
   become: "{{ chia_darwin_launchd_become | bool }}"
@@ -71,6 +88,8 @@
     - chia_job.enabled | bool
     - chia_darwin_start_now | bool
     - chia_darwin_launchd_loaded.rc != 0
+    # Boards start from the ordered restart handler, after any service restart.
+    - chia_job.board is not defined
 
 - name: Record freshly bootstrapped LaunchDaemons
   ansible.builtin.set_fact:

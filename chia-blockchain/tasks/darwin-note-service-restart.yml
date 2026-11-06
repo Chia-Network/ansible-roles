@@ -1,0 +1,12 @@
+---
+# Test hook. A real service-file change sets the same fact and notify.
+- name: This restart includes the service jobs
+  ansible.builtin.set_fact:
+    chia_darwin_restart_boards_only: false
+  changed_when: false
+
+- name: Notify the ordered restart handler
+  ansible.builtin.debug:
+    msg: Shared runtime restart.
+  changed_when: true
+  notify: restart-chia-darwin
