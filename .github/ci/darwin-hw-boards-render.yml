@@ -1,0 +1,165 @@
+---
+- name: Render per-board wrappers
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+    - darwin-hw-boards-fixture.yml
+  vars:
+    render_out: /tmp/chia-darwin-hw-render
+  tasks:
+    - name: Point rendered paths at the test directory
+      ansible.builtin.set_fact:
+        user: timelord
+        chia_darwin_home: "{{ render_out }}/shell-home"
+        chia_darwin_bin_dir: "{{ render_out }}/boards"
+        chia_darwin_log_dir: "{{ render_out }}/shell-home/logs"
+        chia_darwin_etc_dir: "{{ render_out }}/shell-home/etc"
+        chia_root: "{{ render_out }}/shell-home/.chia/mainnet"
+        chia_darwin_env_script: "{{ render_out }}/boards/chia-env.sh"
+        chia_darwin_venv: "{{ render_out }}/shell-home/chia-venv"
+        chia_darwin_topology: local-internal
+        chia_darwin_hw_vdf_expected_serial: FIX-BOARD-0001
+    - name: Create render directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ render_out }}/boards"
+        - "{{ chia_darwin_log_dir }}"
+        - "{{ chia_darwin_home }}"
+    - name: Render the env script
+      ansible.builtin.template:
+        src: ../../chia-blockchain/templates/darwin/chia-env.sh.j2
+        dest: "{{ chia_darwin_env_script }}"
+        mode: "0755"
+    - name: Render the legacy wrapper with no board object
+      ansible.builtin.template:
+        src: ../../chia-blockchain/templates/darwin/chia-hw-vdf-run.sh.j2
+        dest: "{{ render_out }}/boards/legacy-unset.sh"
+        mode: "0755"
+    - name: Resolve the legacy board row
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Keep the legacy serial set
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_expected_serial: FIX-BOARD-0001
+    - name: Resolve the legacy inventory
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: Render the legacy wrapper from the board row
+      ansible.builtin.template:
+        src: ../../chia-blockchain/templates/darwin/chia-hw-vdf-run.sh.j2
+        dest: "{{ render_out }}/boards/legacy-row.sh"
+        mode: "0755"
+      vars:
+        chia_hw_board: "{{ chia_darwin_hw_vdf_active[0] }}"
+        chia_hw_show_device: false
+    - name: The legacy row matches the unset render and the single-board argv
+      ansible.builtin.command:
+        argv:
+          - cmp
+          - "{{ render_out }}/boards/legacy-unset.sh"
+          - "{{ render_out }}/boards/legacy-row.sh"
+      changed_when: false
+    - name: Read the legacy wrapper
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/boards/legacy-unset.sh"
+      register: legacy_script
+    - name: The single-board wrapper does not gain a device flag or a stagger
+      vars:
+        text: "{{ legacy_script.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - "'--device-loc' not in text"
+          - "'wait_for_previous' not in text"
+          - "'opening USB' not in text"
+          - "'Connected to timelord' not in text"
+          - text is search('sleep 3\n')
+          - text is search('SERIAL=FIX-BOARD-0001') or text is search("SERIAL='FIX-BOARD-0001'")
+          - text is search('VDFS_MASK=7')
+          - text is search('N_VDFS=3')
+          - "'1540' in text and '1.0' in text and '500000' in text"
+
+    - name: Render the remote-node env script
+      ansible.builtin.set_fact:
+        chia_darwin_topology: remote-node
+    - name: Write the remote-node env script
+      ansible.builtin.template:
+        src: ../../chia-blockchain/templates/darwin/chia-env.sh.j2
+        dest: "{{ render_out }}/boards/remote-node.sh"
+        mode: "0755"
+    - name: Render the local-external env script
+      ansible.builtin.set_fact:
+        chia_darwin_topology: local-external
+    - name: Write the local-external env script
+      ansible.builtin.template:
+        src: ../../chia-blockchain/templates/darwin/chia-env.sh.j2
+        dest: "{{ render_out }}/boards/local-external.sh"
+        mode: "0755"
+
+    - name: Resolve three boards for wrapper text
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Use the three-board fixture
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_boards: "{{ fixture_boards }}"
+    - name: Resolve three boards
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: Render one wrapper per board
+      ansible.builtin.template:
+        src: ../../chia-blockchain/templates/darwin/chia-hw-vdf-run.sh.j2
+        dest: "{{ render_out }}/boards/chia-{{ item.name }}-run.sh"
+        mode: "0755"
+      vars:
+        chia_hw_board: "{{ item }}"
+        chia_hw_show_device: "{{ not (item.legacy | bool) }}"
+      loop: "{{ chia_darwin_hw_vdf_active }}"
+      loop_control:
+        label: "{{ item.name }}"
+    - name: Read the three wrappers
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/boards/chia-{{ item }}-run.sh"
+      loop:
+        - hw-vdf
+        - hw-vdf-2
+        - hw-vdf-3
+      register: board_scripts
+    - name: Later boards wait, and each wrapper names its own device
+      vars:
+        scripts: "{{ board_scripts.results | map(attribute='content') | map('b64decode') | list }}"
+      ansible.builtin.assert:
+        that:
+          - scripts[0] is search('DEVICE_LOC=1101') or scripts[0] is search("DEVICE_LOC='1101'")
+          - scripts[0] is search('--device-loc')
+          - scripts[0].split('--device-loc')[1] is search('PORT')
+          - scripts[1] is search('1102')
+          - scripts[2] is search('1103')
+          - scripts[0] is search('VDFS_MASK=1')
+          - scripts[0] is search('N_VDFS=1')
+          - scripts[0] is search('OPEN_DELAY=0')
+          - scripts[0] is not search('OPEN_DELAY=15')
+          - scripts[1] is search('OPEN_DELAY=15')
+          - scripts[2] is search('OPEN_DELAY=30')
+          - scripts[1] is search('VDF_THREADS=8')
+          - "'1540' in scripts[2] and '1.0' in scripts[2]"
+          - scripts[0] is search('hw-vdf.log')
+          - scripts[2] is search('hw-vdf-3.log')
+    - name: Read the topology env scripts
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/boards/{{ item }}.sh"
+      loop:
+        - remote-node
+        - local-external
+      register: env_scripts
+    - name: remote-node does not wait for a volume and local-external does
+      vars:
+        envs: "{{ env_scripts.results | map(attribute='content') | map('b64decode') | list }}"
+      ansible.builtin.assert:
+        that:
+          - envs[0] is search('return 0')
+          - envs[0] is not search('CHIA_DB_VOLUME')
+          - envs[1] is search('CHIA_DB_VOLUME')

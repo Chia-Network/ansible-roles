@@ -1,0 +1,67 @@
+---
+# Auto-discovery: hw_vdf_client --list is the same source chiavdf uses for
+# --device-loc, but it cannot list a board that a running client already holds.
+# Read this role's installed wrappers as the persisted inventory: keep every
+# claimed board on its existing ID, refresh only boards that --list can see,
+# and give new serials the next free ID. Explicit boards and the legacy serial
+# still bypass discovery.
+- name: Discover attached ASIC boards
+  when:
+    - chia_darwin_enable_hw_vdf | bool
+    - chia_darwin_hw_vdf_boards | length == 0
+    - chia_darwin_hw_vdf_expected_serial | length == 0
+  block:
+    - name: List attached ASIC boards
+      become: false
+      ansible.builtin.command:
+        argv:
+          - "{{ chia_darwin_hw_vdf_client }}"
+          - --list
+      register: chia_darwin_hw_vdf_list
+      changed_when: false
+      failed_when: false
+
+    - name: Read the role's installed hw-vdf wrappers
+      become: "{{ chia_darwin_launchd_become | bool }}"
+      become_user: "{{ user }}"
+      ansible.builtin.slurp:
+        src: "{{ chia_darwin_bin_dir }}/chia-{{ 'hw-vdf' if item == 1 else 'hw-vdf-' ~ item }}-run.sh"
+      loop:
+        - 1
+        - 2
+        - 3
+      loop_control:
+        label: "{{ item }}"
+      register: chia_darwin_hw_vdf_persisted_wrappers
+      failed_when: false
+
+    - name: Merge attached boards with previously claimed boards
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_discovered_boards: >-
+          {{
+            chia_darwin_hw_vdf_list
+            | chia_hw_vdf_merge_boards(
+                chia_darwin_hw_vdf_persisted_wrappers.results,
+                chia_darwin_hw_vdf_serial_pattern,
+                chia_darwin_hw_vdf_client
+              )
+          }}
+      changed_when: false
+
+    - name: Require one to three attached or claimed boards
+      vars:
+        boards: "{{ chia_darwin_hw_vdf_discovered_boards }}"
+      ansible.builtin.assert:
+        that:
+          - boards | length > 0
+          - boards | length <= 3
+        fail_msg: >-
+          {% if boards | length == 0 %}
+          Auto-discovery found 0 attached or previously claimed Chia ASIC
+          boards via {{ chia_darwin_hw_vdf_client }} --list.
+          {% else %}
+          Auto-discovery found {{ boards | length }} attached or previously
+          claimed Chia ASIC boards; this role supports at most 3.
+          {% endif %}
+          Set chia_darwin_hw_vdf_expected_serial for the legacy single-board
+          path, or set chia_darwin_hw_vdf_boards explicitly.

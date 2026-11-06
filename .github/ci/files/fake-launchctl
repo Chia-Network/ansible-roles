@@ -1,0 +1,63 @@
+#!/bin/sh
+# Fake launchctl for Darwin role tests. Paths come from the environment.
+set -u
+LOG=${CHIA_LAUNCHCTL_LOG:?}
+STATE=${CHIA_LAUNCHCTL_STATE:?}
+DIR=${CHIA_LAUNCHCTL_DIR:?}
+printf '%s\n' "$*" >>"$LOG"
+action=$1
+shift
+case "$action" in
+print)
+	label=${1#system/}
+	hold="$STATE/hold/$label"
+	if [ -f "$hold" ]; then
+		n=$(cat "$hold")
+		if [ "$n" -gt 0 ]; then
+			printf '%s\n' "$((n - 1))" >"$hold"
+			echo "loaded $label"
+			exit 0
+		fi
+		echo "gone $label"
+		exit 1
+	fi
+	if [ -f "$STATE/loaded/$label" ]; then
+		plist="$DIR/$label.plist"
+		if [ -f "$plist" ]; then
+			cat "$plist"
+		else
+			echo "loaded $label"
+		fi
+		exit 0
+	fi
+	echo "absent $label"
+	exit 1
+	;;
+bootout)
+	label=${1#system/}
+	if [ ! -f "$STATE/loaded/$label" ]; then
+		echo "not loaded $label" >&2
+		exit 3
+	fi
+	rm -f "$STATE/loaded/$label"
+	exit 0
+	;;
+bootstrap)
+	plist=$2
+	label=$(basename "$plist" .plist)
+	if [ ! -f "$plist" ]; then
+		echo "missing $plist" >&2
+		exit 1
+	fi
+	mkdir -p "$STATE/loaded"
+	: >"$STATE/loaded/$label"
+	exit 0
+	;;
+enable | disable)
+	exit 0
+	;;
+*)
+	echo "bad action $action" >&2
+	exit 1
+	;;
+esac

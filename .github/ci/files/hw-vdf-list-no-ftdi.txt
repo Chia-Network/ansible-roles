@@ -1,0 +1,2 @@
+List of available devices:
+No FTDI devices connected.

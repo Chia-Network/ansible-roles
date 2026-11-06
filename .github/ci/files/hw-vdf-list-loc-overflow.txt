@@ -1,0 +1,4 @@
+# Example hw_vdf_client --list output for tests only.
+# Not captured from real hardware. The location is above uint32.
+List of available devices:
+Device 0: 'Example Chia ASIC A', loc 4294967296, serial 'CHIA9999999001A'

@@ -1,0 +1,88 @@
+---
+# One hw_vdf_client per board. A non-zero --vdfs-mask selects engines; N_VDFS
+# does not change that mask, so it is just the mask's popcount. Masks by count,
+# in ID order: 1 -> 7, 2 -> 3 then 1, 3 -> 1, 1, 1. An empty board list with a
+# serial is one legacy row: ID 1, chia_darwin_hw_vdf_mask, and no --device-loc.
+# With both empty, boards come from hw_vdf_client --list merged with this
+# role's installed wrappers.
+- name: Clear derived ASIC board state
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_active: []
+    chia_darwin_hw_vdf_jobs: []
+    chia_darwin_hw_vdf_discovered_boards: []
+  changed_when: false
+
+- name: Discover attached ASIC boards
+  ansible.builtin.include_tasks: darwin-hw-vdf-discover.yml
+
+- name: Select the ASIC board list
+  when: chia_darwin_enable_hw_vdf | bool
+  vars:
+    legacy_row:
+      - id: 1
+        device_loc: ""
+        expected_serial: "{{ chia_darwin_hw_vdf_expected_serial }}"
+        vdf_threads: "{{ chia_darwin_hw_vdf_vdf_threads | int }}"
+        proof_threads: "{{ chia_darwin_hw_vdf_proof_threads | int }}"
+    use_legacy: "{{ (chia_darwin_hw_vdf_boards | length == 0) and (chia_darwin_hw_vdf_expected_serial | length > 0) }}"
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_legacy: "{{ use_legacy | bool }}"
+    chia_darwin_hw_vdf_input: "{{ chia_darwin_hw_vdf_boards if chia_darwin_hw_vdf_boards | length > 0 else (legacy_row if (use_legacy | bool) else chia_darwin_hw_vdf_discovered_boards) }}"
+  changed_when: false
+
+- name: Validate ASIC board inventory
+  ansible.builtin.include_tasks: darwin-hw-vdf-validate.yml
+
+- name: Assign one mask per board
+  when: chia_darwin_enable_hw_vdf | bool
+  vars:
+    hw_vdf_masks:
+      - []
+      - [7]
+      - [3, 1]
+      - [1, 1, 1]
+    use_legacy_mask: "{{ chia_darwin_hw_vdf_legacy | bool }}"
+    mask: "{{ (chia_darwin_hw_vdf_mask | int) if (use_legacy_mask | bool) else hw_vdf_masks[chia_darwin_hw_vdf_input | length][ansible_loop.index0] }}"
+    slot_name: "{{ 'hw-vdf' if (item.id | int) == 1 else 'hw-vdf-' ~ (item.id | int) }}"
+    row:
+      id: "{{ item.id | int }}"
+      legacy: "{{ use_legacy_mask | bool }}"
+      device_loc: "{{ '' if (use_legacy_mask | bool) else (item.device_loc | int) }}"
+      expected_serial: "{{ item.expected_serial }}"
+      vdfs_mask: "{{ mask | int }}"
+      n_vdfs: "{{ 1 if (mask | int) in [1, 2, 4] else (2 if (mask | int) in [3, 5, 6] else 3) }}"
+      vdf_threads: "{{ item.vdf_threads | default(chia_darwin_hw_vdf_vdf_threads) | int }}"
+      proof_threads: "{{ item.proof_threads | default(chia_darwin_hw_vdf_proof_threads) | int }}"
+      open_delay: "{{ (ansible_loop.index0 | int) * (chia_darwin_hw_vdf_open_stagger | int) }}"
+      name: "{{ slot_name }}"
+      log_name: "{{ slot_name }}.log"
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_active: "{{ chia_darwin_hw_vdf_active + [row] }}"
+  loop: "{{ chia_darwin_hw_vdf_input | sort(attribute='id') }}"
+  loop_control:
+    extended: true
+    label: "{{ item.id | default('legacy') }}"
+  changed_when: false
+
+- name: Register the three hw-vdf LaunchDaemon slots
+  vars:
+    slot_name: "{{ 'hw-vdf' if item == 1 else 'hw-vdf-' ~ item }}"
+    matched: "{{ chia_darwin_hw_vdf_active | selectattr('name', 'equalto', slot_name) | list }}"
+    slot_on: "{{ (chia_darwin_enable_hw_vdf | bool) and (matched | length == 1) }}"
+    slot_job:
+      name: "{{ slot_name }}"
+      label: "{{ chia_darwin_launchd_prefix }}.{{ slot_name }}"
+      wrapper: "{{ chia_darwin_bin_dir }}/chia-{{ slot_name }}-run.sh"
+      throttle: "{{ chia_darwin_hw_vdf_throttle_interval | int }}"
+      exit_timeout: "{{ chia_darwin_hw_vdf_exit_timeout | int }}"
+      enabled: "{{ slot_on | bool }}"
+      board: "{{ matched[0] if (slot_on | bool) else {} }}"
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_jobs: "{{ chia_darwin_hw_vdf_jobs + [slot_job] }}"
+  loop:
+    - 1
+    - 2
+    - 3
+  loop_control:
+    label: "{{ chia_darwin_launchd_prefix }}.{{ 'hw-vdf' if item == 1 else 'hw-vdf-' ~ item }}"
+  changed_when: false
