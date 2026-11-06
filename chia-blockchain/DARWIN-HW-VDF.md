@@ -104,9 +104,12 @@ they are started in one pass. A board that launchd restarts by itself does
 not wait for the others. Set the stagger to 0 to open every board after the
 shared settle.
 
-Adding a board while another hw-vdf job is loaded does not bootstrap the new
-job immediately. The restart handler stops the loaded hw-vdf jobs first, then
-starts the set in ID order, and the stagger above spaces those opens.
+Adding a board, or retrying when an enabled board is not loaded, stops the
+loaded role-owned hw-vdf jobs and waits until they have exited. Every enabled
+board that is down is then started in ID order. A loaded label this role does
+not own does not block that start, and a second run does not bootstrap boards
+that are already loaded. `--device-loc` is an option before the port and
+`N_VDFS` arguments.
 
 ## Logs, plists, and wrappers
 

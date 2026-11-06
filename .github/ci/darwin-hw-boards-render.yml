@@ -135,6 +135,7 @@
         that:
           - scripts[0] is search('DEVICE_LOC=1101') or scripts[0] is search("DEVICE_LOC='1101'")
           - scripts[0] is search('--device-loc')
+          - scripts[0].split('--device-loc')[1] is search('PORT')
           - scripts[1] is search('1102')
           - scripts[2] is search('1103')
           - scripts[0] is search('VDFS_MASK=1')

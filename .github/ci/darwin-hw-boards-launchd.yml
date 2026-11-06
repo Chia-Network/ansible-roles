@@ -233,9 +233,7 @@
       ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
       vars:
         hw_apply_serial: ""
-        hw_apply_boards:
-          - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
-          - { id: 2, device_loc: 1102, expected_serial: FIX-BOARD-0002 }
+        hw_apply_boards: "{{ fixture_two_boards }}"
     - name: List loaded jobs for two boards
       ansible.builtin.find:
         paths: "{{ launch_state }}/loaded"
@@ -317,4 +315,88 @@
           - "'bootstrap system' in log_text"
           - log_text is search('(?m)^disable system/net\\.chia\\.timelord\\.hw-vdf$')
           - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf') is file
+          - (launch_state ~ '/loaded/com.example.keep') is file
+
+    - name: Apply two boards before the retry case
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards: "{{ fixture_two_boards }}"
+    - name: Plant an unmanaged loaded hw-vdf-3 leftover
+      ansible.builtin.copy:
+        dest: "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf-3.plist"
+        mode: "0644"
+        content: |
+          <?xml version="1.0" encoding="UTF-8"?>
+          <plist version="1.0"><dict>
+          <key>ProgramArguments</key>
+          <array><string>/usr/local/bin/hand-hw-vdf-3</string></array>
+          </dict></plist>
+    - name: Mark the leftover loaded
+      ansible.builtin.file:
+        path: "{{ launch_state }}/loaded/net.chia.timelord.hw-vdf-3"
+        state: touch
+        mode: "0644"
+    - name: Checksum the leftover plist
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf-3.plist"
+        checksum_algorithm: sha1
+      register: leftover_before
+    - name: Drop the loaded marker for hw-vdf-2
+      ansible.builtin.file:
+        path: "{{ launch_state }}/loaded/net.chia.timelord.hw-vdf-2"
+        state: absent
+    - name: Clear the launchctl log before the retry
+      ansible.builtin.copy:
+        dest: "{{ launch_log }}"
+        mode: "0644"
+        content: ""
+    - name: Retry the same two boards with hw-vdf-2 down
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards: "{{ fixture_two_boards }}"
+    - name: Read the retry log
+      ansible.builtin.slurp:
+        src: "{{ launch_log }}"
+      register: retry_log
+    - name: Checksum the leftover plist after the retry
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf-3.plist"
+        checksum_algorithm: sha1
+      register: leftover_after
+    - name: The down board starts in slot order and the leftover stays
+      vars:
+        log_text: "{{ retry_log.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf') is file
+          - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf-2') is file
+          - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf-3') is file
+          - (launch_state ~ '/loaded/com.example.keep') is file
+          - leftover_before.stat.checksum == leftover_after.stat.checksum
+          - log_text.split('bootstrap system')[0] is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf$')
+          - log_text.split('hw-vdf-2.plist')[0] is search('hw-vdf.plist')
+          - "'bootout system/net.chia.timelord.hw-vdf-3' not in log_text"
+          - "'disable system/net.chia.timelord.hw-vdf-3' not in log_text"
+    - name: Clear the launchctl log before the retry's second run
+      ansible.builtin.copy:
+        dest: "{{ launch_log }}"
+        mode: "0644"
+        content: ""
+    - name: Apply the same two boards once both are loaded
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards: "{{ fixture_two_boards }}"
+    - name: Read the loaded-board rerun log
+      ansible.builtin.slurp:
+        src: "{{ launch_log }}"
+      register: retry_idem_log
+    - name: A loaded set is not bootstrapped again while the leftover remains
+      ansible.builtin.assert:
+        that:
+          - "'bootstrap system' not in (retry_idem_log.content | b64decode)"
+          - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf-2') is file
+          - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf-3') is file
           - (launch_state ~ '/loaded/com.example.keep') is file

@@ -3,6 +3,13 @@ ansible_architecture: arm64
 user: timelord
 chia_enable_hw_vdf: false
 chia_darwin_launchd_become: false
+fixture_two_boards:
+  - id: 1
+    device_loc: 1101
+    expected_serial: FIX-BOARD-0001
+  - id: 2
+    device_loc: 1102
+    expected_serial: FIX-BOARD-0002
 fixture_boards:
   - id: 1
     device_loc: 1101
