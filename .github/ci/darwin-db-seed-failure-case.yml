@@ -14,11 +14,14 @@
     dest: "{{ test_root }}/fail-file"
     mode: "0644"
 
-- name: Reset the fake AWS log for the failed seed case
+- name: Reset the fake AWS state for the failed seed case
   ansible.builtin.copy:
     content: ""
-    dest: "{{ test_root }}/aws.log"
+    dest: "{{ test_root }}/{{ item }}"
     mode: "0644"
+  loop:
+    - aws.log
+    - fail-publish
 
 - name: A failed snapshot copy fails the operation
   block:
@@ -30,8 +33,6 @@
         network: mainnet
         download_blockchain_db: true
         blockchain_backup_bucket: test-bucket
-        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
-        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
 
     - name: Mark a snapshot copy failure that did not happen
       ansible.builtin.fail:

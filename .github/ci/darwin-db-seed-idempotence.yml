@@ -30,8 +30,6 @@
         network: mainnet
         download_blockchain_db: true
         blockchain_backup_bucket: test-bucket
-        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
-        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
 
     - name: Require the first run to publish the fixture database
       ansible.builtin.assert:

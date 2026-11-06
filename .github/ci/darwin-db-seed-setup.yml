@@ -79,29 +79,31 @@
         exit 24
       fi
       cp "$fixture" "$dest"
+      if [ -s "$root/fail-publish" ] && [ "$(cat "$root/fail-publish")" = "$name" ]; then
+        db=$(dirname "$(dirname "$dest")")
+        rm -f "$db/$name"
+        mkdir -p "$db/$name"
+        chmod 0555 "$db/$name"
+      fi
     dest: "{{ test_root }}/bin/aws"
     mode: "0755"
 
-- name: Write the fake mount executables
+- name: Write the fake Homebrew executable
   ansible.builtin.copy:
     content: |
       #!/bin/sh
-      echo "/dev/disk9s1 on {{ external_volume }} (apfs, local, nodev, nosuid, journaled)"
-    dest: "{{ test_root }}/bin/mount-present"
-    mode: "0755"
-
-- name: Write the fake mount executable without the external volume
-  ansible.builtin.copy:
-    content: |
-      #!/bin/sh
-      echo "/dev/disk9s1 on / (apfs, local, read-only, journaled)"
-    dest: "{{ test_root }}/bin/mount-absent"
+      root='{{ test_root }}'
+      printf '%s\n' "$*" >> "$root/brew.log"
+      exit 0
+    dest: "{{ test_root }}/bin/brew"
     mode: "0755"
 
 - name: Write the fake launchctl executables
   ansible.builtin.copy:
     content: |
       #!/bin/sh
+      root='{{ test_root }}'
+      printf '%s\n' "$*" >> "$root/launchctl.log"
       if [ "${1:-}" = "print" ]; then
         echo "loaded"
         exit 0
@@ -114,6 +116,7 @@
   ansible.builtin.copy:
     content: |
       #!/bin/sh
+      printf '%s\n' "$*" >> '{{ test_root }}/launchctl.log'
       exit 1
     dest: "{{ test_root }}/bin/launchctl-notloaded"
     mode: "0755"
@@ -131,3 +134,20 @@
     dest: "{{ test_root }}/fail-file"
     force: false
     mode: "0644"
+
+- name: Create an empty fake AWS publish-failure marker without truncating it on reruns
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ test_root }}/fail-publish"
+    force: false
+    mode: "0644"
+
+- name: Create empty fake tool logs without truncating them on reruns
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ test_root }}/{{ item }}"
+    force: false
+    mode: "0644"
+  loop:
+    - brew.log
+    - launchctl.log

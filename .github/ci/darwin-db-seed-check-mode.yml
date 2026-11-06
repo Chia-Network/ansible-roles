@@ -1,6 +1,7 @@
 ---
 # Run with --check. Fixture creation is forced to run so the seed sees a real
-# destination; the seed tasks themselves stay in check mode.
+# destination; the seed tasks themselves stay in check mode. A loaded full node
+# must fail in check mode exactly as it would in a real run.
 - name: Check-mode safety for the Darwin database seed
   hosts: localhost
   connection: local
@@ -25,25 +26,38 @@
             state: directory
             mode: "0755"
 
-        - name: Reset the fake AWS state
+        - name: Reset the fake tool state
           ansible.builtin.copy:
             content: ""
-            dest: "{{ item }}"
+            dest: "{{ test_root }}/{{ item }}"
             mode: "0644"
           loop:
-            - "{{ test_root }}/aws.log"
-            - "{{ test_root }}/fail-file"
+            - aws.log
+            - fail-file
+            - fail-publish
+            - launchctl.log
 
-    - name: Run the seed with the full node loaded in check mode
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
-      vars:
-        chia_darwin_topology: local-internal
-        chia_root: "{{ test_root }}/checkmode/mainnet"
-        network: mainnet
-        download_blockchain_db: true
-        blockchain_backup_bucket: test-bucket
-        chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-loaded"
-        chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
+    - name: A loaded full node fails in check mode
+      block:
+        - name: Run the seed with the full node loaded in check mode
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+          vars:
+            chia_darwin_topology: local-internal
+            chia_root: "{{ test_root }}/checkmode/mainnet"
+            network: mainnet
+            download_blockchain_db: true
+            blockchain_backup_bucket: test-bucket
+            chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-loaded"
+
+        - name: Fail when a loaded node is not predicted in check mode
+          ansible.builtin.fail:
+            msg: "Check mode did not predict the loaded full node failure"
+
+      rescue:
+        - name: Confirm check mode predicted the loaded full node failure
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg is search('LaunchDaemon is loaded')
 
     - name: Inspect the check-mode database and staging paths
       ansible.builtin.stat:

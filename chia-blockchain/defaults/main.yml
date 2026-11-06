@@ -372,11 +372,10 @@ chia_darwin_hw_vdf_client: "{{ chia_darwin_homebrew_prefix }}/bin/hw_vdf_client"
 # Initial full-node database seeding from the same S3 snapshot Linux uses.
 # Reuses blockchain_backup_bucket, download_blockchain_db, network, and
 # db_version. Only local-internal and local-external seed. The AWS CLI is
-# installed with Homebrew when a seed is actually needed and the binary is
-# missing. Credentials use the AWS CLI's normal discovery as the service user.
+# installed with Homebrew when a seed is actually needed. Credentials use the
+# AWS CLI's normal discovery as the service user.
 chia_darwin_aws: "{{ chia_darwin_homebrew_prefix }}/bin/aws"
 chia_darwin_awscli_formula: awscli
-chia_darwin_mount_binary: /sbin/mount
 chia_darwin_db_seed_stub_bytes: 10240
 chia_darwin_db_seed_become: true
 chia_darwin_db_volume: /Volumes/Chia-DB
@@ -385,9 +384,8 @@ chia_darwin_db_marker: "{{ chia_darwin_volume_chia_dir }}/{{ network }}/config/c
 chia_darwin_wait_interval: 5
 chia_darwin_wait_log_every: 12
 chia_darwin_launchd_prefix: net.chia.timelord
-# When chia_darwin_launchd_become is true these must stay launchctl and
-# /Library/LaunchDaemons. Tests set become to false and point them elsewhere.
-chia_darwin_launchctl: launchctl
+# Tests set chia_darwin_launchctl to a fake and chia_darwin_launchd_dir
+# elsewhere. Production uses launchctl and /Library/LaunchDaemons.
 chia_darwin_launchd_dir: /Library/LaunchDaemons
 chia_darwin_launchd_become: true
 chia_darwin_process_type: Interactive

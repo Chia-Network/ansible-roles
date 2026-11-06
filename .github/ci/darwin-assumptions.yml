@@ -66,3 +66,15 @@
           Keep PyPI and add {{ chia_darwin_pip_extra_index }} with
           --extra-index-url. Do not use the pip module; it imports
           packaging from the interpreter discovery selected.
+
+    - name: Darwin still refuses to seed when the external volume is absent
+      ansible.builtin.assert:
+        that:
+          - "'Require the database volume to be mounted now' in darwin_text"
+          - "'is not mounted' in darwin_text"
+          - >-
+            darwin_text.index('Require the database volume to be mounted now')
+            < darwin_text.index('Seed the full-node database from S3')
+        fail_msg: >-
+          local-external must check the mount in darwin.yml before the seed
+          include. The seed itself does not repeat that preflight.

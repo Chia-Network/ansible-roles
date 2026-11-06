@@ -30,7 +30,6 @@ Darwin-specific settings:
 | `chia_darwin_aws`                | `/opt/homebrew/bin/aws` | AWS CLI binary used by the seed.                                             |
 | `chia_darwin_awscli_formula`     | `awscli`                | Homebrew formula installed when seeding is needed and the binary is missing. |
 | `chia_darwin_db_seed_stub_bytes` | `10240`                 | Largest regular file treated as a `chia init` stub.                          |
-| `chia_darwin_mount_binary`       | `/sbin/mount`           | Command used to confirm the external volume is mounted.                      |
 
 ### Prerequisites and credentials
 
@@ -85,10 +84,11 @@ nothing, changes no files, and does not restart services.
 
 All three objects are downloaded into a hidden staging directory under the
 destination `db` directory, on the same filesystem as the final paths. Each file
-is then published with an atomic rename, with the main database last. A failed
-or interrupted download therefore leaves the previous database (or the stub)
-in place; the next run retries. Ownership is set to the service user and group
-with mode `0644`.
+is then published with an atomic rename, with the main database last. Stale
+`-wal`, `-shm`, and `-journal` sidecars beside the stub are removed before the
+main database is published. A failed or interrupted download therefore leaves
+the previous database (or the stub) in place; the next run retries. The publish
+steps run as the service user, for consistent ownership, with mode `0644`.
 
 While staging, the volume needs free space for the whole snapshot in addition to
 the existing files. Once the files are renamed, the staged copy becomes the

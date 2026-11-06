@@ -9,9 +9,8 @@
     chia_darwin_group: "{{ lookup('pipe', 'id -gn') }}"
     chia_darwin_home: "{{ test_root }}/home"
     chia_darwin_aws: "{{ test_root }}/bin/aws"
-    chia_darwin_brew: "{{ test_root }}/bin/brew-not-used"
+    chia_darwin_brew: "{{ test_root }}/bin/brew"
     chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
-    chia_darwin_mount_binary: "{{ test_root }}/bin/mount-absent"
     chia_darwin_launchd_prefix: net.chia.seedtest
     chia_darwin_db_volume: "{{ test_root }}/Volumes/Chia DB"
     chia_darwin_db_seed_become: false

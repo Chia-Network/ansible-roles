@@ -504,6 +504,10 @@
 
 - name: Seed the full-node database from S3
   ansible.builtin.include_tasks: darwin-db-seed.yml
+  when:
+    - chia_darwin_topology != "remote-node"
+    - download_blockchain_db | bool
+    - blockchain_backup_bucket | length > 0
 
 - name: Write the reference chia config used to detect restarts
   become: true

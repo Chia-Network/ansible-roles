@@ -6,7 +6,7 @@
   when: chia_darwin_launchd_become | bool
   ansible.builtin.assert:
     that:
-      - chia_darwin_launchctl in ["launchctl", "/bin/launchctl"]
+      - (chia_darwin_launchctl | default('launchctl')) in ["launchctl", "/bin/launchctl"]
       - chia_darwin_launchd_dir == "/Library/LaunchDaemons"
     fail_msg: >-
       chia_darwin_launchd_become is true, so chia_darwin_launchctl must be
