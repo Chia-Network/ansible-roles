@@ -71,6 +71,12 @@
     - chia_job.enabled | bool
     - chia_darwin_start_now | bool
     - chia_darwin_launchd_loaded.rc != 0
+    # A regrouped hw-vdf set is started by the restart handler, after the
+    # timelord, so these jobs are not recorded as fresh bootstraps.
+    - not (
+      (chia_darwin_hw_vdf_regroup | default(false) | bool)
+      and (chia_job.board is defined)
+      )
 
 - name: Record freshly bootstrapped LaunchDaemons
   ansible.builtin.set_fact:
