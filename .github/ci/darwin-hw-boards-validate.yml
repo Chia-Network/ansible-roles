@@ -194,6 +194,7 @@
           - (chia_darwin_hw_vdf_jobs | selectattr('name', 'equalto', 'hw-vdf') | first).enabled | bool
           - not ((chia_darwin_hw_vdf_jobs | selectattr('name', 'equalto', 'hw-vdf-2') | first).enabled | bool)
           - (chia_darwin_hw_vdf_jobs | selectattr('name', 'equalto', 'hw-vdf-3') | first).enabled | bool
+          - chia_darwin_hw_vdf_jobs | map(attribute='enabled') | map('type_debug') | unique | list == ['bool']
 
     - name: Accept three boards and a per-board thread override
       ansible.builtin.include_tasks: darwin-hw-boards-reset.yml

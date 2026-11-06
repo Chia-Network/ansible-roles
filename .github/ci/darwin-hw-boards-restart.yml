@@ -1,33 +1,45 @@
 ---
-- name: Restart handler waits out a loaded job and skips fresh or idle jobs
+# The ordered restart must fail closed. A board that stays loaded is not
+# followed by a service bootstrap.
+- name: Ordered restart fails closed while a board stays loaded
   hosts: localhost
   connection: local
   gather_facts: false
-  vars_files:
-    - darwin-hw-boards-fixture.yml
   vars:
     work: /tmp/chia-darwin-hw-restart
     launch_log: "{{ work }}/launchctl.log"
     launch_state: "{{ work }}/state"
-    restart_job:
-      name: hw-vdf
-      label: net.chia.timelord.hw-vdf
-      wrapper: "{{ work }}/chia-hw-vdf-run.sh"
-      throttle: 15
-      exit_timeout: 0
-      enabled: true
-      board: {}
   tasks:
     - name: Start from an empty restart tree
       ansible.builtin.file:
         path: "{{ work }}"
         state: absent
-    - name: Keep restart paths on this play's directory
+    - name: Point launchctl at this play
       ansible.builtin.set_fact:
         chia_darwin_launchctl: "{{ work }}/launchctl"
         chia_darwin_launchd_dir: "{{ work }}/LaunchDaemons"
+        chia_darwin_launchd_become: false
         chia_darwin_start_now: true
         chia_darwin_start_on_boot: true
+        chia_darwin_restart_services: true
+        chia_darwin_restart_unload_margin: 1
+        chia_darwin_fresh_bootstraps: []
+        chia_darwin_hw_vdf_changed_labels: []
+        chia_darwin_hw_vdf_jobs:
+          - name: hw-vdf
+            label: net.chia.timelord.hw-vdf
+            wrapper: "{{ work }}/chia-hw-vdf-run.sh"
+            throttle: 15
+            exit_timeout: 0
+            enabled: true
+            board: {}
+        chia_darwin_service_jobs:
+          - name: daemon
+            label: net.chia.timelord.daemon
+            wrapper: "{{ work }}/chia-daemon-run.sh"
+            throttle: 15
+            exit_timeout: 0
+            enabled: true
     - name: Create the restart tree
       ansible.builtin.file:
         path: "{{ item }}"
@@ -39,14 +51,30 @@
         - "{{ launch_state }}/hold"
     - name: Install the fake launchctl
       ansible.builtin.include_tasks: darwin-hw-boards-launchctl.yml
-    - name: Plant a plist and an unrelated loaded job
+    - name: Plant the board plist and a loaded daemon
       ansible.builtin.copy:
-        dest: "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf.plist"
+        dest: "{{ item }}"
         mode: "0644"
         content: "plist\n"
-    - name: Touch the unrelated loaded marker
+      loop:
+        - "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf.plist"
+        - "{{ chia_darwin_launchd_dir }}/net.chia.timelord.daemon.plist"
+    - name: Mark the daemon and an unrelated job loaded
       ansible.builtin.file:
-        path: "{{ launch_state }}/loaded/com.example.keep"
+        path: "{{ launch_state }}/loaded/{{ item }}"
+        state: touch
+        mode: "0644"
+      loop:
+        - net.chia.timelord.daemon
+        - com.example.keep
+    - name: Hold hw-vdf so print keeps reporting it
+      ansible.builtin.copy:
+        dest: "{{ launch_state }}/hold/net.chia.timelord.hw-vdf"
+        mode: "0644"
+        content: "9\n"
+    - name: Mark hw-vdf loaded
+      ansible.builtin.file:
+        path: "{{ launch_state }}/loaded/net.chia.timelord.hw-vdf"
         state: touch
         mode: "0644"
     - name: Prepare an empty launchctl log
@@ -54,26 +82,11 @@
         dest: "{{ launch_log }}"
         mode: "0644"
         content: ""
-    - name: Mark hw-vdf loaded and hold it there
-      ansible.builtin.file:
-        path: "{{ launch_state }}/loaded/net.chia.timelord.hw-vdf"
-        state: touch
-        mode: "0644"
-    - name: Hold the job so print keeps reporting it
-      ansible.builtin.copy:
-        dest: "{{ launch_state }}/hold/net.chia.timelord.hw-vdf"
-        mode: "0644"
-        content: "9\n"
-    - name: Use a one-try unload budget
-      ansible.builtin.set_fact:
-        chia_darwin_restart_unload_margin: 1
-        chia_darwin_fresh_bootstraps: []
-        chia_job: "{{ restart_job }}"
-    - name: The restart task must refuse to bootstrap a job that is still loaded
+    - name: A stuck board stops the restart before the daemon
       block:
-        - name: Restart the stuck job
-          ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-restart-job.yml
-        - name: A still-loaded job was bootstrapped
+        - name: Run the ordered restart
+          ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-restart-ordered.yml
+        - name: The stuck board was restarted anyway
           ansible.builtin.fail:
             msg: a still-loaded job was bootstrapped
       rescue:
@@ -83,45 +96,16 @@
               - (ansible_failed_result | to_json) is search('still loaded')
               - (ansible_failed_result | to_json) is search('Bootstrap was not attempted')
               - "'was bootstrapped' not in (ansible_failed_result.msg | default('') | string)"
-    - name: Read the stuck-job log
+    - name: Read the stuck restart log
       ansible.builtin.slurp:
         src: "{{ launch_log }}"
       register: stuck_log
-    - name: Bootstrap was not called and the unrelated job remains
+    - name: The daemon was not bootstrapped and the unrelated job remains
+      vars:
+        log_text: "{{ stuck_log.content | b64decode }}"
       ansible.builtin.assert:
         that:
-          - "'bootstrap system' not in (stuck_log.content | b64decode)"
+          - "'bootstrap system' not in log_text"
+          - "'daemon.plist' not in log_text"
           - (launch_state ~ '/loaded/com.example.keep') is file
-
-    - name: Mark hw-vdf loaded again
-      ansible.builtin.file:
-        path: "{{ launch_state }}/loaded/net.chia.timelord.hw-vdf"
-        state: touch
-        mode: "0644"
-    - name: Let the second print report the job gone
-      ansible.builtin.copy:
-        dest: "{{ launch_state }}/hold/net.chia.timelord.hw-vdf"
-        mode: "0644"
-        content: "1\n"
-    - name: Clear the launchctl log before the successful restart
-      ansible.builtin.copy:
-        dest: "{{ launch_log }}"
-        mode: "0644"
-        content: ""
-    - name: Allow two unload tries
-      ansible.builtin.set_fact:
-        chia_darwin_restart_unload_margin: 2
-        chia_darwin_fresh_bootstraps: []
-        chia_job: "{{ restart_job }}"
-    - name: Restart after the job unloads
-      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-restart-job.yml
-    - name: Read the successful restart log
-      ansible.builtin.slurp:
-        src: "{{ launch_log }}"
-      register: restarted_log
-    - name: Bootstrap runs once the unload wait sees the job leave
-      ansible.builtin.assert:
-        that:
-          - "'bootstrap system' in (restarted_log.content | b64decode)"
-          - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf') is file
-          - (launch_state ~ '/loaded/com.example.keep') is file
+          - (launch_state ~ '/loaded/net.chia.timelord.daemon') is file

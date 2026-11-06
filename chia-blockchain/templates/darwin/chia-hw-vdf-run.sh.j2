@@ -44,24 +44,14 @@ cmd+=(--vdf-threads "$VDF_THREADS" --proof-threads "$PROOF_THREADS")
 [ "$RETAIN_ASIC_VALUES" = "1" ] && cmd+=(--retain-asic-values)
 {% if per_board %}
 DEVICE_LOC={{ chia_hw_board.device_loc | quote }}
-cmd+=(
-	--checkpoint-threshold "$CHECKPOINT_THRESHOLD"
-	--vdfs-mask "$VDFS_MASK"
-	--expected-serial "$SERIAL"
-	--ip "$IP"
-	--device-loc "$DEVICE_LOC"
-	"$PORT"
-	"$N_VDFS"
-)
-{% else %}
-cmd+=(
-	--checkpoint-threshold "$CHECKPOINT_THRESHOLD"
-	--vdfs-mask "$VDFS_MASK"
-	--expected-serial "$SERIAL"
-	--ip "$IP"
-	"$PORT"
-	"$N_VDFS"
-)
 {% endif %}
+cmd+=(
+	--checkpoint-threshold "$CHECKPOINT_THRESHOLD"
+	--vdfs-mask "$VDFS_MASK"
+	--expected-serial "$SERIAL"
+	--ip "$IP"
+	{% if per_board %}--device-loc "$DEVICE_LOC" {% endif %}"$PORT"
+	"$N_VDFS"
+)
 # exec keeps hw_vdf_client as the launchd-tracked PID (SIGTERM goes straight to it).
 exec "${cmd[@]}" > >({{ chia_darwin_bin_dir | quote }}/rotpipe.py "$LOG" {{ chia_darwin_rotpipe_max_bytes | quote }} {{ chia_darwin_rotpipe_backups | quote }}) 2>&1

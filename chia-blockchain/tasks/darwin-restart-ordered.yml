@@ -7,7 +7,7 @@
   when:
     - chia_darwin_start_now | bool
     - chia_job.enabled | bool
-    - (chia_darwin_restart_services | default(false) | bool) or chia_job.label in chia_darwin_hw_vdf_changed_labels
+    - (chia_darwin_restart_services | bool) or (chia_job.label in chia_darwin_hw_vdf_changed_labels)
   ansible.builtin.include_tasks: darwin-stop-job.yml
   loop: "{{ chia_darwin_hw_vdf_jobs }}"
   loop_control:
@@ -15,7 +15,7 @@
     label: "{{ chia_job.label }}"
 
 - name: Restart service jobs
-  when: chia_darwin_restart_services | default(false) | bool
+  when: chia_darwin_restart_services | bool
   ansible.builtin.include_tasks: darwin-restart-job.yml
   loop: "{{ chia_darwin_service_jobs }}"
   loop_control:

@@ -13,6 +13,20 @@
       launchctl or /bin/launchctl and chia_darwin_launchd_dir must be
       /Library/LaunchDaemons.
 
+- name: Read each board enabled flag as a boolean
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_jobs: >-
+      {{
+        chia_darwin_hw_vdf_jobs[:ansible_loop.index0]
+        + [item | combine({'enabled': item.enabled | bool})]
+        + chia_darwin_hw_vdf_jobs[ansible_loop.index0 + 1:]
+      }}
+  loop: "{{ chia_darwin_hw_vdf_jobs }}"
+  loop_control:
+    extended: true
+    label: "{{ item.label }}"
+  changed_when: false
+
 - name: See whether each hw-vdf plist was written by this role
   become: "{{ chia_darwin_launchd_become | bool }}"
   ansible.builtin.command:
@@ -49,12 +63,12 @@
     chia_darwin_launchd_jobs: >-
       {{
         (chia_darwin_service_jobs | default([]))
-        + (chia_darwin_hw_vdf_jobs | selectattr('enabled', 'truthy') | list)
+        + (chia_darwin_hw_vdf_jobs | selectattr('enabled', 'equalto', true) | list)
         + (
           chia_darwin_hw_plist_owner.results
           | selectattr('rc', 'equalto', 0)
           | map(attribute='item')
-          | rejectattr('enabled', 'truthy')
+          | selectattr('enabled', 'equalto', false)
           | list
         )
       }}

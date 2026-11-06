@@ -2,6 +2,7 @@
 - name: Clear the changed ASIC board list
   ansible.builtin.set_fact:
     chia_darwin_hw_vdf_changed_labels: []
+    chia_darwin_restart_services: false
   changed_when: false
 
 - name: Require an Apple Silicon Mac

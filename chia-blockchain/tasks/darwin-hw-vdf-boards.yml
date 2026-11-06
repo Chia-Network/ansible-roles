@@ -169,7 +169,7 @@
       wrapper: "{{ chia_darwin_bin_dir }}/chia-{{ slot_name }}-run.sh"
       throttle: "{{ chia_darwin_hw_vdf_throttle_interval | int }}"
       exit_timeout: "{{ chia_darwin_hw_vdf_exit_timeout | int }}"
-      enabled: "{{ slot_on }}"
+      enabled: "{{ slot_on | bool }}"
       board: "{{ matched[0] if (slot_on | bool) else {} }}"
   ansible.builtin.set_fact:
     chia_darwin_hw_vdf_jobs: "{{ chia_darwin_hw_vdf_jobs + [slot_job] }}"
