@@ -20,20 +20,27 @@ With `chia_darwin_enable_hw_vdf` true, precedence is:
    `hw_vdf_client --list` after chiavdf is installed.
 
 `hw_vdf_client --list` is the same source chiavdf uses for `--device-loc`.
-Only interface-A rows are printed. Auto-discovery sorts the rows by printed
-serial, assigns IDs 1..N in that order, and looks up the current `loc` on every
-run, so IDs stay stable when cables or hubs change. For `--expected-serial` it
-strips one trailing interface letter (A/B/C/D) when present, otherwise it uses
-the printed serial as-is. Discovery fails clearly when it finds 0 boards, more
-than 3 boards, or when `--list` fails or cannot be parsed.
+It enumerates every FT4222 interface, not only Chia boards. Auto-discovery
+keeps only interface-A Chia ASIC serials that match `^CHIA[0-9]{10}A$`: the
+`CHIA` prefix, ten digits, and a trailing `A`. Rows for other FT4222 devices
+are valid output and are ignored. If no row matches, discovery fails clearly.
+It sorts the matching rows by printed serial, assigns IDs 1..N in that order,
+and looks up the current `loc` on every run, so IDs stay stable when cables or
+hubs change. For `--expected-serial` it strips one trailing interface letter
+(A/B/C/D) when present, otherwise it uses the printed serial as-is. Discovery
+also fails clearly when it finds more than 3 Chia boards, duplicate serials or
+locations, an invalid location, or when `--list` fails or cannot be parsed.
 
 Example `--list` output (example only, not captured from a real host):
 
-```
+```text
 List of available devices:
-Device 0: 'Example Chia ASIC A', loc 1101, serial 'EXAMPLE00000001A'
-Device 1: 'Example Chia ASIC A', loc 1102, serial 'EXAMPLE00000002A'
+Device 0: 'Example Chia ASIC A', loc 1101, serial 'CHIA9999999001A'
+Device 1: 'Example Chia ASIC A', loc 1102, serial 'CHIA9999999002A'
+Device 2: 'Other FT4222 A', loc 1103, serial 'FT4222999999003A'
 ```
+
+The last row is not a Chia board, so auto-discovery ignores it.
 
 For an explicit list, copy each `device_loc` and `expected_serial` from
 `hw_vdf_client --list`. Location IDs change when cables or hubs change.

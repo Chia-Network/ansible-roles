@@ -1,4 +1,6 @@
 # Example hw_vdf_client --list output for tests only.
 # Not captured from real hardware. Serials and locations are made up.
+# The second row is a different FT4222 device and must be ignored.
 List of available devices:
-Device 0: 'Example Chia ASIC A', loc 21001, serial 'EXAMPLE00000001A'
+Device 0: 'Example Chia ASIC A', loc 21001, serial 'CHIA9999999001A'
+Device 1: 'Other FT4222 A', loc 21002, serial 'FT4222999999002A'

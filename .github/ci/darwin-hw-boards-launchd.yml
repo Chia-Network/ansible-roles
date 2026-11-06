@@ -407,3 +407,83 @@
           - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf') is file
           - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf-2') is file
           - (launch_state ~ '/loaded/com.example.keep') is file
+
+- name: Apply auto-discovered boards with a fake launchctl
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: /tmp/chia-darwin-hw-launchd-discover
+    launch_log: "{{ work }}/launchctl.log"
+    launch_state: "{{ work }}/state"
+    chia_darwin_hw_vdf_client: "{{ work }}/hw_vdf_client"
+    hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-3.txt"
+  tasks:
+    - name: Start from an empty discovery apply tree
+      ansible.builtin.file:
+        path: "{{ work }}"
+        state: absent
+    - name: Point discovery apply paths at the test directory
+      ansible.builtin.set_fact:
+        chia_darwin_home: "{{ work }}/home"
+        chia_darwin_bin_dir: "{{ work }}/home/bin"
+        chia_darwin_log_dir: "{{ work }}/home/Library/Logs/chia"
+        chia_darwin_etc_dir: "{{ work }}/home/etc"
+        chia_root: "{{ work }}/home/.chia/mainnet"
+        chia_darwin_env_script: "{{ work }}/home/bin/chia-env.sh"
+        chia_darwin_launchctl: "{{ work }}/launchctl"
+        chia_darwin_launchd_dir: "{{ work }}/LaunchDaemons"
+        chia_darwin_topology: remote-node
+    - name: Create the discovery apply tree
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ chia_darwin_bin_dir }}"
+        - "{{ chia_darwin_log_dir }}"
+        - "{{ chia_darwin_launchd_dir }}"
+        - "{{ launch_state }}/loaded"
+        - "{{ chia_darwin_home }}"
+    - name: Install the fake launchctl for discovery
+      ansible.builtin.include_tasks: darwin-hw-boards-launchctl.yml
+    - name: Install the fake hw_vdf_client for discovery
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+    - name: Apply boards discovered from hw_vdf_client --list
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards: []
+    - name: Read the discovered wrappers
+      ansible.builtin.slurp:
+        src: "{{ chia_darwin_bin_dir }}/chia-{{ item }}-run.sh"
+      loop:
+        - hw-vdf
+        - hw-vdf-2
+        - hw-vdf-3
+      register: discovered_scripts
+    - name: List loaded discovery jobs
+      ansible.builtin.find:
+        paths: "{{ launch_state }}/loaded"
+        patterns: "*"
+        file_type: file
+      register: discovered_loaded
+    - name: Discovery drives the fake launchctl handler and three board jobs
+      vars:
+        names: "{{ discovered_loaded.files | map(attribute='path') | map('basename') | sort }}"
+        scripts: "{{ discovered_scripts.results | map(attribute='content') | map('b64decode') | list }}"
+      ansible.builtin.assert:
+        that:
+          - names == ['net.chia.timelord.hw-vdf', 'net.chia.timelord.hw-vdf-2', 'net.chia.timelord.hw-vdf-3']
+          - scripts[0] is search('SERIAL=CHIA9999999001')
+          - scripts[1] is search('SERIAL=CHIA9999999002')
+          - scripts[2] is search('SERIAL=CHIA9999999003')
+          - scripts[0] is search('DEVICE_LOC=23001')
+          - scripts[1] is search('DEVICE_LOC=23002')
+          - scripts[2] is search('DEVICE_LOC=23003')
+          - scripts[0] is search('VDFS_MASK=1')
+          - scripts[0] is search('OPEN_DELAY=0')
+          - scripts[1] is search('OPEN_DELAY=15')
+          - scripts[2] is search('OPEN_DELAY=30')

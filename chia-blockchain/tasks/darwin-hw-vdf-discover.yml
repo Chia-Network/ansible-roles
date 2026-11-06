@@ -1,6 +1,7 @@
 ---
 # Auto-discovery: hw_vdf_client --list is the same source chiavdf uses for
-# --device-loc. Run this only after the binary is installed. IDs follow a
+# --device-loc. Run this only after the binary is installed. It enumerates
+# every FT4222 interface, so keep only Chia ASIC serials. IDs follow a
 # lexicographic sort of the printed serial so they stay stable.
 - name: Discover attached ASIC boards
   when:
@@ -9,6 +10,7 @@
     - chia_darwin_hw_vdf_expected_serial | length == 0
   block:
     - name: List attached ASIC boards
+      become: false
       ansible.builtin.command:
         argv:
           - "{{ chia_darwin_hw_vdf_client }}"
@@ -30,7 +32,7 @@
       vars:
         list_text: "{{ (chia_darwin_hw_vdf_list.stdout | default('')) ~ '\n' ~ (chia_darwin_hw_vdf_list.stderr | default('')) }}"
         device_lines: "{{ list_text | regex_findall('(?m)^Device [0-9]+:') | length }}"
-        pairs: "{{ list_text | regex_findall(\"(?m)^Device [0-9]+: .*, loc ([0-9]+), serial '([^']+)'\") }}"
+        pairs: '{{ list_text | regex_findall("(?m)^Device [0-9]+: .*, loc ([0-9]+), serial ''([^'']+)''") }}'
       ansible.builtin.set_fact:
         chia_darwin_hw_vdf_list_text: "{{ list_text }}"
         chia_darwin_hw_vdf_list_device_lines: "{{ device_lines | int }}"
@@ -51,23 +53,44 @@
           "Device N: '<description>', loc <id>, serial '<serial>'" lines.
           Output was: {{ text | trim }}
 
-    - name: Require at least one discovered board
+    - name: Start the Chia board rows
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_list_chia_pairs: []
+      changed_when: false
+
+    - name: Keep only Chia interface-A rows
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_list_chia_pairs: "{{ chia_darwin_hw_vdf_list_chia_pairs + [item] }}"
+      when: item[1] is match(chia_darwin_hw_vdf_serial_pattern)
+      loop: "{{ chia_darwin_hw_vdf_list_pairs }}"
+      loop_control:
+        label: "{{ item[1] }}"
+      changed_when: false
+
+    - name: Require at least one discovered Chia board
+      vars:
+        chia_rows: "{{ chia_darwin_hw_vdf_list_chia_pairs }}"
+        other_rows: "{{ (chia_darwin_hw_vdf_list_pairs | length) - (chia_rows | length) }}"
       ansible.builtin.assert:
         that:
-          - chia_darwin_hw_vdf_list_pairs | length > 0
+          - chia_rows | length > 0
         fail_msg: >-
-          Auto-discovery found 0 attached ASIC boards via
-          {{ chia_darwin_hw_vdf_client }} --list. Set
+          Auto-discovery found 0 attached Chia ASIC boards via
+          {{ chia_darwin_hw_vdf_client }} --list. It lists every FT4222
+          interface; {{ other_rows }} non-Chia row(s) were ignored. Chia board
+          serials must match {{ chia_darwin_hw_vdf_serial_pattern }}. Set
           chia_darwin_hw_vdf_expected_serial for the legacy single-board path,
           or set chia_darwin_hw_vdf_boards explicitly.
 
-    - name: Require at most three discovered boards
+    - name: Require at most three discovered Chia boards
+      vars:
+        chia_rows: "{{ chia_darwin_hw_vdf_list_chia_pairs }}"
       ansible.builtin.assert:
         that:
-          - chia_darwin_hw_vdf_list_pairs | length <= 3
+          - chia_rows | length <= 3
         fail_msg: >-
-          Auto-discovery found {{ chia_darwin_hw_vdf_list_pairs | length }}
-          attached ASIC boards; this role supports at most 3. Set
+          Auto-discovery found {{ chia_rows | length }} attached Chia ASIC
+          boards; this role supports at most 3. Set
           chia_darwin_hw_vdf_boards to choose which boards to run.
 
     - name: Start the discovered board list
@@ -75,7 +98,7 @@
         chia_darwin_hw_vdf_discovered: []
       changed_when: false
 
-    - name: Record each discovered board
+    - name: Record each discovered Chia board
       vars:
         row:
           device_loc: "{{ item[0] | int }}"
@@ -83,7 +106,7 @@
           expected_serial: "{{ item[1] | regex_replace('[ABCD]$', '') }}"
       ansible.builtin.set_fact:
         chia_darwin_hw_vdf_discovered: "{{ chia_darwin_hw_vdf_discovered + [row] }}"
-      loop: "{{ chia_darwin_hw_vdf_list_pairs }}"
+      loop: "{{ chia_darwin_hw_vdf_list_chia_pairs }}"
       loop_control:
         label: "{{ item[1] }}"
       changed_when: false
@@ -91,7 +114,7 @@
     - name: Check discovered board identities
       ansible.builtin.assert:
         that:
-          - item.serial is match('^[!-~]+$')
+          - item.serial is match(chia_darwin_hw_vdf_serial_pattern)
           - item.expected_serial is match('^[!-~]{1,15}$')
         fail_msg: >-
           Discovered serial {{ item.serial | default('?') }} cannot be used as
@@ -100,6 +123,35 @@
       loop: "{{ chia_darwin_hw_vdf_discovered }}"
       loop_control:
         label: "{{ item.serial | default('?') }}"
+
+    - name: Check discovered board device locations
+      vars:
+        device_loc: "{{ item.device_loc | int }}"
+      ansible.builtin.assert:
+        that:
+          - item.device_loc | string is match('^[0-9]+$')
+          - device_loc <= 4294967295
+          - (chia_darwin_hw_vdf_discovered | length == 1) or (device_loc > 0)
+        fail_msg: >-
+          Discovered board {{ item.serial | default('?') }} has device location
+          {{ item.device_loc | default('?') }}. A device location must be a
+          decimal uint32, and must be positive unless exactly one Chia board
+          was discovered.
+      loop: "{{ chia_darwin_hw_vdf_discovered }}"
+      loop_control:
+        label: "{{ item.serial | default('?') }}"
+
+    - name: Reject duplicate discovered boards
+      vars:
+        serials: "{{ chia_darwin_hw_vdf_discovered | map(attribute='serial') | list }}"
+        locations: "{{ chia_darwin_hw_vdf_discovered | map(attribute='device_loc') | map('int') | list }}"
+      ansible.builtin.assert:
+        that:
+          - serials | unique | length == serials | length
+          - locations | unique | length == locations | length
+        fail_msg: >-
+          Auto-discovery found duplicate board identities or device locations.
+          Serials {{ serials }}; locations {{ locations }}.
 
     - name: Sort discovered boards by serial
       ansible.builtin.set_fact:

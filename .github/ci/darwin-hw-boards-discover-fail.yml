@@ -1,0 +1,29 @@
+---
+# Run discovery with a --list fixture that must be rejected, then check that
+# the failure names the expected problem.
+- name: Reset inputs before expecting {{ hw_discover_expect }}
+  ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+
+- name: Install the fake client for {{ hw_discover_expect }}
+  ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+  vars:
+    hw_vdf_list_fixture: "{{ hw_discover_fixture }}"
+
+- name: Expect discovery to fail ({{ hw_discover_expect }})
+  block:
+    - name: Resolve the failing --list fixture
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: Discovery accepted the failing fixture
+      ansible.builtin.fail:
+        msg: "discovery accepted {{ hw_discover_expect }}"
+  rescue:
+    - name: The discovery failure mentions {{ hw_discover_expect }}
+      vars:
+        failure_text: "{{ ansible_failed_result | to_json }}"
+      ansible.builtin.assert:
+        that:
+          - failure_text is search(hw_discover_expect)
+          - "'discovery accepted' not in failure_text"
+        fail_msg: "{{ ansible_failed_result.msg | default('no failure message') }}"

@@ -422,6 +422,10 @@ chia_darwin_hw_vdf_retain_asic_values: true
 # empty and this is empty, the role discovers boards with
 # hw_vdf_client --list (the same source chiavdf uses for --device-loc).
 chia_darwin_hw_vdf_expected_serial: ""
+# hw_vdf_client --list enumerates every FT4222 interface, not only Chia ASIC
+# boards. Discovery keeps only interface-A Chia serials: a CHIA prefix, ten
+# digits, and a trailing A.
+chia_darwin_hw_vdf_serial_pattern: "^CHIA[0-9]{10}A$"
 # One to three boards. A non-empty list overrides auto-discovery and pins each
 # board's location and serial. Empty with chia_darwin_hw_vdf_expected_serial
 # set keeps the legacy single-board path (no --device-loc). Empty with both

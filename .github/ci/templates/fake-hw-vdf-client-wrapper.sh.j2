@@ -1,8 +1,9 @@
 #!/bin/sh
 # Fake hw_vdf_client for Darwin role tests. It only prints the example --list
-# fixture; no USB or real board is involved.
+# fixture; no USB or real board is involved. The real client prints --list on
+# stderr, so write the fixture there too.
 if [ "${1:-}" = "--list" ]; then
-	exec cat {{ hw_vdf_list_fixture | quote }}
+	exec cat {{ hw_vdf_list_fixture | quote }} >&2
 fi
 echo "fake hw_vdf_client only supports --list" >&2
 exit 2
