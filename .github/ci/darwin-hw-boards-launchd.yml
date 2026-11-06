@@ -484,9 +484,9 @@
       ansible.builtin.assert:
         that:
           - names == ['net.chia.timelord.hw-vdf', 'net.chia.timelord.hw-vdf-2', 'net.chia.timelord.hw-vdf-3']
-          - scripts[0] is search('SERIAL=CHIA9999999001')
-          - scripts[1] is search('SERIAL=CHIA9999999002')
-          - scripts[2] is search('SERIAL=CHIA9999999003')
+          - scripts[0] is search('SERIAL=CHIA9999999001A')
+          - scripts[1] is search('SERIAL=CHIA9999999002A')
+          - scripts[2] is search('SERIAL=CHIA9999999003A')
           - scripts[0] is search('DEVICE_LOC=23001')
           - scripts[1] is search('DEVICE_LOC=23002')
           - scripts[2] is search('DEVICE_LOC=23003')
@@ -521,7 +521,7 @@
     - name: A visible board refreshes its location without changing ID
       vars:
         wrapper: "{{ moved_wrapper.content | b64decode }}"
-        moved: "{{ chia_darwin_hw_vdf_active | selectattr('expected_serial', 'equalto', 'CHIA9999999002') | first }}"
+        moved: "{{ chia_darwin_hw_vdf_active | selectattr('expected_serial', 'equalto', 'CHIA9999999002A') | first }}"
       ansible.builtin.assert:
         that:
           - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2, 3]
@@ -529,7 +529,7 @@
           - (moved.device_loc | int) == 23902
           - chia_darwin_hw_vdf_active | map(attribute='device_loc') | map('int') | list == [23001, 23902, 23003]
           - wrapper is search('DEVICE_LOC=23902')
-          - wrapper is search('SERIAL=CHIA9999999002')
+          - wrapper is search('SERIAL=CHIA9999999002A')
 
     - name: Apply two claimed boards before adding a new one
       ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
@@ -555,7 +555,7 @@
       ansible.builtin.assert:
         that:
           - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2, 3]
-          - chia_darwin_hw_vdf_active | map(attribute='expected_serial') | list == ['CHIA9999999001', 'CHIA9999999002', 'CHIA9999999000']
+          - chia_darwin_hw_vdf_active | map(attribute='expected_serial') | list == ['CHIA9999999001', 'CHIA9999999002', 'CHIA9999999000A']
           - chia_darwin_hw_vdf_active | map(attribute='device_loc') | map('int') | list == [22001, 22002, 24000]
           - chia_darwin_hw_vdf_active | map(attribute='vdfs_mask') | map('int') | list == [1, 1, 1]
 
@@ -725,12 +725,12 @@
         that:
           - names == ['net.chia.timelord.hw-vdf', 'net.chia.timelord.hw-vdf-2']
           - scripts[0] is search('# Managed by the chia-blockchain Ansible role.')
-          - scripts[0] is search('SERIAL=CHIA9999999001')
+          - scripts[0] is search('SERIAL=CHIA9999999001A')
           - scripts[0] is search('DEVICE_LOC=22001')
           - scripts[0] is search('VDFS_MASK=3')
           - scripts[0] is not search('CHIA9999999099')
           - scripts[1] is search('# Managed by the chia-blockchain Ansible role.')
-          - scripts[1] is search('SERIAL=CHIA9999999002')
+          - scripts[1] is search('SERIAL=CHIA9999999002A')
           - scripts[1] is search('DEVICE_LOC=22002')
           - scripts[1] is search('VDFS_MASK=1')
           - before_bootstrap is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf$')

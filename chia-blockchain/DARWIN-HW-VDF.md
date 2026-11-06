@@ -33,13 +33,14 @@ including rows with an empty serial, are valid output and are ignored.
 form without that final `A`.
 
 Claimed wrappers and `--list` rows are matched directly, without the serial
-pattern deciding identity. A stored serial and a listed serial match when they
-are equal or one equals the other with its final letter dropped, in either
-order. The pattern only selects which visible rows are Chia boards. Newly
-discovered boards keep the base form, and an already claimed wrapper keeps the
-SERIAL spelling it already has. That keeps existing wrappers stable while a
-wrapper written from an explicit full `CHIA...A` inventory still matches the
-same visible board instead of being counted twice.
+pattern deciding identity. A stored serial matches a listed serial when they
+are equal or the stored serial equals the listed serial with its final
+character removed. The pattern only selects which visible rows are Chia boards.
+Newly discovered boards keep the full serial printed by `--list`, and an
+already claimed wrapper keeps the SERIAL spelling it already has. That keeps
+existing wrappers stable while a wrapper written from an explicit full
+`CHIA...A` inventory still matches the same visible board instead of being
+counted twice.
 
 A board held open by a running `hw_vdf_client` does not appear in `--list`.
 Discovery therefore treats this role's installed wrappers at the role-owned

@@ -45,7 +45,7 @@
           - not (chia_darwin_hw_vdf_legacy | bool)
           - (chia_darwin_hw_vdf_active[0].id | int) == 1
           - (chia_darwin_hw_vdf_active[0].device_loc | int) == 21001
-          - chia_darwin_hw_vdf_active[0].expected_serial == "CHIA9999999001"
+          - chia_darwin_hw_vdf_active[0].expected_serial == "CHIA9999999001A"
           - (chia_darwin_hw_vdf_active[0].vdfs_mask | int) == 7
           - (chia_darwin_hw_vdf_active[0].n_vdfs | int) == 3
           - (chia_darwin_hw_vdf_jobs | selectattr('name', 'equalto', 'hw-vdf') | first).enabled | bool
@@ -70,11 +70,11 @@
         that:
           - chia_darwin_hw_vdf_active | length == 2
           - (first.id | int) == 1
-          - first.expected_serial == "CHIA9999999001"
+          - first.expected_serial == "CHIA9999999001A"
           - (first.device_loc | int) == 22001
           - (first.vdfs_mask | int) == 3
           - (second.id | int) == 2
-          - second.expected_serial == "CHIA9999999002"
+          - second.expected_serial == "CHIA9999999002A"
           - (second.device_loc | int) == 22002
           - (second.vdfs_mask | int) == 1
           - (second.open_delay | int) == (chia_darwin_hw_vdf_open_stagger | int)
@@ -94,7 +94,7 @@
         that:
           - chia_darwin_hw_vdf_active | length == 3
           - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2, 3]
-          - chia_darwin_hw_vdf_active | map(attribute='expected_serial') | list == ['CHIA9999999001', 'CHIA9999999002', 'CHIA9999999003']
+          - chia_darwin_hw_vdf_active | map(attribute='expected_serial') | list == ['CHIA9999999001A', 'CHIA9999999002A', 'CHIA9999999003A']
           - chia_darwin_hw_vdf_active | map(attribute='device_loc') | map('int') | list == [23001, 23002, 23003]
           - chia_darwin_hw_vdf_active | map(attribute='vdfs_mask') | map('int') | unique | list == [1]
           - chia_darwin_hw_vdf_active | map(attribute='n_vdfs') | map('int') | unique | list == [1]
@@ -113,9 +113,9 @@
     - name: IDs follow the serials and the locations are refreshed
       vars:
         expected_by_serial:
-          CHIA9999999001: 25001
-          CHIA9999999002: 25002
-          CHIA9999999003: 25003
+          CHIA9999999001A: 25001
+          CHIA9999999002A: 25002
+          CHIA9999999003A: 25003
         actual_by_serial: >-
           {{ dict(
             chia_darwin_hw_vdf_active | map(attribute='expected_serial')
@@ -234,6 +234,33 @@
       ansible.builtin.set_fact:
         chia_darwin_hw_vdf_serial_pattern: "^CHIA[0-9]{10}A$"
 
+    - name: Reset inputs before the non-A new-serial case
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Allow a synthetic non-A serial for the new-board case
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_serial_pattern: "^SYNTH[0-9]{10}$"
+    - name: Discover a new board whose serial does not end in A
+      ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+      vars:
+        hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-non-a.txt"
+    - name: Resolve the new non-A serial board
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: A new board keeps its full printed non-A serial
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | length == 1
+          - (chia_darwin_hw_vdf_active[0].id | int) == 1
+          - chia_darwin_hw_vdf_active[0].expected_serial == "SYNTH0000000042"
+          - chia_darwin_hw_vdf_active[0].expected_serial != "SYNTH000000004"
+          - (chia_darwin_hw_vdf_active[0].device_loc | int) == 28001
+          - (chia_darwin_hw_vdf_active[0].vdfs_mask | int) == 7
+          - (chia_darwin_hw_vdf_active[0].n_vdfs | int) == 3
+    - name: Restore the serial pattern after the non-A new-serial case
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_serial_pattern: "^CHIA[0-9]{10}A$"
+
     - name: Create the wrapper directory for the ownership case
       ansible.builtin.file:
         path: "{{ chia_darwin_bin_dir }}"
@@ -263,8 +290,8 @@
         that:
           - chia_darwin_hw_vdf_active | length == 1
           - (chia_darwin_hw_vdf_active[0].id | int) == 1
-          - chia_darwin_hw_vdf_active[0].expected_serial == "CHIA9999999001"
-          - chia_darwin_hw_vdf_discovered_boards | map(attribute='expected_serial') | list == ['CHIA9999999001']
+          - chia_darwin_hw_vdf_active[0].expected_serial == "CHIA9999999001A"
+          - chia_darwin_hw_vdf_discovered_boards | map(attribute='expected_serial') | list == ['CHIA9999999001A']
           - not ((chia_darwin_bin_dir ~ '/chia-hw-vdf-2-run.sh') is file)
     - name: Remove the unowned wrapper fixture
       ansible.builtin.file:
@@ -294,7 +321,7 @@
         that:
           - chia_darwin_hw_vdf_active | length == 1
           - (chia_darwin_hw_vdf_active[0].id | int) == 1
-          - chia_darwin_hw_vdf_active[0].expected_serial == "CHIA9999999001"
+          - chia_darwin_hw_vdf_active[0].expected_serial == "CHIA9999999001A"
           - not ((chia_darwin_bin_dir ~ '/chia-hw-vdf-run.sh') is file)
     - name: Remove the legacy wrapper fixture
       ansible.builtin.file:
@@ -658,7 +685,7 @@
             that:
               - (chia_darwin_hw_vdf_list.rc | default(1) | int) == 0
               - chia_darwin_hw_vdf_active | length == 1
-              - chia_darwin_hw_vdf_active[0].expected_serial == "CHIA9999999001"
+              - chia_darwin_hw_vdf_active[0].expected_serial == "CHIA9999999001A"
       rescue:
         - name: --list inherited become instead of overriding it
           ansible.builtin.fail:

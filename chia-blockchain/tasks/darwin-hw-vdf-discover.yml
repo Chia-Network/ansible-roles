@@ -42,7 +42,7 @@
       ansible.builtin.set_fact:
         chia_darwin_hw_vdf_takeover_slots: >-
           {{ chia_darwin_hw_vdf_takeover_slots
-             + ([item.item] if (item.content is defined and not (is_claim | bool)) else []) }}
+            + ([item.item] if (item.content is defined and not (is_claim | bool)) else []) }}
       loop: "{{ chia_darwin_hw_vdf_persisted_wrappers.results }}"
       loop_control:
         label: "{{ item.item }}"

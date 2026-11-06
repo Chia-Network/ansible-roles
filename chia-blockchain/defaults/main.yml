@@ -432,6 +432,7 @@ chia_darwin_hw_vdf_expected_serial: ""
 # boards print something else. --expected-serial accepts the printed form or
 # the base form without that final A. Discovery matches wrappers and --list
 # rows directly and preserves the SERIAL spelling already stored in a wrapper.
+# New boards keep the full serial printed by --list.
 chia_darwin_hw_vdf_serial_pattern: "^CHIA[0-9]{10}A$"
 # The role-owned board slots. ID 1 is <prefix>.hw-vdf; IDs 2 and 3 are
 # <prefix>.hw-vdf-2 and <prefix>.hw-vdf-3. Discovery reads only these wrappers,
