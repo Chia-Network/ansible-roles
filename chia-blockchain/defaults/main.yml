@@ -373,8 +373,8 @@ chia_darwin_db_marker: "{{ chia_darwin_volume_chia_dir }}/{{ network }}/config/c
 chia_darwin_wait_interval: 5
 chia_darwin_wait_log_every: 12
 chia_darwin_launchd_prefix: net.chia.timelord
-# Tests point these at a fake launchctl and a writable directory. Leave them
-# on a Mac.
+# When chia_darwin_launchd_become is true these must stay launchctl and
+# /Library/LaunchDaemons. Tests set become to false and point them elsewhere.
 chia_darwin_launchctl: launchctl
 chia_darwin_launchd_dir: /Library/LaunchDaemons
 chia_darwin_launchd_become: true
@@ -421,19 +421,20 @@ chia_darwin_hw_vdf_retain_asic_values: true
 # belongs to one board. Do not set this and the board list together.
 chia_darwin_hw_vdf_expected_serial: ""
 # One to three boards. Empty keeps the legacy single-board settings above
-# (no --device-loc). Each entry needs id 1, 2, or 3, device_loc (decimal from
-# hw_vdf_client --list; 0 only when it is the only board), and expected_serial
-# (1-15 printable non-space characters). Optional vdf_threads and proof_threads.
-# This role does not discover USB devices. See DARWIN-HW-VDF.md.
+# (no --device-loc). Each entry allows only id, device_loc, expected_serial,
+# vdf_threads, and proof_threads. id is 1, 2, or 3. device_loc is the decimal
+# location from hw_vdf_client --list; 0 is allowed only for one board.
+# expected_serial is 1-15 printable non-space characters. This role does not
+# discover USB devices. See DARWIN-HW-VDF.md.
 chia_darwin_hw_vdf_boards: []
-# Later boards wait until the previous board's client log shows it connected
-# after this role's opening line, so two hw_vdf_client processes do not
-# enumerate FTDI at the same time. 0 waits indefinitely, like the port wait.
-# A positive value makes the wrapper exit so launchd can retry.
-chia_darwin_hw_vdf_sequence_opens: true
-chia_darwin_hw_vdf_peer_wait_attempts: 0
-chia_darwin_hw_vdf_open_marker: "opening USB"
-chia_darwin_hw_vdf_connected_marker: "Connected to timelord"
+# Seconds after the timelord port is up before board N in ID order opens USB.
+# Board 0 waits only chia_darwin_hw_vdf_settle_seconds. Later boards wait
+# that plus index * this value, so they do not enumerate FTDI together.
+# 0 starts every board after the shared settle.
+chia_darwin_hw_vdf_open_stagger: 15
+# A plist that does not run this role's wrapper is left in place. Set true
+# to replace that label.
+chia_darwin_hw_vdf_claim_existing: false
 chia_darwin_hw_vdf_ip: 127.0.0.1
 chia_darwin_hw_vdf_port: "{{ chia_timelord_launcher_port }}"
 chia_darwin_hw_vdf_settle_seconds: 3

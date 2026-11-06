@@ -10,6 +10,8 @@
     chia_darwin_hw_vdf_proof_threads: 11
     chia_darwin_hw_vdf_checkpoint_threshold: 500000
     chia_darwin_hw_vdf_mask: 7
+    chia_darwin_hw_vdf_claim_existing: false
+    chia_darwin_hw_vdf_open_stagger: 15
     chia_darwin_start_now: true
     chia_darwin_start_on_boot: true
     chia_darwin_service_jobs: []

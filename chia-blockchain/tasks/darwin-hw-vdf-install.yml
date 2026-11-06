@@ -9,6 +9,7 @@
     mode: "0755"
   vars:
     chia_hw_board: "{{ item.board }}"
+    chia_hw_show_device: "{{ not (item.board.legacy | bool) }}"
   loop: "{{ chia_darwin_hw_vdf_jobs }}"
   loop_control:
     label: "{{ item.wrapper }}"

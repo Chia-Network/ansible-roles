@@ -14,7 +14,12 @@
   block:
     - name: Stop LaunchDaemon {{ chia_job.label }}
       ansible.builtin.command:
-        argv: ["{{ chia_darwin_launchctl }}", bootout, "system/{{ chia_job.label }}"]
+        argv:
+          [
+            "{{ chia_darwin_launchctl }}",
+            bootout,
+            "system/{{ chia_job.label }}",
+          ]
       register: chia_darwin_restart_bootout
       changed_when: chia_darwin_restart_bootout.rc == 0
       failed_when: false
@@ -23,7 +28,8 @@
     # status is success here, so ignore the command's own failure.
     - name: Wait until LaunchDaemon is unloaded {{ chia_job.label }}
       ansible.builtin.command:
-        argv: ["{{ chia_darwin_launchctl }}", print, "system/{{ chia_job.label }}"]
+        argv:
+          ["{{ chia_darwin_launchctl }}", print, "system/{{ chia_job.label }}"]
       register: chia_darwin_restart_gone
       changed_when: false
       failed_when: false
@@ -45,7 +51,8 @@
 
     - name: Enable LaunchDaemon before starting {{ chia_job.label }}
       ansible.builtin.command:
-        argv: ["{{ chia_darwin_launchctl }}", enable, "system/{{ chia_job.label }}"]
+        argv:
+          ["{{ chia_darwin_launchctl }}", enable, "system/{{ chia_job.label }}"]
       changed_when: false
 
     - name: Start LaunchDaemon {{ chia_job.label }}
@@ -63,6 +70,11 @@
 
     - name: Disable LaunchDaemon at boot {{ chia_job.label }}
       ansible.builtin.command:
-        argv: ["{{ chia_darwin_launchctl }}", disable, "system/{{ chia_job.label }}"]
+        argv:
+          [
+            "{{ chia_darwin_launchctl }}",
+            disable,
+            "system/{{ chia_job.label }}",
+          ]
       changed_when: false
       when: not (chia_darwin_start_on_boot | bool)

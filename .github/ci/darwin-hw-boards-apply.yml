@@ -8,21 +8,22 @@
     chia_darwin_hw_vdf_boards: "{{ hw_apply_boards }}"
     chia_darwin_start_now: "{{ hw_apply_start_now | default(true) }}"
     chia_darwin_start_on_boot: "{{ hw_apply_start_on_boot | default(true) }}"
+    chia_darwin_hw_vdf_claim_existing: "{{ hw_apply_claim | default(false) }}"
 
 - name: Resolve the inventory
   ansible.builtin.include_role:
     name: chia-blockchain
     tasks_from: darwin-hw-vdf-boards.yml
 
+- name: Decide which hw-vdf LaunchDaemons this role will change
+  ansible.builtin.include_role:
+    name: chia-blockchain
+    tasks_from: darwin-hw-vdf-launchd.yml
+
 - name: Install enabled wrappers
   ansible.builtin.include_role:
     name: chia-blockchain
     tasks_from: darwin-hw-vdf-install.yml
-
-- name: Decide which disabled jobs are role-owned
-  ansible.builtin.include_role:
-    name: chia-blockchain
-    tasks_from: darwin-hw-vdf-launchd.yml
 
 - name: Apply LaunchDaemons
   ansible.builtin.include_role:

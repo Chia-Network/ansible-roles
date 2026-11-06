@@ -1,0 +1,6 @@
+---
+- name: Install the fake launchctl wrapper
+  ansible.builtin.template:
+    src: fake-launchctl-wrapper.sh.j2
+    dest: "{{ chia_darwin_launchctl }}"
+    mode: "0755"

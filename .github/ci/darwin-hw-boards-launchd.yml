@@ -1,0 +1,317 @@
+---
+- name: Apply board changes with a fake launchctl
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: /tmp/chia-darwin-hw-apply
+    launch_log: "{{ work }}/launchctl.log"
+    launch_state: "{{ work }}/state"
+  tasks:
+    - name: Start from an empty launchd tree
+      ansible.builtin.file:
+        path: "{{ work }}"
+        state: absent
+    - name: Keep this play's paths off the render tree
+      ansible.builtin.set_fact:
+        chia_darwin_home: "{{ work }}/home"
+        chia_darwin_bin_dir: "{{ work }}/home/bin"
+        chia_darwin_log_dir: "{{ work }}/home/Library/Logs/chia"
+        chia_darwin_etc_dir: "{{ work }}/home/etc"
+        chia_root: "{{ work }}/home/.chia/mainnet"
+        chia_darwin_env_script: "{{ work }}/home/bin/chia-env.sh"
+        chia_darwin_launchctl: "{{ work }}/launchctl"
+        chia_darwin_launchd_dir: "{{ work }}/LaunchDaemons"
+        chia_darwin_topology: remote-node
+    - name: Create the fake launchd tree
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ chia_darwin_bin_dir }}"
+        - "{{ chia_darwin_log_dir }}"
+        - "{{ chia_darwin_launchd_dir }}"
+        - "{{ launch_state }}/loaded"
+        - "{{ chia_darwin_home }}"
+    - name: Install the fake launchctl
+      ansible.builtin.include_tasks: darwin-hw-boards-launchctl.yml
+    - name: Plant an unrelated job and a hand-made hw-vdf-2
+      ansible.builtin.copy:
+        dest: "{{ item.dest }}"
+        mode: "0644"
+        content: "{{ item.content }}"
+      loop:
+        - dest: "{{ chia_darwin_launchd_dir }}/com.example.keep.plist"
+          content: "leave-this-plist\n"
+        - dest: "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf-2.plist"
+          content: |
+            <?xml version="1.0" encoding="UTF-8"?>
+            <plist version="1.0"><dict>
+            <key>ProgramArguments</key>
+            <array><string>/usr/local/bin/hand-hw-vdf</string></array>
+            </dict></plist>
+      loop_control:
+        label: "{{ item.dest }}"
+    - name: Mark the planted jobs loaded
+      ansible.builtin.file:
+        path: "{{ launch_state }}/loaded/{{ item }}"
+        state: touch
+        mode: "0644"
+      loop:
+        - com.example.keep
+        - net.chia.timelord.hw-vdf-2
+    - name: Checksum the hand-made plist
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf-2.plist"
+        checksum_algorithm: sha1
+      register: handmade_before
+    - name: Apply the legacy single-board config
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: FIX-BOARD-0001
+        hw_apply_boards: []
+    - name: Read the legacy launchctl log
+      ansible.builtin.slurp:
+        src: "{{ launch_log }}"
+      register: legacy_log
+    - name: Checksum the hand-made plist again
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf-2.plist"
+        checksum_algorithm: sha1
+      register: handmade_after
+    - name: A foreign hw-vdf-2 job is not stopped or replaced
+      vars:
+        log_text: "{{ legacy_log.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - handmade_before.stat.checksum == handmade_after.stat.checksum
+          - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf-2') is file
+          - (launch_state ~ '/loaded/com.example.keep') is file
+          - "'bootout system/net.chia.timelord.hw-vdf-2' not in log_text"
+          - "'disable system/net.chia.timelord.hw-vdf-2' not in log_text"
+          - "'hw-vdf-2.plist' not in log_text"
+          - (chia_darwin_bin_dir ~ '/chia-hw-vdf-run.sh') is file
+          - not ((chia_darwin_bin_dir ~ '/chia-hw-vdf-2-run.sh') is file)
+
+    - name: Refuse to claim the hand-made hw-vdf-2 job
+      block:
+        - name: Apply three boards without permission to replace it
+          ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+          vars:
+            hw_apply_serial: ""
+            hw_apply_boards: "{{ fixture_boards }}"
+            hw_apply_claim: false
+        - name: The hand-made job was replaced
+          ansible.builtin.fail:
+            msg: hand-made hw-vdf-2 was replaced without claim_existing
+      rescue:
+        - name: The failure names the label and the opt-in
+          ansible.builtin.assert:
+            that:
+              - (ansible_failed_result | to_json) is search('will not replace')
+              - (ansible_failed_result | to_json) is search('hw-vdf-2')
+              - (ansible_failed_result | to_json) is search('chia_darwin_hw_vdf_claim_existing')
+              - "'was replaced without' not in (ansible_failed_result | to_json)"
+    - name: The hand-made plist is still the original file
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf-2.plist"
+        checksum_algorithm: sha1
+      register: handmade_still
+    - name: Claiming was refused before the plist changed
+      ansible.builtin.assert:
+        that:
+          - handmade_before.stat.checksum == handmade_still.stat.checksum
+          - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf-2') is file
+
+    - name: Clear the launchctl log before the claim
+      ansible.builtin.copy:
+        dest: "{{ launch_log }}"
+        mode: "0644"
+        content: ""
+    - name: Claim the existing label and apply three boards
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards: "{{ fixture_boards }}"
+        hw_apply_claim: true
+    - name: Read the claim log and loaded jobs
+      ansible.builtin.slurp:
+        src: "{{ launch_log }}"
+      register: three_log
+    - name: List loaded jobs after the claim
+      ansible.builtin.find:
+        paths: "{{ launch_state }}/loaded"
+        patterns: "*"
+        file_type: file
+      register: loaded_three
+    - name: Three role-owned jobs are loaded and the unrelated job remains
+      vars:
+        names: "{{ loaded_three.files | map(attribute='path') | map('basename') | sort }}"
+      ansible.builtin.assert:
+        that:
+          - names == ['com.example.keep', 'net.chia.timelord.hw-vdf', 'net.chia.timelord.hw-vdf-2', 'net.chia.timelord.hw-vdf-3']
+          - (chia_darwin_bin_dir ~ '/chia-hw-vdf-3-run.sh') is file
+
+    - name: Clear the launchctl log before the second run
+      ansible.builtin.copy:
+        dest: "{{ launch_log }}"
+        mode: "0644"
+        content: ""
+    - name: Apply the same three boards again
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards: "{{ fixture_boards }}"
+    - name: Read the second-run log
+      ansible.builtin.slurp:
+        src: "{{ launch_log }}"
+      register: idem_log
+    - name: A second run does not bootstrap the loaded jobs again
+      ansible.builtin.assert:
+        that:
+          - "'bootstrap system' not in (idem_log.content | b64decode)"
+          - (launch_state ~ '/loaded/com.example.keep') is file
+
+    - name: Clear the launchctl log before dropping to one board
+      ansible.builtin.copy:
+        dest: "{{ launch_log }}"
+        mode: "0644"
+        content: ""
+    - name: Drop to the one role-owned board
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards:
+          - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
+    - name: List loaded jobs after dropping to one board
+      ansible.builtin.find:
+        paths: "{{ launch_state }}/loaded"
+        patterns: "*"
+        file_type: file
+      register: loaded_one
+    - name: Read the remaining wrapper and the log
+      ansible.builtin.slurp:
+        src: "{{ item }}"
+      loop:
+        - "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+        - "{{ launch_log }}"
+      register: one_files
+    - name: One board passes its device and the other role-owned jobs are gone
+      vars:
+        names: "{{ loaded_one.files | map(attribute='path') | map('basename') | sort }}"
+        wrapper: "{{ one_files.results[0].content | b64decode }}"
+        log_text: "{{ one_files.results[1].content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - names == ['com.example.keep', 'net.chia.timelord.hw-vdf']
+          - not ((chia_darwin_launchd_dir ~ '/net.chia.timelord.hw-vdf-2.plist') is file)
+          - not ((chia_darwin_launchd_dir ~ '/net.chia.timelord.hw-vdf-3.plist') is file)
+          - not ((chia_darwin_bin_dir ~ '/chia-hw-vdf-2-run.sh') is file)
+          - not ((chia_darwin_bin_dir ~ '/chia-hw-vdf-3-run.sh') is file)
+          - wrapper is search('1101')
+          - wrapper is search('VDFS_MASK=7')
+          - log_text is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf-2$')
+          - log_text is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf-3$')
+
+    - name: Restore three role-owned boards
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards: "{{ fixture_boards }}"
+    - name: Clear the launchctl log before keeping two boards
+      ansible.builtin.copy:
+        dest: "{{ launch_log }}"
+        mode: "0644"
+        content: ""
+    - name: Keep two role-owned boards
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards:
+          - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
+          - { id: 2, device_loc: 1102, expected_serial: FIX-BOARD-0002 }
+    - name: List loaded jobs for two boards
+      ansible.builtin.find:
+        paths: "{{ launch_state }}/loaded"
+        patterns: "*"
+        file_type: file
+      register: loaded_two
+    - name: Read the two wrappers
+      ansible.builtin.slurp:
+        src: "{{ chia_darwin_bin_dir }}/chia-{{ item }}-run.sh"
+      loop:
+        - hw-vdf
+        - hw-vdf-2
+      register: two_scripts
+    - name: Two boards are mask 3 and mask 1, and board 3 is gone
+      vars:
+        names: "{{ loaded_two.files | map(attribute='path') | map('basename') | sort }}"
+        first: "{{ two_scripts.results[0].content | b64decode }}"
+        second: "{{ two_scripts.results[1].content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - names == ['com.example.keep', 'net.chia.timelord.hw-vdf', 'net.chia.timelord.hw-vdf-2']
+          - not ((chia_darwin_bin_dir ~ '/chia-hw-vdf-3-run.sh') is file)
+          - first is search('VDFS_MASK=3')
+          - second is search('VDFS_MASK=1')
+          - second is search('OPEN_DELAY=15')
+          - (launch_state ~ '/loaded/com.example.keep') is file
+
+    - name: Clear the launchctl log before start_now false
+      ansible.builtin.copy:
+        dest: "{{ launch_log }}"
+        mode: "0644"
+        content: ""
+    - name: Apply one board with start_now false
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards:
+          - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
+        hw_apply_start_now: false
+        hw_apply_start_on_boot: true
+    - name: Read the start_now log
+      ansible.builtin.slurp:
+        src: "{{ launch_log }}"
+      register: start_now_log
+    - name: The loaded board is booted out and left enabled for the next boot
+      vars:
+        log_text: "{{ start_now_log.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - log_text is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf$')
+          - "'bootstrap system' not in log_text"
+          - log_text is search('(?m)^enable system/net\\.chia\\.timelord\\.hw-vdf$')
+          - not (log_text is search('(?m)^disable system/net\\.chia\\.timelord\\.hw-vdf$'))
+          - not ((launch_state ~ '/loaded/net.chia.timelord.hw-vdf') is file)
+          - (launch_state ~ '/loaded/com.example.keep') is file
+
+    - name: Clear the launchctl log before start_on_boot false
+      ansible.builtin.copy:
+        dest: "{{ launch_log }}"
+        mode: "0644"
+        content: ""
+    - name: Apply one board with start_on_boot false
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards:
+          - { id: 1, device_loc: 1101, expected_serial: FIX-BOARD-0001 }
+        hw_apply_start_now: true
+        hw_apply_start_on_boot: false
+    - name: Read the start_on_boot log
+      ansible.builtin.slurp:
+        src: "{{ launch_log }}"
+      register: boot_log
+    - name: start_on_boot false still starts now and disables the job at boot
+      vars:
+        log_text: "{{ boot_log.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - "'bootstrap system' in log_text"
+          - log_text is search('(?m)^disable system/net\\.chia\\.timelord\\.hw-vdf$')
+          - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf') is file
+          - (launch_state ~ '/loaded/com.example.keep') is file
