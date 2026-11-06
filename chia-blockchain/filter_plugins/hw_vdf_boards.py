@@ -100,9 +100,9 @@ def _wrapper_boards(
             )
         key = _canonical_serial(serial, serial_re)
         if key in boards:
+            prior = boards[key]["id"]
             raise AnsibleFilterError(
-                "Auto-discovery found duplicate claimed board serial "
-                f"{serial} in {boards[key]['id']} and {board_id}."
+                f"found duplicate serial {serial}: {prior}, {board_id}",
             )
         boards[key] = {
             "id": board_id,
@@ -185,11 +185,7 @@ def merge_boards(
     merged: list[dict[str, int | str]] = [
         {
             "id": board["id"],
-            "device_loc": (
-                visible[serial]["device_loc"]
-                if serial in visible
-                else board["device_loc"]
-            ),
+            "device_loc": visible.get(serial, board)["device_loc"],
             "expected_serial": board["serial"],
         }
         for serial, board in claimed.items()
