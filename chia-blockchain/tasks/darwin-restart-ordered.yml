@@ -34,12 +34,31 @@
     loop_var: chia_job
     label: "{{ chia_job.label }}"
 
+- name: See which ASIC boards are loaded after the stops
+  when:
+    - chia_darwin_start_now | bool
+    - item.enabled | bool
+  become: "{{ chia_darwin_launchd_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_launchctl }}"
+      - print
+      - "system/{{ item.label }}"
+  register: chia_darwin_board_loaded
+  changed_when: false
+  failed_when: false
+  loop: "{{ chia_darwin_hw_vdf_jobs | default([]) }}"
+  loop_control:
+    label: "{{ item.label }}"
+
 - name: Start ASIC boards that are down, in ID order
   when:
     - chia_darwin_start_now | bool
-    - chia_job.enabled | bool
-  ansible.builtin.include_tasks: darwin-start-job.yml
-  loop: "{{ chia_darwin_hw_vdf_jobs | default([]) }}"
+    - item.rc | default(0) | int != 0
+    - item.item.enabled | default(false) | bool
+  vars:
+    chia_job: "{{ item.item }}"
+  ansible.builtin.include_tasks: darwin-restart-job.yml
+  loop: "{{ chia_darwin_board_loaded.results | default([]) }}"
   loop_control:
-    loop_var: chia_job
-    label: "{{ chia_job.label }}"
+    label: "{{ item.item.label | default('skipped') }}"
