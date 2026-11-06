@@ -1,0 +1,2 @@
+List of available devices:
+Device 0: 'Example Chia ASIC A', loc 23003, serial 'CHIA9999999003A'

@@ -56,9 +56,6 @@
     fail_msg: Set chia_darwin_db_volume for the local-external topology.
   when: chia_darwin_topology == "local-external"
 
-- name: Validate ASIC board inventory early
-  ansible.builtin.include_tasks: darwin-hw-vdf-validate.yml
-
 - name: Use the Darwin CHIA_ROOT and skip software VDF clients
   ansible.builtin.set_fact:
     chia_root: "{{ chia_darwin_root }}"

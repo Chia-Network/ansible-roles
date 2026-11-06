@@ -1,13 +1,6 @@
 ---
-# Inventory validation only. Auto-discovery runs later, after chiavdf is
-# installed, so this file can be included early in darwin.yml.
-- name: Clear derived ASIC board state
-  ansible.builtin.set_fact:
-    chia_darwin_hw_vdf_active: []
-    chia_darwin_hw_vdf_jobs: []
-    chia_darwin_hw_vdf_discovered_boards: []
-  changed_when: false
-
+# Inventory validation only. The board list is validated once, after discovery
+# and selection, so explicit, legacy, and discovered rows share these checks.
 - name: Require shared hw_vdf_client options and one inventory source
   when: chia_darwin_enable_hw_vdf | bool
   ansible.builtin.assert:
@@ -55,10 +48,14 @@
       chia_darwin_hw_vdf_expected_serial must be 1-15 printable non-space
       characters, and chia_darwin_hw_vdf_mask must be 1-7.
 
-- name: Check each inventoried board
+- name: Check each selected board
   when:
     - chia_darwin_enable_hw_vdf | bool
-    - chia_darwin_hw_vdf_boards | length > 0
+    - not (chia_darwin_hw_vdf_legacy | default(false) | bool)
+    - chia_darwin_hw_vdf_input is sequence
+    - chia_darwin_hw_vdf_input is not string
+    - chia_darwin_hw_vdf_input is not mapping
+    - chia_darwin_hw_vdf_input | length > 0
   vars:
     allowed_keys:
       - id
@@ -77,7 +74,7 @@
       - item.device_loc is defined
       - item.device_loc | string is match('^[0-9]+$')
       - (item.device_loc | int) <= 4294967295
-      - chia_darwin_hw_vdf_boards | length == 1 or (item.device_loc | int) > 0
+      - chia_darwin_hw_vdf_input | length == 1 or (item.device_loc | int) > 0
       - item.expected_serial is defined
       - item.expected_serial is string
       - item.expected_serial is match('^[!-~]{1,15}$')
@@ -94,18 +91,22 @@
       decimal location from hw_vdf_client --list, with no leading zeros.
       device_loc 0 is allowed only for a single board. proof_threads must be lower than
       vdf_threads (2-64).
-  loop: "{{ chia_darwin_hw_vdf_boards }}"
+  loop: "{{ chia_darwin_hw_vdf_input }}"
   loop_control:
     label: "{{ item.id | default('missing-id') }}"
 
 - name: Reject duplicate IDs, serials, or device locations
   when:
     - chia_darwin_enable_hw_vdf | bool
-    - chia_darwin_hw_vdf_boards | length > 0
+    - not (chia_darwin_hw_vdf_legacy | default(false) | bool)
+    - chia_darwin_hw_vdf_input is sequence
+    - chia_darwin_hw_vdf_input is not string
+    - chia_darwin_hw_vdf_input is not mapping
+    - chia_darwin_hw_vdf_input | length > 0
   vars:
-    board_ids: "{{ chia_darwin_hw_vdf_boards | map(attribute='id') | map('string') | list }}"
-    board_serials: "{{ chia_darwin_hw_vdf_boards | map(attribute='expected_serial') | list }}"
-    board_locs: "{{ chia_darwin_hw_vdf_boards | map(attribute='device_loc') | map('int') | list }}"
+    board_ids: "{{ chia_darwin_hw_vdf_input | map(attribute='id') | map('string') | list }}"
+    board_serials: "{{ chia_darwin_hw_vdf_input | map(attribute='expected_serial') | list }}"
+    board_locs: "{{ chia_darwin_hw_vdf_input | map(attribute='device_loc') | map('int') | list }}"
   ansible.builtin.assert:
     that:
       - board_ids | unique | length == board_ids | length

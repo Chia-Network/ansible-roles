@@ -8,6 +8,7 @@
   ansible.builtin.include_tasks: darwin-hw-boards-client.yml
   vars:
     hw_vdf_list_fixture: "{{ hw_discover_fixture }}"
+    hw_vdf_list_rc: "{{ hw_discover_rc | default(0) }}"
 
 - name: Expect discovery to fail ({{ hw_discover_expect }})
   block:
