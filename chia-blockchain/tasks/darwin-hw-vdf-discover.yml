@@ -80,7 +80,7 @@
       loop: >-
         {{ (chia_darwin_hw_vdf_slots
             | selectattr('id', 'in', chia_darwin_hw_vdf_takeover_slots) | list)
-           | product(chia_darwin_hw_vdf_plists.files | default([])) | list }}
+            | product(chia_darwin_hw_vdf_plists.files | default([])) | list }}
       loop_control:
         label: "{{ item.0.label }}: {{ item.1.path | basename }}"
       register: chia_darwin_hw_vdf_wrapper_refs
@@ -118,7 +118,7 @@
         src: "{{ item.item.1.path }}"
       loop: >-
         {{ chia_darwin_hw_vdf_wrapper_refs.results
-           | selectattr('rc', 'equalto', 0) | list }}
+            | selectattr('rc', 'equalto', 0) | list }}
       loop_control:
         label: "{{ item.item.0.label }}: {{ item.item.1.path | basename }}"
       register: chia_darwin_hw_vdf_wrapper_owner_plists
@@ -155,7 +155,7 @@
           - "system/{{ item.label }}"
       loop: >-
         {{ chia_darwin_hw_vdf_slots
-           | selectattr('id', 'in', chia_darwin_hw_vdf_takeover_slots) | list }}
+            | selectattr('id', 'in', chia_darwin_hw_vdf_takeover_slots) | list }}
       loop_control:
         label: "{{ item.label }}"
       register: chia_darwin_hw_vdf_takeover_loaded
@@ -166,8 +166,8 @@
       ansible.builtin.set_fact:
         chia_darwin_hw_vdf_takeover_was_loaded: >-
           {{ chia_darwin_hw_vdf_takeover_loaded.results
-             | selectattr('rc', 'equalto', 0)
-             | map(attribute='item') | list }}
+              | selectattr('rc', 'equalto', 0)
+              | map(attribute='item') | list }}
       changed_when: false
 
     - name: Stop, enumerate, and merge takeover boards
@@ -176,7 +176,7 @@
           ansible.builtin.include_tasks: darwin-stop-job.yml
           loop: >-
             {{ chia_darwin_hw_vdf_slots
-               | selectattr('id', 'in', chia_darwin_hw_vdf_takeover_slots) | list }}
+                | selectattr('id', 'in', chia_darwin_hw_vdf_takeover_slots) | list }}
           loop_control:
             loop_var: takeover_slot
             label: "{{ takeover_slot.label }}"

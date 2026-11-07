@@ -1,0 +1,110 @@
+---
+# Regression: takeover ownership must compare integer slots even when job IDs
+# were templated as strings (Ansible 2.18). Both launchd selection/refusal and
+# retirement must treat the same slot as taken over.
+- name: Takeover slot IDs are type-consistent
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-takeover-ids"
+    launch_state: "{{ work }}/state"
+    hw_label_prefix: net.chia.timelord
+    hw_takeover_job_rows:
+      - id: "1"
+        name: hw-vdf
+        enabled: false
+      - id: "2"
+        name: hw-vdf-2
+        enabled: true
+      - id: "3"
+        name: hw-vdf-3
+        enabled: false
+  tasks:
+    - name: Create the takeover-ID tree
+      vars:
+        hw_tree_launchctl: false
+      ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
+
+    - name: Start with no takeover jobs
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_jobs: []
+
+    - name: Build takeover jobs with string IDs
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_jobs: >-
+          {{ chia_darwin_hw_vdf_jobs + [{
+            'id': item.id,
+            'name': item.name,
+            'label': hw_label_prefix ~ '.' ~ item.name,
+            'wrapper': chia_darwin_bin_dir ~ '/chia-' ~ item.name ~ '-run.sh',
+            'throttle': 15,
+            'exit_timeout': 30,
+            'enabled': item.enabled | bool
+          }] }}
+      loop: "{{ hw_takeover_job_rows }}"
+      loop_control:
+        label: "{{ item.id }}"
+
+    - name: Use integer takeover slots and no service jobs
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_takeover_slots: [2, 3]
+        chia_darwin_service_jobs: []
+
+    - name: Confirm the job IDs start as strings
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_jobs | map(attribute='id') | select('string') | list | length == 3
+
+    - name: Plant a plist that does not run the enabled takeover wrapper
+      ansible.builtin.copy:
+        dest: "{{ chia_darwin_launchd_dir }}/{{ hw_label_prefix }}.hw-vdf-2.plist"
+        mode: "0644"
+        content: "foreign plist\n"
+
+    - name: Select launchd jobs with the takeover slot IDs
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-launchd.yml
+
+    - name: String job IDs are normalized and the takeover jobs stay selected
+      vars:
+        selected: "{{ chia_darwin_launchd_jobs | map(attribute='label') | sort }}"
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_jobs | map(attribute='id') | map('type_debug') | unique == ['int']
+          - selected == [hw_label_prefix ~ '.hw-vdf-2', hw_label_prefix ~ '.hw-vdf-3']
+
+    - name: Give the stopped takeover slot a string ID again
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_jobs:
+          - id: "3"
+            name: hw-vdf-3
+            label: "{{ hw_label_prefix }}.hw-vdf-3"
+            wrapper: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-3-run.sh"
+            throttle: 15
+            exit_timeout: 30
+            enabled: false
+        chia_darwin_hw_vdf_takeover_slots: [3]
+
+    - name: Plant a stopped hand-written wrapper on the takeover slot
+      ansible.builtin.copy:
+        dest: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-3-run.sh"
+        mode: "0644"
+        content: |
+          #!/bin/zsh
+          # Hand-written, not managed by this role.
+          SERIAL=CHIA9999999003
+          DEVICE_LOC=29997
+
+    - name: Retire the stopped unused takeover wrapper
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-retire.yml
+
+    - name: The string-ID takeover slot is retired
+      ansible.builtin.assert:
+        that:
+          - not ((chia_darwin_bin_dir ~ '/chia-hw-vdf-3-run.sh') is file)

@@ -10,7 +10,7 @@
     chia_darwin_hw_vdf_jobs: >-
       {{
         chia_darwin_hw_vdf_jobs[:ansible_loop.index0]
-        + [item | combine({'enabled': item.enabled | bool})]
+        + [item | combine({'id': item.id | int, 'enabled': item.enabled | bool})]
         + chia_darwin_hw_vdf_jobs[ansible_loop.index0 + 1:]
       }}
   loop: "{{ chia_darwin_hw_vdf_jobs }}"
@@ -49,7 +49,7 @@
     - item.item.enabled | bool
     - not (chia_darwin_hw_vdf_claim_existing | bool)
     - (item.rc | default(2) | int) == 1
-    - item.item.id | default(0) not in (chia_darwin_hw_vdf_takeover_slots | default([]))
+    - (item.item.id | default(0) | int) not in (chia_darwin_hw_vdf_takeover_slots | default([]) | map('int') | list)
 
 - name: Build the LaunchDaemon list
   ansible.builtin.set_fact:
@@ -62,13 +62,13 @@
           | selectattr('rc', 'equalto', 0)
           | map(attribute='item')
           | selectattr('enabled', 'equalto', false)
-          | rejectattr('id', 'in', chia_darwin_hw_vdf_takeover_slots | default([]))
+          | rejectattr('id', 'in', chia_darwin_hw_vdf_takeover_slots | default([]) | map('int') | list)
           | list
         )
         + (
           chia_darwin_hw_vdf_jobs
           | selectattr('enabled', 'equalto', false)
-          | selectattr('id', 'in', chia_darwin_hw_vdf_takeover_slots | default([]))
+          | selectattr('id', 'in', chia_darwin_hw_vdf_takeover_slots | default([]) | map('int') | list)
           | list
         )
       }}
