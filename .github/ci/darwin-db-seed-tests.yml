@@ -34,22 +34,11 @@
           - sub-epoch-summaries
           - blockchain_v2_mainnet.sqlite
 
-    - name: Set the shared test identity, fixtures, and tool paths
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-test-identity.yml"
-
-    - name: Create the shared fake tools and fixtures
+    - name: Create the shared fixtures and fake tools
       ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-setup.yml"
 
     - name: Reset the fake tool state
-      ansible.builtin.copy:
-        content: ""
-        dest: "{{ test_root }}/{{ item }}"
-        mode: "0644"
-      loop:
-        - aws.log
-        - fail-file
-        - fail-publish
-        - launchctl.log
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-reset-tools.yml"
 
     - name: Prepare the scenario directories
       ansible.builtin.file:
@@ -150,16 +139,7 @@
           - "'s3://test-bucket/testnet11/sub-epoch-summaries' in lookup('file', test_root ~ '/aws.log')"
 
     - name: Reset the fake tool state before the existing database case
-      ansible.builtin.copy:
-        content: ""
-        dest: "{{ test_root }}/{{ item }}"
-        mode: "0644"
-      loop:
-        - aws.log
-        - fail-file
-        - fail-publish
-        - launchctl.log
-        - sudo.log
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-reset-tools.yml"
 
     - name: Write the existing large database and sidecars
       ansible.builtin.copy:
@@ -296,16 +276,7 @@
           - (lookup('file', test_root ~ '/aws.log') | split('\n') | reject('eq', '') | list | length) == 3
 
     - name: Reset the fake tool state before the stale-sidecar case
-      ansible.builtin.copy:
-        content: ""
-        dest: "{{ test_root }}/{{ item }}"
-        mode: "0644"
-      loop:
-        - aws.log
-        - fail-file
-        - fail-publish
-        - launchctl.log
-        - sudo.log
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-reset-tools.yml"
 
     - name: Prepare a stub with stale WAL, SHM, and journal sidecars
       ansible.builtin.copy:
@@ -348,16 +319,7 @@
           - darwin_db_seed_stale_sidecars.results[3].stat.exists is false
 
     - name: Reset the fake tool state before the loaded large-database case
-      ansible.builtin.copy:
-        content: ""
-        dest: "{{ test_root }}/{{ item }}"
-        mode: "0644"
-      loop:
-        - aws.log
-        - fail-file
-        - fail-publish
-        - launchctl.log
-        - sudo.log
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-reset-tools.yml"
 
     - name: Prepare a large database with the full node loaded
       ansible.builtin.copy:
@@ -421,9 +383,13 @@
         - name: main database publish failure
           root: "{{ publish_root }}"
           file: blockchain_v2_mainnet.sqlite
+          published_before:
+            - height-to-hash
+            - sub-epoch-summaries
         - name: cache publish failure
           root: "{{ cache_publish_root }}"
           file: height-to-hash
+          published_before: []
       loop_control:
         loop_var: publish_case
         label: "{{ publish_case.name }}"
@@ -451,17 +417,14 @@
       ansible.builtin.set_fact:
         test_root: "{{ darwin_db_seed_become_temp.path }}"
 
-    - name: Set the shared service-user test identity
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-test-identity.yml"
+    - name: Create the shared fixtures and fake tools
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-setup.yml"
 
     - name: Use a distinct service user and a logging fake sudo
       ansible.builtin.set_fact:
         user: "{{ test_user }}-seed-service"
         chia_darwin_launchd_become: true
         ansible_become_exe: "{{ test_root }}/bin/sudo"
-
-    - name: Create the shared fake tools and fixtures
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-setup.yml"
 
     - name: Force a publish failure to exercise cleanup and rescue as the service user
       ansible.builtin.copy:
@@ -482,19 +445,24 @@
         path: "{{ test_root }}/sudo.log"
       register: darwin_db_seed_become_sudo
 
+    # The seed makes one launchctl probe as root, then 18 service-user calls:
+    # staging cleanup/create, 3 downloads, 3 staged stats, 3 permission
+    # changes, 3 stale-sidecar removals, 2 cache renames, the main rename, and
+    # the final staging cleanup.
     - name: Assert all seed tasks used the service user except the launchctl probe
       vars:
         sudo_lines: "{{ darwin_db_seed_become_sudo.content | b64decode | split('\n') | reject('eq', '') | list }}"
       ansible.builtin.assert:
         that:
-          - sudo_lines | length >= 10
+          - sudo_lines | length == 19
           - sudo_lines | select('search', '-u root ') | list | length == 1
           - sudo_lines[0] is search('-u root ')
           - sudo_lines | reject('search', '-u (root|' ~ user ~ ') ') | list | length == 0
-          - sudo_lines | select('search', '-u ' ~ user ~ ' ') | list | length == (sudo_lines | length) - 1
+          - sudo_lines | select('search', '-u ' ~ user ~ ' ') | list | length == 18
         fail_msg: >-
-          Expected the launchctl probe to use the default become user and every
-          other seed task to run as {{ user }}. Log: {{ sudo_lines | join(' | ') }}
+          Expected exactly 19 sudo lines: one launchctl probe as the default
+          become user and 18 seed calls as {{ user }}. Log:
+          {{ sudo_lines | join(' | ') }}
 
     - name: Inspect the failed service-user main database path
       ansible.builtin.stat:

@@ -10,10 +10,7 @@
   vars:
     test_root: "{{ lookup('env', 'DARWIN_DB_SEED_TEST_ROOT') | default('/tmp/darwin-db-seed-idempotence', true) }}"
   tasks:
-    - name: Set the test identity, fixtures, and tool paths
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-test-identity.yml"
-
-    - name: Create the shared fake tools and fixtures
+    - name: Create the shared fixtures and fake tools
       ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-setup.yml"
 
     - name: Prepare the idempotence database directory

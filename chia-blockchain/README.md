@@ -2,99 +2,52 @@
 
 ## Darwin full-node database seeding
 
-Darwin `local-internal` and `local-external` full nodes can optionally start
-from the same uncompressed S3 snapshot layout the Linux tasks use. This is
-initial seeding, not integrity repair and not an ongoing snapshot refresh. The
-role never replaces an existing non-stub database, and it does not check the
-health of a large existing database.
+Darwin `local-internal` and `local-external` full nodes can optionally seed from
+the uncompressed S3 snapshot layout used by the Linux tasks. This is initial
+seeding, not integrity repair or an ongoing refresh, and the role does not check
+the health of an existing large database. `remote-node` never seeds because it
+has no local full node. The seed reuses `download_blockchain_db`,
+`blockchain_backup_bucket`, `network` (S3 prefix and
+`blockchain_<db_version>_<network>.sqlite` filename), and `db_version`, and is
+skipped when seeding is disabled or the bucket is empty.
 
-`remote-node` never seeds because it does not run a local full node. If
-`download_blockchain_db` is false or `blockchain_backup_bucket` is empty, the
-node keeps its normal syncing behavior.
+| Darwin variable                  | Default                 | Purpose                                             |
+| -------------------------------- | ----------------------- | --------------------------------------------------- |
+| `chia_darwin_aws`                | `/opt/homebrew/bin/aws` | AWS CLI binary.                                     |
+| `chia_darwin_awscli_formula`     | `awscli`                | Formula installed only when a seed is needed.       |
+| `chia_darwin_db_seed_stub_bytes` | `10240`                 | Largest regular file treated as a `chia init` stub. |
 
-### Variables
+The bucket needs `blockchain_<db_version>_<network>.sqlite`, `height-to-hash`,
+and `sub-epoch-summaries` under `<network>/`. Chia can regenerate the caches, but
+this role requires all three downloads to succeed so an old cache is not left
+beside a new main database. Credentials use the AWS CLI's normal discovery as the
+service user (`user`); the role never creates, copies, or prints them. For
+`local-external`, the volume must already be mounted and readable, and the role
+never falls back to writing the database on the internal disk.
 
-The Darwin seed reuses the existing Linux variables:
-
-| Variable                   | Purpose                                                                            |
-| -------------------------- | ---------------------------------------------------------------------------------- |
-| `download_blockchain_db`   | Enables initial database seeding. Defaults to `true`.                              |
-| `blockchain_backup_bucket` | S3 bucket holding `<network>/` snapshots. Defaults to empty, which skips seeding.  |
-| `network`                  | Selects the S3 prefix and the `blockchain_<db_version>_<network>.sqlite` filename. |
-| `db_version`               | Database version in the filename. Defaults to `v2`.                                |
-
-Darwin-specific settings:
-
-| Variable                         | Default                 | Purpose                                                                      |
-| -------------------------------- | ----------------------- | ---------------------------------------------------------------------------- |
-| `chia_darwin_aws`                | `/opt/homebrew/bin/aws` | AWS CLI binary used by the seed.                                             |
-| `chia_darwin_awscli_formula`     | `awscli`                | Homebrew formula installed when seeding is needed and the binary is missing. |
-| `chia_darwin_db_seed_stub_bytes` | `10240`                 | Largest regular file treated as a `chia init` stub.                          |
-
-### Prerequisites and credentials
-
-The snapshot bucket must contain these three objects under `<network>/`:
-
-- `blockchain_<db_version>_<network>.sqlite` - main blockchain database
-- `height-to-hash` - height-to-hash cache
-- `sub-epoch-summaries` - sub-epoch summary cache
-
-Chia can regenerate the two caches if they are missing, but this role requires
-all three copies to succeed before publishing anything. When replacing a
-database, the caches are replaced with the matching snapshot so an old cache is
-not left beside a new main database.
-
-The AWS CLI is installed with Homebrew only when a seed is actually needed.
-Credentials use the AWS CLI's normal discovery as the service user (`user`), for
-example that user's `~/.aws` files, environment variables supplied by the
-operator, or another standard AWS credential source. The role does not create,
-copy, or print credentials.
-
-For `local-external`, the external volume must already be mounted and readable.
-The role checks the mount before staging anything and never falls back to
-writing the database on the internal disk.
-
-### Skip and overwrite rules
-
-The role seeds only when all of these are true:
-
-- topology is `local-internal` or `local-external`
-- `download_blockchain_db` is true
-- `blockchain_backup_bucket` is nonempty
-- the main database is absent, or is a regular file of at most
-  `chia_darwin_db_seed_stub_bytes`
-
-An existing larger database is left untouched, including its caches. A
-directory or symlink at the main database path is also left untouched. A small
-regular file (the stub created by `chia init`) is replaced only after the whole
-snapshot has downloaded successfully. Cache paths that are directories or
-symlinks are refused rather than deleted.
-
-If the full-node LaunchDaemon is already loaded when a seed is needed, the role
-fails before touching the database. Stop that job and rerun:
+The role seeds only when the topology is local, seeding is enabled, the bucket is
+nonempty, and the main database is absent or a regular file of at most
+`chia_darwin_db_seed_stub_bytes`. An existing larger database and its caches are
+left untouched; a directory or symlink at the main or cache path is refused
+rather than deleted. A stub is replaced only after the whole snapshot downloads
+successfully. If the full-node LaunchDaemon is loaded, the role fails before
+touching the database:
 
 ```sh
 sudo launchctl bootout system/net.chia.timelord.full-node
 ```
 
-A second run after a successful seed finds a non-stub database, downloads
-nothing, changes no files, and does not restart services.
+All three objects are downloaded to a hidden staging directory under the
+destination `db` directory, sharing a filesystem with the final paths. Each file
+is published with an atomic rename, main database last. Stale `-wal`, `-shm`,
+and `-journal` sidecars beside the stub are removed before that main rename.
+Publish steps run as the service user with mode `0644`, for consistent
+ownership. A failed or interrupted download leaves the previous database (or the
+stub) in place; the next run removes its leftover staging directory and retries.
 
-### Staging, disk space, and recovery
-
-All three objects are downloaded into a hidden staging directory under the
-destination `db` directory, on the same filesystem as the final paths. Each file
-is then published with an atomic rename, with the main database last. Stale
-`-wal`, `-shm`, and `-journal` sidecars beside the stub are removed before the
-main database is published. A failed or interrupted download therefore leaves
-the previous database (or the stub) in place; the next run retries. The publish
-steps run as the service user, for consistent ownership, with mode `0644`.
-
-While staging, the volume needs free space for the whole snapshot in addition to
-the existing files. Once the files are renamed, the staged copy becomes the
-database, so the extra space is only needed during the seed. Replacing an
-existing stub adds no meaningful old-database space.
-
-After a failure, check S3 access as the service user, available disk space, and
-(for `local-external`) that the volume is mounted. Remove nothing by hand:
-rerunning the role removes its own leftover staging directory and starts over.
+The volume needs room for the whole snapshot while staging; after the renames
+the staged copy becomes the database. After a failure, check S3 access as the
+service user, free disk space, and for `local-external` that the volume is
+mounted. A refused destination directory or symlink must be moved aside by the
+operator before retry. A second successful run finds a non-stub database,
+downloads nothing, changes no files, and does not restart services.

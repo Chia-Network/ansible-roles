@@ -253,13 +253,15 @@
 
         - name: Fail the database seed without publishing a partial database
           ansible.builtin.fail:
-            msg: >-
+            msg: "{{ chia_darwin_db_seed_failure | regex_replace('\\s+', ' ') | trim }}"
+          vars:
+            chia_darwin_db_seed_failure: >-
               The S3 database seed failed while running
-              "{{ ansible_failed_task.name | default('a seed task') }}"
-              {% if ansible_failed_result.item | default('') %}for {{ ansible_failed_result.item }} {% endif %}: {{ ansible_failed_result.msg | default('no further detail') }}
+              "{{ ansible_failed_task.name | default('a seed task') }}"{% if ansible_failed_result.item | default('') %} for {{ ansible_failed_result.item }}{% endif %}:
+              {{ ansible_failed_result.msg | default('no further detail') }}
               {{ ansible_failed_result.stderr | default('') | trim }}
-              {% for failed_copy in ansible_failed_result.results | default([]) if failed_copy.failed | default(false) %}
-              Failed copy {{ failed_copy.item }}: {{ (failed_copy.stderr | default(failed_copy.msg)) | trim }}
+              {% for failed_item in ansible_failed_result.results | default([]) if failed_item.failed | default(false) %}
+              Failed item {{ failed_item.item }}: {{ (failed_item.stderr | default(failed_item.msg)) | trim }}
               {% endfor %}
               No partial main database was published at
               {{ chia_darwin_db_seed_db_dir }}/{{ chia_darwin_db_seed_main_name }}.

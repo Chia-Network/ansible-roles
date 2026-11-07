@@ -1,26 +1,17 @@
 ---
-# A failed publish rename must keep the main database unpublished. A failed
-# cache rename may still let the cache loop try its other item, but the separate
-# main database task must not run, so no main database is published after a
-# cache failure. A failed main database rename leaves the previous file in
-# place. The fake aws fail-publish marker replaces the final destination for the
-# named file with a non-writable directory, so that rename fails. Included with
-# a publish_case loop item from darwin-db-seed-tests.yml.
-- name: Record the publish failure order and contents for {{ publish_case.name }}
+# A failed publish rename must leave its destination obstacle in place and clean
+# the staging directory. A failed cache rename can still let the loop's other
+# cache publish; only the separate main rename is blocked. The fake aws
+# fail-publish marker replaces the named destination with a non-writable
+# directory so the rename fails. Included with a publish_case loop item from
+# darwin-db-seed-tests.yml; publish_case.published_before lists files that must
+# already contain fixture data after the failure.
+- name: Record the original database state for {{ publish_case.name }}
   ansible.builtin.set_fact:
-    publish_failure_index: "{{ publish_files.index(publish_case.file) }}"
     publish_failure_original:
       height-to-hash: old-height-to-hash
       sub-epoch-summaries: old-sub-epoch-summaries
       blockchain_v2_mainnet.sqlite: "{{ 'P' * 10240 }}"
-    publish_failure_published:
-      height-to-hash: "{{ fixture_h2h }}"
-      sub-epoch-summaries: "{{ fixture_ses }}"
-      blockchain_v2_mainnet.sqlite: "{{ fixture_main }}"
-
-- name: Record the files published before the failed file for {{ publish_case.name }}
-  ansible.builtin.set_fact:
-    publish_failure_before: "{{ publish_files[:publish_failure_index | int] }}"
 
 - name: Prepare the {{ publish_case.name }} database directory
   ansible.builtin.file:
@@ -38,15 +29,7 @@
     label: "{{ item }}"
 
 - name: Reset the fake tool state for {{ publish_case.name }}
-  ansible.builtin.copy:
-    content: ""
-    dest: "{{ test_root }}/{{ item }}"
-    mode: "0644"
-  loop:
-    - aws.log
-    - fail-file
-    - fail-publish
-    - launchctl.log
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-reset-tools.yml"
 
 - name: Arrange a failure on the {{ publish_case.file }} publish
   ansible.builtin.copy:
@@ -62,11 +45,10 @@
       root: "{{ publish_case.root }}"
       expect_failure: "(?s)S3 database seed failed.*Publish.*{{ publish_case.file }}"
 
-- name: Inspect the publish failure destinations for {{ publish_case.name }}
+- name: Inspect the failed publish destination for {{ publish_case.name }}
   ansible.builtin.stat:
-    path: "{{ publish_case.root }}/db/{{ item }}"
-  loop: "{{ publish_files }}"
-  register: darwin_db_seed_publish_failure_files
+    path: "{{ publish_case.root }}/db/{{ publish_case.file }}"
+  register: darwin_db_seed_publish_failure_obstacle
 
 - name: Inspect the publish failure staging directory for {{ publish_case.name }}
   ansible.builtin.stat:
@@ -76,15 +58,15 @@
 - name: Assert the failed publish left its obstacle and cleaned staging for {{ publish_case.name }}
   ansible.builtin.assert:
     that:
-      - darwin_db_seed_publish_failure_files.results[publish_failure_index | int].stat.isdir | default(false)
+      - darwin_db_seed_publish_failure_obstacle.stat.isdir | default(false)
       - not (darwin_db_seed_publish_failure_staging.stat.exists | default(false))
       - (lookup('file', test_root ~ '/aws.log') | split('\n') | reject('eq', '') | list | length) == (publish_files | length)
 
 - name: Assert files before the failed publish were published for {{ publish_case.name }}
   ansible.builtin.assert:
     that:
-      - lookup('file', publish_case.root ~ '/db/' ~ item) == publish_failure_published[item]
-  loop: "{{ publish_failure_before }}"
+      - lookup('file', publish_case.root ~ '/db/' ~ item) == lookup('file', test_root ~ '/fixtures/mainnet/' ~ item)
+  loop: "{{ publish_case.published_before }}"
   loop_control:
     label: "{{ item }}"
 
@@ -115,7 +97,7 @@
 - name: Assert the retry published the complete snapshot for {{ publish_case.name }}
   ansible.builtin.assert:
     that:
-      - lookup('file', publish_case.root ~ '/db/' ~ item) == publish_failure_published[item]
+      - lookup('file', publish_case.root ~ '/db/' ~ item) == lookup('file', test_root ~ '/fixtures/mainnet/' ~ item)
   loop: "{{ publish_files }}"
   loop_control:
     label: "{{ item }}"

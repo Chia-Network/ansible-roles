@@ -11,13 +11,10 @@
   vars:
     test_root: "{{ lookup('env', 'DARWIN_DB_SEED_TEST_ROOT') | default('/tmp/darwin-db-seed-checkmode', true) }}"
   tasks:
-    - name: Set the test identity, fixtures, and tool paths
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-test-identity.yml"
-
     - name: Create fixtures even when the play runs in check mode
       check_mode: false
       block:
-        - name: Create the shared fake tools and fixtures
+        - name: Create the shared fixtures and fake tools
           ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-setup.yml"
 
         - name: Prepare the check-mode database directory
@@ -27,15 +24,7 @@
             mode: "0755"
 
         - name: Reset the fake tool state
-          ansible.builtin.copy:
-            content: ""
-            dest: "{{ test_root }}/{{ item }}"
-            mode: "0644"
-          loop:
-            - aws.log
-            - fail-file
-            - fail-publish
-            - launchctl.log
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-reset-tools.yml"
 
     - name: A loaded full node fails in check mode
       block:
