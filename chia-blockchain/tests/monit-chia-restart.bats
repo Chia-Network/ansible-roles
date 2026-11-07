@@ -7,10 +7,12 @@ setup() {
 	SYSTEMCTL_LOG="$BATS_TEST_TMPDIR/systemctl.log"
 	NOTIFY_LOG="$BATS_TEST_TMPDIR/notify.log"
 	HW_LOG="$BATS_TEST_TMPDIR/hw.log"
+	KILL_LOG="$BATS_TEST_TMPDIR/kill.log"
 	mkdir -p "$BIN" "$STATE_DIR"
 	: >"$SYSTEMCTL_LOG"
 	: >"$NOTIFY_LOG"
 	: >"$HW_LOG"
+	: >"$KILL_LOG"
 
 	cat >"$BIN/systemctl" <<'EOF'
 #!/usr/bin/env bash
@@ -26,6 +28,13 @@ if [ "${1:-}" = show ]; then
 		;;
 	*) printf 'n/a\n' ;;
 	esac
+	exit 0
+fi
+if [ "${1:-}" = is-active ]; then
+	unit=${!#}
+	for inactive in ${FAKE_INACTIVE_UNITS:-}; do
+		[ "$unit" = "$inactive" ] && exit 3
+	done
 fi
 exit 0
 EOF
@@ -33,7 +42,11 @@ EOF
 	cat >"$BIN/date" <<'EOF'
 #!/usr/bin/env bash
 if [ "$#" -eq 1 ] && [ "$1" = "+%s" ]; then
-	printf '%s\n' "$FAKE_NOW"
+	total=0
+	if [ -s "${BATS_TEST_TMPDIR}/slept" ]; then
+		total=$(awk '{ s += $1 } END { printf "%d", s }' "${BATS_TEST_TMPDIR}/slept")
+	fi
+	printf '%s\n' "$((FAKE_NOW + total))"
 else
 	exec /bin/date "$@"
 fi
@@ -49,7 +62,32 @@ EOF
 printf '%s\n' restarted >>"${BATS_TEST_TMPDIR}/hw.log"
 EOF
 
-	chmod +x "$BIN/systemctl" "$BIN/date" "$BIN/notify" "$BIN/hw-restart"
+	cat >"$BIN/ss" <<'EOF'
+#!/usr/bin/env bash
+[ "${FAKE_SS_EMPTY:-}" = 1 ] && exit 0
+printf '%s\n' 'LISTEN 0 128 0.0.0.0:8444 0.0.0.0:*'
+EOF
+
+	cat >"$BIN/sleep" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "${1:-0}" >>"${BATS_TEST_TMPDIR}/slept"
+exit 0
+EOF
+
+	cat >"$BIN/id" <<'EOF'
+#!/usr/bin/env bash
+if [ "${FAKE_ID_FAIL:-}" = 1 ]; then exit 1; fi
+printf '%s\n' "${FAKE_UID:-1001}"
+EOF
+
+	cat >"$BIN/timeout" <<'EOF'
+#!/usr/bin/env bash
+shift
+exec "$@"
+EOF
+
+	chmod +x "$BIN/systemctl" "$BIN/date" "$BIN/notify" "$BIN/hw-restart" \
+		"$BIN/ss" "$BIN/sleep" "$BIN/id" "$BIN/timeout"
 
 	render_script
 
@@ -59,6 +97,8 @@ EOF
 
 render_script() {
 	SCRIPT="$BATS_TEST_TMPDIR/monit-chia-restart.sh"
+	local enabled='["full-node","timelord"]'
+	[ -n "${ENABLED_SERVICES:-}" ] && enabled=$ENABLED_SERVICES
 	ANSIBLE_LOCALHOST_WARNING=False ANSIBLE_INVENTORY_UNPARSED_WARNING=False \
 		ansible localhost -c local -m template \
 		-a "src=${REPO_ROOT}/chia-blockchain/templates/monit-chia-restart.sh.j2 dest=${SCRIPT}" \
@@ -66,15 +106,28 @@ render_script() {
 		-e "chia_monit_restart_min_seconds=600" \
 		-e "chia_monit_restart_max_seconds=3600" \
 		-e "chia_monit_restart_backoff_factor=2" \
+		-e "chia_monit_restart_verify_seconds=90" \
 		-e "chia_monit_restart_state_dir=${STATE_DIR}" \
+		-e "user=chia-test" \
+		-e "full_node_port=8444" \
+		-e "chia_timelord_port=8446" \
+		-e "{\"chia_enabled_services\": ${enabled}}" \
+		-e '{"chia_all_services":["daemon","full-node","timelord"]}' \
 		-e "{\"chia_monit_alert_on_restart\": ${ALERT:-false}}" >/dev/null
 	sed -i \
 		-e "s|^SYSTEMCTL=.*|SYSTEMCTL=\"${BIN}/systemctl\"|" \
+		-e "s|^KILL=.*|KILL=\"${BIN}/kill\"|" \
+		-e "s|^PROC=.*|PROC=\"${BATS_TEST_TMPDIR}/proc\"|" \
 		-e "s|^NOTIFY=.*|NOTIFY=\"${BIN}/notify\"|" \
 		-e "s|^HW_RESTART=.*|HW_RESTART=\"${BIN}/hw-restart\"|" \
 		-e "s|^STATE_DIR=.*|STATE_DIR=\"${STATE_DIR}\"|" \
 		"$SCRIPT"
-	chmod +x "$SCRIPT"
+	mkdir -p "$BATS_TEST_TMPDIR/proc"
+	cat >"$BIN/kill" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"${BATS_TEST_TMPDIR}/kill.log"
+EOF
+	chmod +x "$SCRIPT" "$BIN/kill"
 }
 
 write_state() {
@@ -84,7 +137,21 @@ write_state() {
 }
 
 restart_count() {
-	grep -c '^restart chia.target$' "$SYSTEMCTL_LOG" || true
+	grep -c '^start chia.target$' "$SYSTEMCTL_LOG" || true
+}
+
+make_proc() {
+	local pid=$1 name=$2 cgroup=$3
+	mkdir -p "$BATS_TEST_TMPDIR/proc/$pid"
+	printf '%s\0' "$name" >"$BATS_TEST_TMPDIR/proc/$pid/cmdline"
+	printf '%s\n' "$cgroup" >"$BATS_TEST_TMPDIR/proc/$pid/cgroup"
+}
+
+require_non_root() {
+	local uid
+	uid=$(/usr/bin/id -u)
+	[ "$uid" -ne 0 ] || skip "stray tests require a non-root user"
+	export FAKE_UID=$uid
 }
 
 @test "first call with no state restarts chia.target" {
@@ -155,7 +222,7 @@ restart_count() {
 	grep -q '^target_restarts=32$' "$STATE_DIR/state"
 	grep -q '^hw_restarts=32$' "$STATE_DIR/state"
 	[ -s "$NOTIFY_LOG" ]
-	! grep -q '^restart chia.target$' "$SYSTEMCTL_LOG"
+	! grep -q '^start chia.target$' "$SYSTEMCTL_LOG"
 }
 
 @test "with alerts enabled a restart notifies" {
@@ -197,18 +264,19 @@ restart_count() {
 
 @test "a held lock skips without restarting" {
 	local lock_pid
-	flock "$STATE_DIR/lock" sleep 5 &
+	flock "$STATE_DIR/lock" /bin/sleep 5 &
 	lock_pid=$!
 	for _ in {1..100}; do
 		if ! flock -n "$STATE_DIR/lock" true 2>/dev/null; then break; fi
-		sleep 0.02
+		/bin/sleep 0.02
 	done
 	run "$SCRIPT" target
 	kill "$lock_pid" 2>/dev/null || true
 	wait "$lock_pid" 2>/dev/null || true
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"holds"* ]]
-	[ "$(restart_count)" -eq 0 ]
+	! grep -q '^start chia.target$' "$SYSTEMCTL_LOG"
+	! grep -q '^stop chia.target$' "$SYSTEMCTL_LOG"
 }
 
 @test "state with duplicate and missing keys is repaired" {
@@ -253,6 +321,112 @@ restart_count() {
 	[[ "$output" == *"not a usable directory"* ]]
 	[ -s "$NOTIFY_LOG" ]
 	[ ! -s "$SYSTEMCTL_LOG" ]
+}
+
+@test "a due target restart stops, kills, resets and starts in order" {
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	local actions
+	actions=$(grep -E '^(stop|kill|reset-failed|start) ' "$SYSTEMCTL_LOG" || true)
+	[ "$actions" = "stop chia.target
+kill --kill-who=all --signal=SIGKILL chia-daemon.service
+kill --kill-who=all --signal=SIGKILL chia-full-node.service
+kill --kill-who=all --signal=SIGKILL chia-timelord.service
+reset-failed chia.target
+reset-failed chia-daemon.service
+reset-failed chia-full-node.service
+reset-failed chia-timelord.service
+start chia.target" ]
+}
+
+@test "verify success does not notify" {
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[ ! -s "$NOTIFY_LOG" ]
+	[[ "$output" == *"active and listening"* ]]
+}
+
+@test "verify timeout notifies and still exits 0" {
+	sed -i 's/^VERIFY_SECONDS=.*/VERIFY_SECONDS=0/' "$SCRIPT"
+	export FAKE_SS_EMPTY=1
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[ -s "$NOTIFY_LOG" ]
+	[[ "$output" == *"timed out waiting"* ]]
+}
+
+@test "kill_strays refuses when the user resolves to uid 0" {
+	export FAKE_UID=0
+	make_proc 9001 chia_full_node '0::/user.slice/user-1000.slice/session-3.scope'
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"refusing to kill strays"* ]]
+	[ ! -s "$KILL_LOG" ]
+}
+
+@test "kill_strays does not signal when the user cannot be resolved" {
+	export FAKE_ID_FAIL=1
+	make_proc 9002 chia_full_node '0::/user.slice/user-1000.slice/session-3.scope'
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"refusing to kill strays"* ]]
+	[ ! -s "$KILL_LOG" ]
+}
+
+@test "a listed stray outside managed units is terminated then killed" {
+	require_non_root
+	make_proc 9003 chia_full_node '0::/user.slice/user-1000.slice/session-3.scope'
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[ "$(cat "$KILL_LOG")" = "-s TERM 9003
+-s KILL 9003" ]
+}
+
+@test "a listed process in an active managed unit is not signalled" {
+	require_non_root
+	make_proc 9004 chia_full_node '0::/system.slice/chia-full-node.service'
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[ ! -s "$KILL_LOG" ]
+}
+
+@test "unlisted process names are not signalled" {
+	require_non_root
+	make_proc 9005 sleep '0::/user.slice/user-1000.slice/session-3.scope'
+	make_proc 9006 start_other_tool '0::/user.slice/user-1000.slice/session-3.scope'
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[ ! -s "$KILL_LOG" ]
+}
+
+@test "an exact start_ stray name is signalled" {
+	require_non_root
+	make_proc 9007 start_full_node '0::/user.slice/user-1000.slice/session-3.scope'
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[[ "$(cat "$KILL_LOG")" == *"-s TERM 9007"* ]]
+}
+
+@test "a process in an inactive managed unit is signalled" {
+	require_non_root
+	export FAKE_INACTIVE_UNITS="chia-full-node.service"
+	make_proc 9008 chia_full_node '0::/system.slice/chia-full-node.service'
+	sed -i 's/^VERIFY_SECONDS=.*/VERIFY_SECONDS=0/' "$SCRIPT"
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[[ "$(cat "$KILL_LOG")" == *"-s TERM 9008"* ]]
+}
+
+@test "verify failure names the only enabled unit" {
+	export ENABLED_SERVICES='["full-node"]'
+	export FAKE_SS_EMPTY=1
+	render_script
+	unset ENABLED_SERVICES
+	sed -i 's/^VERIFY_SECONDS=.*/VERIFY_SECONDS=0/' "$SCRIPT"
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[ -s "$NOTIFY_LOG" ]
+	grep -q 'chia-full-node.service' "$NOTIFY_LOG"
 }
 
 @test "unknown command exits 2" {
