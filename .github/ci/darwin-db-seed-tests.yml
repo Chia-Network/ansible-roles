@@ -447,8 +447,8 @@
 
     # The seed makes one launchctl probe as root, then 18 service-user calls:
     # staging cleanup/create, 3 downloads, 3 staged stats, 3 permission
-    # changes, 3 stale-sidecar removals, 2 cache renames, the main rename, and
-    # the final staging cleanup.
+    # changes, 3 stale-sidecar removals, 2 cache renames, the failing main
+    # rename, and the rescue staging cleanup.
     - name: Assert all seed tasks used the service user except the launchctl probe
       vars:
         sudo_lines: "{{ darwin_db_seed_become_sudo.content | b64decode | split('\n') | reject('eq', '') | list }}"

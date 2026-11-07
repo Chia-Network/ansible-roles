@@ -259,9 +259,11 @@
               The S3 database seed failed while running
               "{{ ansible_failed_task.name | default('a seed task') }}"{% if ansible_failed_result.item | default('') %} for {{ ansible_failed_result.item }}{% endif %}:
               {{ ansible_failed_result.msg | default('no further detail') }}
-              {{ ansible_failed_result.stderr | default('') | trim }}
+              {% if ansible_failed_result.stderr | default('') | trim %}
+              {{ ansible_failed_result.stderr | trim }}.
+              {% endif %}
               {% for failed_item in ansible_failed_result.results | default([]) if failed_item.failed | default(false) %}
-              Failed item {{ failed_item.item }}: {{ (failed_item.stderr | default(failed_item.msg)) | trim }}
+              Failed item {{ failed_item.item }}: {{ (failed_item.stderr | default(failed_item.msg)) | trim }}{% if (failed_item.stderr | default(failed_item.msg)) | trim %}.{% endif %}
               {% endfor %}
               No partial main database was published at
               {{ chia_darwin_db_seed_db_dir }}/{{ chia_darwin_db_seed_main_name }}.

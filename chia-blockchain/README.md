@@ -27,11 +27,11 @@ never falls back to writing the database on the internal disk.
 
 The role seeds only when the topology is local, seeding is enabled, the bucket is
 nonempty, and the main database is absent or a regular file of at most
-`chia_darwin_db_seed_stub_bytes`. An existing larger database and its caches are
-left untouched; a directory or symlink at the main or cache path is refused
-rather than deleted. A stub is replaced only after the whole snapshot downloads
-successfully. If the full-node LaunchDaemon is loaded, the role fails before
-touching the database:
+`chia_darwin_db_seed_stub_bytes`. An existing larger database, or a directory or
+symlink at the main database path, is left untouched and the seed is skipped; a
+directory or symlink at a cache path is refused rather than deleted. A stub is
+replaced only after the whole snapshot downloads successfully. If the full-node
+LaunchDaemon is loaded, the role fails before touching the database:
 
 ```sh
 sudo launchctl bootout system/net.chia.timelord.full-node
@@ -48,6 +48,6 @@ stub) in place; the next run removes its leftover staging directory and retries.
 The volume needs room for the whole snapshot while staging; after the renames
 the staged copy becomes the database. After a failure, check S3 access as the
 service user, free disk space, and for `local-external` that the volume is
-mounted. A refused destination directory or symlink must be moved aside by the
+mounted. A refused cache directory or symlink must be moved aside by the
 operator before retry. A second successful run finds a non-stub database,
 downloads nothing, changes no files, and does not restart services.
