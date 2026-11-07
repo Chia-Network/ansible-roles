@@ -1,0 +1,63 @@
+---
+# Run with --check. Fixture creation is forced to run so the seed sees a real
+# destination; the seed tasks themselves stay in check mode. A loaded full node
+# must fail in check mode exactly as it would in a real run.
+- name: Check-mode safety for the Darwin database seed
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+  vars:
+    test_root: "{{ lookup('env', 'DARWIN_DB_SEED_TEST_ROOT') | default('/tmp/darwin-db-seed-checkmode', true) }}"
+  tasks:
+    - name: Create fixtures even when the play runs in check mode
+      check_mode: false
+      block:
+        - name: Create the shared fixtures and fake tools
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-setup.yml"
+
+        - name: Prepare the check-mode database directory
+          ansible.builtin.file:
+            path: "{{ test_root }}/checkmode/mainnet/db"
+            state: directory
+            mode: "0755"
+
+        - name: Reset the fake tool state
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-reset-tools.yml"
+
+    - name: A loaded full node fails in check mode
+      block:
+        - name: Run the seed with the full node loaded in check mode
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+          vars:
+            chia_darwin_topology: local-internal
+            chia_root: "{{ test_root }}/checkmode/mainnet"
+            network: mainnet
+            download_blockchain_db: true
+            blockchain_backup_bucket: test-bucket
+            chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-loaded"
+
+        - name: Fail when a loaded node is not predicted in check mode
+          ansible.builtin.fail:
+            msg: "Check mode did not predict the loaded full node failure"
+
+      rescue:
+        - name: Confirm check mode predicted the loaded full node failure
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg is search('LaunchDaemon is loaded')
+
+    - name: Inspect the check-mode database and staging paths
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ test_root }}/checkmode/mainnet/db/blockchain_v2_mainnet.sqlite"
+        - "{{ test_root }}/checkmode/mainnet/db/.chia-s3-seed-mainnet"
+      register: darwin_db_seed_checkmode
+
+    - name: Assert check mode downloaded nothing and wrote nothing
+      ansible.builtin.assert:
+        that:
+          - darwin_db_seed_checkmode.results | rejectattr('stat.exists') | list | length == 2
+          - (lookup('file', test_root ~ '/aws.log') | length) == 0
