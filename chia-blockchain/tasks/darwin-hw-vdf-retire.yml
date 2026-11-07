@@ -1,36 +1,16 @@
 ---
 # Delete wrappers this role wrote for slots that are no longer enabled.
-# A script without the role header is left alone.
-- name: Check whether a retired wrapper belongs to this role
-  become: "{{ chia_darwin_launchd_become | bool }}"
-  become_user: "{{ user }}"
-  ansible.builtin.command:
-    argv:
-      - grep
-      - -F
-      - -q
-      - "Managed by the chia-blockchain Ansible role."
-      - "{{ item.wrapper }}"
-  register: chia_darwin_hw_wrapper_owner
-  changed_when: false
-  failed_when: false
-  loop: "{{ chia_darwin_hw_vdf_jobs }}"
-  loop_control:
-    label: "{{ item.wrapper }}"
-  when: not (item.enabled | bool)
-
+# A script without the role header is left alone, except a takeover wrapper,
+# which discovery replaces or retires deliberately.
 - name: Remove retired role-owned hw_vdf wrappers
   become: "{{ chia_darwin_launchd_become | bool }}"
   become_user: "{{ user }}"
   ansible.builtin.file:
-    path: "{{ item.item.wrapper }}"
+    path: "{{ item.wrapper }}"
     state: absent
-  loop: "{{ chia_darwin_hw_wrapper_owner.results }}"
+  loop: "{{ chia_darwin_hw_vdf_jobs }}"
   loop_control:
-    label: "{{ item.item.wrapper | default('retired-wrapper') }}"
+    label: "{{ item.wrapper }}"
   when:
-    - not (item.skipped | default(false))
-    - not (item.item.enabled | bool)
-    - >-
-      (item.rc | default(1) | int) == 0 or
-      item.item.label in (chia_darwin_hw_vdf_takeover_labels | default([]))
+    - not (item.enabled | bool)
+    - item.label in (chia_darwin_hw_vdf_retire_labels | default([]))

@@ -82,6 +82,7 @@
           become: false
           ansible.builtin.command:
             argv: ["{{ chia_darwin_hw_vdf_client }}", --list]
+          timeout: 30
           register: chia_darwin_hw_vdf_list
           changed_when: false
           failed_when: false
@@ -114,7 +115,10 @@
           changed_when: false
 
         - name: Restart old hw-vdf jobs that were stopped for --list
-          ansible.builtin.include_tasks: darwin-restart-job.yml
+          ansible.builtin.include_tasks:
+            file: darwin-restart-job.yml
+            apply:
+              ignore_errors: true
           loop: "{{ chia_darwin_hw_vdf_takeover_stopped.stdout_lines }}"
           loop_control:
             loop_var: takeover_label
@@ -125,6 +129,32 @@
               enabled: true
               exit_timeout: "{{ chia_darwin_hw_vdf_exit_timeout }}"
             chia_darwin_start_now: true
+
+        - name: Check every hw-vdf job stopped for --list after its restart attempt
+          become: "{{ chia_darwin_launchd_become | bool }}"
+          ansible.builtin.command:
+            argv:
+              - "{{ chia_darwin_launchctl }}"
+              - print
+              - "system/{{ item }}"
+          loop: "{{ chia_darwin_hw_vdf_takeover_stopped.stdout_lines }}"
+          loop_control:
+            label: "{{ item }}"
+          register: chia_darwin_hw_vdf_takeover_restored
+          changed_when: false
+          failed_when: false
+
+        - name: Fail if any hw-vdf job stopped for --list is still down
+          vars:
+            down: >-
+              {{ chia_darwin_hw_vdf_takeover_restored.results | default([])
+                | selectattr('rc', 'defined') | rejectattr('rc', 'equalto', 0)
+                | map(attribute='item') | list }}
+          ansible.builtin.fail:
+            msg: >-
+              Could not restore {{ down | join(', ') }} after stopping it for
+              hw_vdf_client --list. Other old jobs were restored where possible.
+          when: down | length > 0
 
     - name: Merge attached boards with previously claimed boards
       ansible.builtin.set_fact:

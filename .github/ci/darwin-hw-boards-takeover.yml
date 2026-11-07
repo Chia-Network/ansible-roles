@@ -420,13 +420,33 @@
         hw_client_guard_labels: "{{ hw_restore_guard_labels }}"
         hw_client_pre_list: |
           rm -f "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf-2.plist"
-    - name: A failed restore reports the real error after a failed takeover
+    - name: A failed restore names the job left down after a failed takeover
       ansible.builtin.include_tasks: darwin-hw-boards-expect-takeover-failure.yml
       vars:
         hw_failure_sentinel: takeover hid a failed old-job restore
         hw_failure_expect:
-          - missing
-          - net.chia.timelord.hw-vdf-2.plist
+          - Could not restore
+          - net.chia.timelord.hw-vdf-2
+
+- name: Restore later old jobs when an earlier restore fails
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    hw_best_effort_base: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-takeover-best-effort"
+  tasks:
+    - name: Keep restoring after the first old job fails to come back
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-restore-best-effort.yml
+      loop:
+        - work: "{{ hw_best_effort_base }}/boot"
+          start_on_boot: true
+        - work: "{{ hw_best_effort_base }}/no-boot"
+          start_on_boot: false
+      loop_control:
+        loop_var: hw_best_effort
+        label: "{{ hw_best_effort.work | basename }}"
 
 - name: Restore disabled-at-boot jobs after a failed takeover
   hosts: localhost

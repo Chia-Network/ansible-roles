@@ -35,6 +35,40 @@
   loop_control:
     label: "{{ item.label }}"
 
+- name: Record the hw-vdf labels this role owns or has taken over
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_owned_labels: >-
+      {{ (chia_darwin_hw_plist_owner.results | selectattr('rc', 'equalto', 0)
+          | map(attribute='item') | map(attribute='label') | list)
+          | union(chia_darwin_hw_vdf_takeover_labels | default([])) }}
+  changed_when: false
+
+- name: See which retired hw-vdf wrappers carry this role's header
+  become: "{{ chia_darwin_launchd_become | bool }}"
+  become_user: "{{ user }}"
+  ansible.builtin.command:
+    argv:
+      - grep
+      - -F
+      - -q
+      - "Managed by the chia-blockchain Ansible role."
+      - "{{ item.wrapper }}"
+  loop: "{{ chia_darwin_hw_vdf_jobs | selectattr('enabled', 'equalto', false) | list }}"
+  loop_control:
+    label: "{{ item.wrapper }}"
+  register: chia_darwin_hw_vdf_wrapper_owner
+  changed_when: false
+  failed_when: false
+
+- name: Record the retired hw-vdf labels whose wrappers this role wrote
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_retire_labels: >-
+      {{ (chia_darwin_hw_vdf_wrapper_owner.results | default([])
+          | selectattr('rc', 'defined') | selectattr('rc', 'equalto', 0)
+          | map(attribute='item') | map(attribute='label') | list)
+          | union(chia_darwin_hw_vdf_takeover_labels | default([])) }}
+  changed_when: false
+
 - name: Refuse to replace a LaunchDaemon this role did not write
   ansible.builtin.fail:
     msg: >-
@@ -49,7 +83,7 @@
     - item.item.enabled | bool
     - not (chia_darwin_hw_vdf_claim_existing | bool)
     - (item.rc | default(2) | int) == 1
-    - item.item.label not in (chia_darwin_hw_vdf_takeover_labels | default([]))
+    - item.item.label not in (chia_darwin_hw_vdf_owned_labels | default([]))
 
 - name: Build the LaunchDaemon list
   ansible.builtin.set_fact:
@@ -58,17 +92,9 @@
         (chia_darwin_service_jobs | default([]))
         + (chia_darwin_hw_vdf_jobs | selectattr('enabled', 'equalto', true) | list)
         + (
-          chia_darwin_hw_plist_owner.results
-          | selectattr('rc', 'equalto', 0)
-          | map(attribute='item')
-          | selectattr('enabled', 'equalto', false)
-          | rejectattr('label', 'in', chia_darwin_hw_vdf_takeover_labels | default([]))
-          | list
-        )
-        + (
           chia_darwin_hw_vdf_jobs
           | selectattr('enabled', 'equalto', false)
-          | selectattr('label', 'in', chia_darwin_hw_vdf_takeover_labels | default([]))
+          | selectattr('label', 'in', chia_darwin_hw_vdf_owned_labels | default([]))
           | list
         )
       }}

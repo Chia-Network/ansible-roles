@@ -74,27 +74,39 @@ means another job or process, inside or outside the configured LaunchDaemons
 directory, holds the board (for example a LaunchAgent or a manual run), the
 plist's actual `Label` differs, or the board is detached, so discovery fails
 closed and restores the old jobs. This catches holders the plist grep cannot
-see without scanning the whole filesystem.
+see without scanning the whole filesystem. A hand-written takeover wrapper
+without a nonempty `SERIAL` is refused after its job has been stopped and
+restored, because the visibility check cannot match it. Set
+`chia_darwin_hw_vdf_boards` explicitly to configure that no-`SERIAL` board; an
+explicit list does not take it over. Wrappers written by this role always
+contain `SERIAL`, including the legacy single-board wrapper.
 
-The jobs for previously loaded takeover slots are down only while `--list` and
-that visibility check run. Discovery restarts them in an `always` block through
-the normal restart helper (`enable`, `bootstrap`, then `disable` when
-`start_on_boot` is false), whether the takeover succeeds or fails. The old plist
-and wrapper stay until the normal install or retire step replaces or removes
-them. Restored processes keep running after a later task fails, but a crash or
-reboot after some wrapper or plist writes and before the run completes can start
-an incomplete new on-disk set. The ordered restart handler has its own brief
-window after it stops changed boards and before it starts them in ID order, and
-a failed restore reports its real error instead of hiding it. This is not an
-all-role transaction; each step has its own failure window. A managed per-board
-claim is left running and keeps its ID, which is how held-board reruns stay
-stable. Explicit `chia_darwin_hw_vdf_boards` and the legacy serial path do not
-take anything over and keep the existing ownership refusal.
+The stop, enumerate, and restore-attempt window for previously loaded takeover
+slots covers `--list`, the visibility check, and the restore attempts; a failed
+restore or an interrupted run can leave jobs unloaded. Discovery restarts every
+stopped job in an `always` block through the normal restart helper (`enable`,
+`bootstrap`, then `disable` when `start_on_boot` is false), whether the takeover
+succeeds or fails. Each label gets its own attempt, so one failed restart does
+not skip the remaining labels. After those attempts, one `launchctl print` per
+stopped label verifies that it is loaded. Any label still down fails the run and
+is named in the failure, even when the other jobs came back. The old plist and
+wrapper stay until the normal install or retire step replaces or removes them.
+Restored processes keep running after a later task fails, but a crash or reboot
+after some wrapper or plist writes and before the run completes can start an
+incomplete new on-disk set. A later ordered-handler stop/start failure can leave
+changed jobs unloaded; otherwise that handler's brief window is after it stops
+changed boards and before it starts them in ID order. `KeepAlive` can respawn a
+process while its files are being rewritten. This is not an all-role
+transaction; each step has its own failure window. A managed per-board claim is
+left running and keeps its ID, which is how held-board reruns stay stable.
+Explicit `chia_darwin_hw_vdf_boards` and the legacy serial path do not take
+anything over and keep the existing ownership refusal.
 
 This preserves IDs, masks, wrappers, and loaded jobs when every board is held
 (header-only `--list`) or only some are held. Discovery fails when the merged
 set is empty or has more than the allowed slots, when `--list` exits non-zero
-(including `No FTDI devices connected.`), or when its output cannot be parsed.
+(including `No FTDI devices connected.`), when it exceeds its 30-second task
+timeout, or when its output cannot be parsed.
 A zero exit with only the header is success when wrappers already claim
 boards; with no claimed boards it fails as an empty merged set. It also fails
 when a takeover wrapper is still hidden after its job stops, when a
@@ -180,12 +192,15 @@ The prefix is `chia_darwin_launchd_prefix` (`net.chia.timelord` by default).
 Launchd also writes `<name>.out.log` and `<name>.err.log`. Client logs are under
 `chia_darwin_log_dir`. Removing a board from an explicit
 `chia_darwin_hw_vdf_boards` list, or switching back to the legacy single-board
-path, retires that role-owned slot: it stops the job and deletes the plist and
-wrapper only when that plist runs this role's wrapper, or when discovery took
-that slot over. A managed board that is
-only physically detached remains claimed by its wrapper, so auto-discovery
-keeps it and its masks until an explicit list retires it. If an enabled label
-already has some other plist, the run fails until
+path, retires that slot. It stops the job and deletes the LaunchDaemon plist
+when the plist path greps to this role's wrapper or discovery took the slot
+over. It removes the wrapper only when the wrapper carries the role header or
+discovery took the slot over, including a marked orphan whose plist is already
+gone. An unmarked wrapper that a role-label plist merely runs is left in place;
+that plist is removed and the wrapper remains. A managed board that is only
+physically detached remains claimed by its wrapper, so auto-discovery keeps it
+and its masks until an explicit list retires it. If an enabled label already
+has some other plist, the run fails until
 `chia_darwin_hw_vdf_claim_existing` is true. `start_now` and `start_on_boot`
 apply to every enabled board. The restart handler waits for each job's
 `ExitTimeOut` plus `chia_darwin_restart_unload_margin` before bootstrap.
