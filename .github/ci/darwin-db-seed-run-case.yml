@@ -1,8 +1,7 @@
 ---
-# Run one Darwin database seed scenario from darwin-db-seed-tests.yml. The
-# include gate matches darwin.yml so disabled scenarios are skipped the same
-# way in tests and production. Set case.expect_failure to a message regex when
-# the seed must fail.
+# Run one Darwin database seed scenario from darwin-db-seed-tests.yml. Set
+# case.expect_failure to a message regex when the seed must fail. The
+# production include gate is asserted separately in darwin-assumptions.yml.
 - name: Prepare the database directory for {{ case.name }}
   ansible.builtin.file:
     path: "{{ case.root }}/db"
@@ -23,10 +22,6 @@
         blockchain_backup_bucket: "{{ case.bucket | default('test-bucket') }}"
         chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-{{ case.launchctl | default('notloaded') }}"
         chia_darwin_db_volume: "{{ case.volume | default(external_volume) }}"
-      when:
-        - (case.topology | default('local-internal')) != "remote-node"
-        - case.download | default(true) | bool
-        - (case.bucket | default('test-bucket')) | length > 0
 
     - name: Fail when the {{ case.name }} seed unexpectedly succeeded
       ansible.builtin.fail:
@@ -50,8 +45,4 @@
     blockchain_backup_bucket: "{{ case.bucket | default('test-bucket') }}"
     chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-{{ case.launchctl | default('notloaded') }}"
     chia_darwin_db_volume: "{{ case.volume | default(external_volume) }}"
-  when:
-    - case.expect_failure is not defined
-    - (case.topology | default('local-internal')) != "remote-node"
-    - case.download | default(true) | bool
-    - (case.bucket | default('test-bucket')) | length > 0
+  when: case.expect_failure is not defined

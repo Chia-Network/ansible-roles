@@ -121,6 +121,26 @@
     dest: "{{ test_root }}/bin/launchctl-notloaded"
     mode: "0755"
 
+- name: Write the fake sudo executable
+  ansible.builtin.copy:
+    content: |
+      #!/bin/sh
+      root='{{ test_root }}'
+      printf '%s\n' "$*" >> "$root/sudo.log"
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          -u) shift 2 ;;
+          -H|-S|-n|-E) shift ;;
+          -p) shift 2 ;;
+          --) shift; break ;;
+          -*) shift ;;
+          *) break ;;
+        esac
+      done
+      exec "$@"
+    dest: "{{ test_root }}/bin/sudo"
+    mode: "0755"
+
 - name: Create an empty fake AWS log without truncating it on reruns
   ansible.builtin.copy:
     content: ""
@@ -151,3 +171,4 @@
   loop:
     - brew.log
     - launchctl.log
+    - sudo.log

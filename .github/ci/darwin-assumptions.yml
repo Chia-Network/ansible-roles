@@ -23,6 +23,30 @@
         restart_text: "{{ darwin_sources.results[0].stdout ~ '\n' ~ darwin_sources.results[1].stdout }}"
         darwin_text: "{{ darwin_sources.results[2].stdout }}"
 
+    - name: Parse the production Darwin tasks
+      ansible.builtin.set_fact:
+        darwin_tasks: "{{ lookup('file', playbook_dir ~ '/../../chia-blockchain/tasks/darwin.yml') | from_yaml }}"
+
+    - name: Locate the production database seed include
+      ansible.builtin.set_fact:
+        darwin_db_seed_include: >-
+          {{ darwin_tasks | selectattr('name', 'equalto', 'Seed the full-node database from S3') | list }}
+
+    - name: The production database seed include keeps its full gate
+      ansible.builtin.assert:
+        that:
+          - darwin_db_seed_include | length == 1
+          - darwin_db_seed_include[0]['ansible.builtin.include_tasks'] == 'darwin-db-seed.yml'
+          - darwin_db_seed_include[0].when is sequence
+          - darwin_db_seed_include[0].when | length == 3
+          - '''chia_darwin_topology != "remote-node"'' in darwin_db_seed_include[0].when'
+          - "'download_blockchain_db | bool' in darwin_db_seed_include[0].when"
+          - "'blockchain_backup_bucket | length > 0' in darwin_db_seed_include[0].when"
+        fail_msg: >-
+          The Darwin database seed include must stay gated on a non-remote
+          topology, download_blockchain_db, and a nonempty
+          blockchain_backup_bucket.
+
     - name: The unload wait lasts through ExitTimeOut plus a short margin
       vars:
         unload_task: "{{ restart_text.split('Wait until LaunchDaemon')[1].split('Enable LaunchDaemon')[0] }}"
@@ -73,8 +97,10 @@
           - "'Require the database volume to be mounted now' in darwin_text"
           - "'is not mounted' in darwin_text"
           - >-
-            darwin_text.index('Require the database volume to be mounted now')
-            < darwin_text.index('Seed the full-node database from S3')
+            (darwin_tasks | map(attribute='name') | list).index(
+            'Require the database volume to be mounted now') <
+            (darwin_tasks | map(attribute='name') | list).index(
+            'Seed the full-node database from S3')
         fail_msg: >-
           local-external must check the mount in darwin.yml before the seed
           include. The seed itself does not repeat that preflight.

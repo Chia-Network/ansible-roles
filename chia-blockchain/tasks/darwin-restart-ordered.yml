@@ -29,7 +29,7 @@
   become: "{{ chia_darwin_launchd_become | bool }}"
   ansible.builtin.command:
     argv:
-      - "{{ chia_darwin_launchctl | default('launchctl') }}"
+      - "{{ chia_darwin_launchctl }}"
       - print
       - "system/{{ item.label }}"
   register: chia_darwin_board_loaded

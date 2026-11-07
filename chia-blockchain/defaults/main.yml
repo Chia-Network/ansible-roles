@@ -377,15 +377,15 @@ chia_darwin_hw_vdf_client: "{{ chia_darwin_homebrew_prefix }}/bin/hw_vdf_client"
 chia_darwin_aws: "{{ chia_darwin_homebrew_prefix }}/bin/aws"
 chia_darwin_awscli_formula: awscli
 chia_darwin_db_seed_stub_bytes: 10240
-chia_darwin_db_seed_become: true
 chia_darwin_db_volume: /Volumes/Chia-DB
 chia_darwin_volume_chia_dir: "{{ chia_darwin_db_volume }}/dot-chia"
 chia_darwin_db_marker: "{{ chia_darwin_volume_chia_dir }}/{{ network }}/config/config.yaml"
 chia_darwin_wait_interval: 5
 chia_darwin_wait_log_every: 12
 chia_darwin_launchd_prefix: net.chia.timelord
-# Tests set chia_darwin_launchctl to a fake and chia_darwin_launchd_dir
-# elsewhere. Production uses launchctl and /Library/LaunchDaemons.
+# When chia_darwin_launchd_become is true these must stay launchctl and
+# /Library/LaunchDaemons. Tests set become to false and point them elsewhere.
+chia_darwin_launchctl: launchctl
 chia_darwin_launchd_dir: /Library/LaunchDaemons
 chia_darwin_launchd_become: true
 chia_darwin_process_type: Interactive

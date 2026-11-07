@@ -18,7 +18,7 @@
     - name: Enable LaunchDaemon before starting {{ chia_job.label }}
       ansible.builtin.command:
         argv:
-          - "{{ chia_darwin_launchctl | default('launchctl') }}"
+          - "{{ chia_darwin_launchctl }}"
           - enable
           - "system/{{ chia_job.label }}"
       changed_when: false
@@ -26,7 +26,7 @@
     - name: Start LaunchDaemon {{ chia_job.label }}
       ansible.builtin.command:
         argv:
-          - "{{ chia_darwin_launchctl | default('launchctl') }}"
+          - "{{ chia_darwin_launchctl }}"
           - bootstrap
           - system
           - "{{ chia_darwin_launchd_dir }}/{{ chia_job.label }}.plist"
@@ -39,7 +39,7 @@
     - name: Disable LaunchDaemon at boot {{ chia_job.label }}
       ansible.builtin.command:
         argv:
-          - "{{ chia_darwin_launchctl | default('launchctl') }}"
+          - "{{ chia_darwin_launchctl }}"
           - disable
           - "system/{{ chia_job.label }}"
       changed_when: false

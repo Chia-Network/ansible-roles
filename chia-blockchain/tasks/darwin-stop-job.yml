@@ -5,7 +5,7 @@
   become: "{{ chia_darwin_launchd_become | bool }}"
   ansible.builtin.command:
     argv:
-      - "{{ chia_darwin_launchctl | default('launchctl') }}"
+      - "{{ chia_darwin_launchctl }}"
       - bootout
       - "system/{{ chia_job.label }}"
   register: chia_darwin_restart_bootout
@@ -18,7 +18,7 @@
   become: "{{ chia_darwin_launchd_become | bool }}"
   ansible.builtin.command:
     argv:
-      - "{{ chia_darwin_launchctl | default('launchctl') }}"
+      - "{{ chia_darwin_launchctl }}"
       - print
       - "system/{{ chia_job.label }}"
   register: chia_darwin_restart_gone

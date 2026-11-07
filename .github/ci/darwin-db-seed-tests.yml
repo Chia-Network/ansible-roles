@@ -19,9 +19,6 @@
       ansible.builtin.set_fact:
         test_root: "{{ darwin_db_seed_temp.path }}"
         mainnet_root: "{{ darwin_db_seed_temp.path }}/internal/mainnet"
-        remote_root: "{{ darwin_db_seed_temp.path }}/remote/mainnet"
-        disabled_root: "{{ darwin_db_seed_temp.path }}/disabled/mainnet"
-        empty_bucket_root: "{{ darwin_db_seed_temp.path }}/empty-bucket/mainnet"
         existing_root: "{{ darwin_db_seed_temp.path }}/existing/mainnet"
         directory_root: "{{ darwin_db_seed_temp.path }}/directory/mainnet"
         symlink_root: "{{ darwin_db_seed_temp.path }}/symlink/mainnet"
@@ -53,21 +50,6 @@
         - fail-file
         - fail-publish
         - launchctl.log
-
-    - name: Check the publish include applies the service-user directives
-      ansible.builtin.command:
-        argv:
-          - "{{ ansible_playbook_python }}"
-          - "{{ playbook_dir }}/check_darwin_db_seed_publish_become.py"
-          - --tasks
-          - "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
-          - --defaults
-          - "{{ playbook_dir }}/../../chia-blockchain/defaults/main.yml"
-          - --service-user
-          - "{{ test_user }}-publish-service"
-          - --remote-user
-          - "{{ test_user }}"
-      changed_when: false
 
     - name: Prepare the scenario directories
       ansible.builtin.file:
@@ -167,7 +149,7 @@
           - "'s3://test-bucket/testnet11/height-to-hash' in lookup('file', test_root ~ '/aws.log')"
           - "'s3://test-bucket/testnet11/sub-epoch-summaries' in lookup('file', test_root ~ '/aws.log')"
 
-    - name: Reset the fake tool state before the skip cases
+    - name: Reset the fake tool state before the existing database case
       ansible.builtin.copy:
         content: ""
         dest: "{{ test_root }}/{{ item }}"
@@ -177,38 +159,7 @@
         - fail-file
         - fail-publish
         - launchctl.log
-
-    - name: Skip the seed for disabled local topologies
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
-      loop:
-        - name: remote-node
-          root: "{{ remote_root }}"
-          topology: remote-node
-        - name: download disabled
-          root: "{{ disabled_root }}"
-          download: false
-        - name: empty bucket
-          root: "{{ empty_bucket_root }}"
-          bucket: ""
-      loop_control:
-        loop_var: case
-        label: "{{ case.name }}"
-
-    - name: Inspect the skip-case database paths
-      ansible.builtin.stat:
-        path: "{{ item }}/db/blockchain_v2_mainnet.sqlite"
-      loop:
-        - "{{ remote_root }}"
-        - "{{ disabled_root }}"
-        - "{{ empty_bucket_root }}"
-      register: darwin_db_seed_skips
-
-    - name: Assert the skip cases took no action
-      ansible.builtin.assert:
-        that:
-          - darwin_db_seed_skips.results | rejectattr('stat.exists') | list | length == 3
-          - (lookup('file', test_root ~ '/aws.log') | length) == 0
-          - (lookup('file', test_root ~ '/launchctl.log') | length) == 0
+        - sudo.log
 
     - name: Write the existing large database and sidecars
       ansible.builtin.copy:
@@ -354,6 +305,7 @@
         - fail-file
         - fail-publish
         - launchctl.log
+        - sudo.log
 
     - name: Prepare a stub with stale WAL, SHM, and journal sidecars
       ansible.builtin.copy:
@@ -405,6 +357,7 @@
         - fail-file
         - fail-publish
         - launchctl.log
+        - sudo.log
 
     - name: Prepare a large database with the full node loaded
       ansible.builtin.copy:
@@ -462,7 +415,7 @@
         loop_var: failure_case
         label: "{{ failure_case.name }}"
 
-    - name: Failed publish renames stop later files and recover
+    - name: Failed publish renames keep the main database and recover
       ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-publish-failure-case.yml"
       loop:
         - name: main database publish failure
@@ -478,3 +431,87 @@
     - name: Report the temporary test root
       ansible.builtin.debug:
         msg: "Darwin database seed tests passed under {{ test_root }}"
+
+- name: Verify the Darwin database seed runs as the service user
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+  vars:
+    ansible_pipelining: true
+  tasks:
+    - name: Create a temporary service-user test root
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: "-darwin-db-seed-become"
+      register: darwin_db_seed_become_temp
+
+    - name: Record the service-user test root
+      ansible.builtin.set_fact:
+        test_root: "{{ darwin_db_seed_become_temp.path }}"
+
+    - name: Set the shared service-user test identity
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-test-identity.yml"
+
+    - name: Use a distinct service user and a logging fake sudo
+      ansible.builtin.set_fact:
+        user: "{{ test_user }}-seed-service"
+        chia_darwin_launchd_become: true
+        ansible_become_exe: "{{ test_root }}/bin/sudo"
+
+    - name: Create the shared fake tools and fixtures
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-setup.yml"
+
+    - name: Force a publish failure to exercise cleanup and rescue as the service user
+      ansible.builtin.copy:
+        content: "blockchain_v2_mainnet.sqlite\n"
+        dest: "{{ test_root }}/fail-publish"
+        mode: "0644"
+
+    - name: Run the seed with become on
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
+      vars:
+        case:
+          name: service-user become
+          root: "{{ test_root }}/become/mainnet"
+          expect_failure: "S3 database seed failed"
+
+    - name: Read the fake sudo log
+      ansible.builtin.slurp:
+        path: "{{ test_root }}/sudo.log"
+      register: darwin_db_seed_become_sudo
+
+    - name: Assert all seed tasks used the service user except the launchctl probe
+      vars:
+        sudo_lines: "{{ darwin_db_seed_become_sudo.content | b64decode | split('\n') | reject('eq', '') | list }}"
+      ansible.builtin.assert:
+        that:
+          - sudo_lines | length >= 10
+          - sudo_lines | select('search', '-u root ') | list | length == 1
+          - sudo_lines[0] is search('-u root ')
+          - sudo_lines | reject('search', '-u (root|' ~ user ~ ') ') | list | length == 0
+          - sudo_lines | select('search', '-u ' ~ user ~ ' ') | list | length == (sudo_lines | length) - 1
+        fail_msg: >-
+          Expected the launchctl probe to use the default become user and every
+          other seed task to run as {{ user }}. Log: {{ sudo_lines | join(' | ') }}
+
+    - name: Inspect the failed service-user main database path
+      ansible.builtin.stat:
+        path: "{{ test_root }}/become/mainnet/db/blockchain_v2_mainnet.sqlite"
+      register: darwin_db_seed_become_main
+
+    - name: Require the main database path to remain the failure obstacle
+      ansible.builtin.assert:
+        that:
+          - darwin_db_seed_become_main.stat.isdir | default(false)
+
+    - name: Inspect the failed service-user staging directory
+      ansible.builtin.stat:
+        path: "{{ test_root }}/become/mainnet/db/.chia-s3-seed-mainnet"
+      register: darwin_db_seed_become_staging
+
+    - name: Require the service-user rescue to remove the staging directory
+      ansible.builtin.assert:
+        that:
+          - not (darwin_db_seed_become_staging.stat.exists | default(false))

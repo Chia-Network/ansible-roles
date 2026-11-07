@@ -13,7 +13,7 @@
     chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
     chia_darwin_launchd_prefix: net.chia.seedtest
     chia_darwin_db_volume: "{{ test_root }}/Volumes/Chia DB"
-    chia_darwin_db_seed_become: false
+    chia_darwin_launchd_become: false
     chia_darwin_db_seed_stub_bytes: 10240
     external_volume: "{{ test_root }}/Volumes/Chia DB"
     external_root: "{{ test_root }}/Volumes/Chia DB/dot-chia"

@@ -1,8 +1,11 @@
 ---
-# One failed publish rename must stop every later publish. The fake aws
-# fail-publish marker replaces the final destination for the named file with a
-# non-writable directory, so that rename fails. Included with a publish_case
-# loop item from darwin-db-seed-tests.yml.
+# A failed publish rename must keep the main database unpublished. A failed
+# cache rename may still let the cache loop try its other item, but the separate
+# main database task must not run, so no main database is published after a
+# cache failure. A failed main database rename leaves the previous file in
+# place. The fake aws fail-publish marker replaces the final destination for the
+# named file with a non-writable directory, so that rename fails. Included with
+# a publish_case loop item from darwin-db-seed-tests.yml.
 - name: Record the publish failure order and contents for {{ publish_case.name }}
   ansible.builtin.set_fact:
     publish_failure_index: "{{ publish_files.index(publish_case.file) }}"
@@ -15,10 +18,9 @@
       sub-epoch-summaries: "{{ fixture_ses }}"
       blockchain_v2_mainnet.sqlite: "{{ fixture_main }}"
 
-- name: Split the publish order around the failed file for {{ publish_case.name }}
+- name: Record the files published before the failed file for {{ publish_case.name }}
   ansible.builtin.set_fact:
     publish_failure_before: "{{ publish_files[:publish_failure_index | int] }}"
-    publish_failure_after: "{{ publish_files[publish_failure_index | int + 1:] }}"
 
 - name: Prepare the {{ publish_case.name }} database directory
   ansible.builtin.file:
@@ -71,7 +73,7 @@
     path: "{{ publish_case.root }}/db/.chia-s3-seed-{{ publish_case.network | default('mainnet') }}"
   register: darwin_db_seed_publish_failure_staging
 
-- name: Assert the failed publish stopped later publishes for {{ publish_case.name }}
+- name: Assert the failed publish left its obstacle and cleaned staging for {{ publish_case.name }}
   ansible.builtin.assert:
     that:
       - darwin_db_seed_publish_failure_files.results[publish_failure_index | int].stat.isdir | default(false)
@@ -86,13 +88,11 @@
   loop_control:
     label: "{{ item }}"
 
-- name: Assert files after the failed publish were untouched for {{ publish_case.name }}
+- name: Assert the main database was not published after {{ publish_case.name }}
   ansible.builtin.assert:
     that:
-      - lookup('file', publish_case.root ~ '/db/' ~ item) == publish_failure_original[item]
-  loop: "{{ publish_failure_after }}"
-  loop_control:
-    label: "{{ item }}"
+      - lookup('file', publish_case.root ~ '/db/blockchain_v2_mainnet.sqlite') == publish_failure_original['blockchain_v2_mainnet.sqlite']
+  when: publish_case.file != 'blockchain_v2_mainnet.sqlite'
 
 - name: Remove the {{ publish_case.file }} publish obstacle
   ansible.builtin.file:

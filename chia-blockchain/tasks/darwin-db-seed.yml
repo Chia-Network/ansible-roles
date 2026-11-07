@@ -90,14 +90,14 @@
     - name: Check whether the full node is loaded before replacing its database
       ansible.builtin.command:
         argv:
-          - "{{ chia_darwin_launchctl | default('launchctl') }}"
+          - "{{ chia_darwin_launchctl }}"
           - print
           - "system/{{ chia_darwin_launchd_prefix }}.full-node"
       register: chia_darwin_db_seed_node
       changed_when: false
       failed_when: false
       check_mode: false
-      become: "{{ chia_darwin_db_seed_become | bool }}"
+      become: "{{ chia_darwin_launchd_become | bool }}"
 
     - name: Refuse to replace a database under a loaded full node
       ansible.builtin.fail:
@@ -150,7 +150,7 @@
 
     - name: Download and publish the Darwin database seed
       when: not ansible_check_mode
-      become: "{{ chia_darwin_db_seed_become | bool }}"
+      become: "{{ chia_darwin_launchd_become | bool }}"
       become_user: "{{ user }}"
       block:
         - name: Remove a leftover database seed staging directory
@@ -215,19 +215,30 @@
             - -shm
             - -journal
 
-        # The main database is last in chia_darwin_db_seed_files. Each mv is an
-        # atomic rename on the destination filesystem, so a partial download is
-        # never at the final path. The include stops at the first failed
-        # rename, so no later file, especially the main database, is published.
-        - name: Publish the snapshot files with the main database last
-          ansible.builtin.include_tasks:
-            file: darwin-db-seed-publish.yml
-            apply:
-              become: "{{ chia_darwin_db_seed_become | bool }}"
-              become_user: "{{ user }}"
-          loop: "{{ chia_darwin_db_seed_files }}"
+        # Each mv is an atomic rename on the destination filesystem, so a
+        # partial download is never at the final path. A failed cache rename
+        # fails this loop before the main database task runs, so the main
+        # database is never published after a failed rename.
+        - name: Publish the snapshot cache files
+          ansible.builtin.command:
+            argv:
+              - /bin/mv
+              - -f
+              - "{{ chia_darwin_db_seed_staging_dir }}/{{ item }}"
+              - "{{ chia_darwin_db_seed_db_dir }}/{{ item }}"
+          loop: "{{ chia_darwin_db_seed_caches }}"
           loop_control:
             label: "{{ item }}"
+          changed_when: true
+
+        - name: Publish the snapshot main database last
+          ansible.builtin.command:
+            argv:
+              - /bin/mv
+              - -f
+              - "{{ chia_darwin_db_seed_staging_dir }}/{{ chia_darwin_db_seed_main_name }}"
+              - "{{ chia_darwin_db_seed_db_dir }}/{{ chia_darwin_db_seed_main_name }}"
+          changed_when: true
 
         - name: Remove the database seed staging directory
           ansible.builtin.file:
@@ -245,18 +256,11 @@
             msg: >-
               The S3 database seed failed while running
               "{{ ansible_failed_task.name | default('a seed task') }}"
-              {% if ansible_failed_result.item | default('') %}
-              for {{ ansible_failed_result.item }}
-              {% endif %}:
-              {{ ansible_failed_result.msg | default('no further detail') }}
+              {% if ansible_failed_result.item | default('') %}for {{ ansible_failed_result.item }} {% endif %}: {{ ansible_failed_result.msg | default('no further detail') }}
               {{ ansible_failed_result.stderr | default('') | trim }}
-              {% if ansible_failed_result.results | default([]) %}
-              Failed copies:
-              {% for failed_copy in ansible_failed_result.results if failed_copy.failed | default(false) %}
-              {{ failed_copy.item }}:
-              {{ (failed_copy.stderr | default(failed_copy.msg)) | trim }}
+              {% for failed_copy in ansible_failed_result.results | default([]) if failed_copy.failed | default(false) %}
+              Failed copy {{ failed_copy.item }}: {{ (failed_copy.stderr | default(failed_copy.msg)) | trim }}
               {% endfor %}
-              {% endif %}
               No partial main database was published at
               {{ chia_darwin_db_seed_db_dir }}/{{ chia_darwin_db_seed_main_name }}.
               The previous file (or no file) remains. Recheck S3 access and free
