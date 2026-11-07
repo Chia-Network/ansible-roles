@@ -1,0 +1,51 @@
+---
+# A legacy slot 1 is loaded. Bootout cannot unload it, so takeover must fail
+# before --list, file removal, or bootstrap.
+- name: Create the shared {{ hw_takeover_failure }} takeover tree
+  vars:
+    hw_tree_dirs:
+      - "{{ launch_state }}/fail"
+      - "{{ launch_state }}/hold"
+  ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
+
+- name: Give the {{ hw_takeover_failure }} takeover a short unload wait
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_exit_timeout: 0
+    chia_darwin_restart_unload_margin: 1
+
+- name: Install the client and plant the old wrapper and plist for the takeover
+  ansible.builtin.include_tasks: darwin-hw-boards-takeover-legacy-client.yml
+
+- name: Make bootout fail while the job stays loaded
+  when: hw_takeover_failure == 'fail'
+  ansible.builtin.copy:
+    dest: "{{ launch_state }}/fail/net.chia.timelord.hw-vdf"
+    mode: "0644"
+    content: "failure\n"
+
+- name: Hold the job loaded after bootout
+  when: hw_takeover_failure == 'hold'
+  ansible.builtin.copy:
+    dest: "{{ launch_state }}/hold/net.chia.timelord.hw-vdf"
+    mode: "0644"
+    content: "99\n"
+
+- name: Expect takeover to refuse a loaded old job ({{ hw_takeover_failure }})
+  ansible.builtin.include_tasks: darwin-hw-boards-expect-takeover-failure.yml
+  vars:
+    hw_failure_sentinel: takeover overwrote a loaded old job
+    hw_failure_expect:
+      - still loaded
+      - Bootstrap was not attempted
+
+- name: No enumeration, removal, or bootstrap happened ({{ hw_takeover_failure }})
+  vars:
+    log_text: "{{ lookup('ansible.builtin.file', launch_log) }}"
+    wrapper_text: "{{ lookup('ansible.builtin.file', chia_darwin_bin_dir ~ '/chia-hw-vdf-run.sh') }}"
+  ansible.builtin.assert:
+    that:
+      - not ((work ~ '/client-ran') is file)
+      - wrapper_text is search('SERIAL=CHIA9999999099')
+      - (chia_darwin_launchd_dir ~ '/net.chia.timelord.hw-vdf.plist') is file
+      - log_text is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf$')
+      - "'bootstrap system' not in log_text"

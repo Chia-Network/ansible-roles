@@ -1,0 +1,30 @@
+---
+- name: Snapshot the files after the refusal
+  ansible.builtin.include_tasks: darwin-hw-boards-snapshot.yml
+  vars:
+    hw_snapshot_var: hw_refusal_after
+    hw_snapshot_paths: "{{ hw_refusal_paths }}"
+
+- name: List loaded jobs after the refusal
+  ansible.builtin.find:
+    paths: "{{ launch_state }}/loaded"
+    patterns: "*"
+    file_type: file
+  register: hw_refusal_loaded
+
+- name: Read the refusal launchctl log
+  ansible.builtin.slurp:
+    src: "{{ launch_log }}"
+  register: hw_refusal_log
+
+- name: The refusal changes nothing and does not stop jobs
+  vars:
+    names: "{{ hw_refusal_loaded.files | map(attribute='path') | map('basename') | sort }}"
+    log_text: "{{ hw_refusal_log.content | b64decode }}"
+  ansible.builtin.assert:
+    that:
+      - hw_refusal_before == hw_refusal_after
+      - names == hw_refusal_names
+      - (hw_refusal_client_ran | default(false) | bool) or not ((work ~ '/client-ran') is file)
+      - (hw_refusal_allow_bootout | default(false) | bool) or ('bootout system' not in log_text)
+      - "'bootstrap system' not in log_text"

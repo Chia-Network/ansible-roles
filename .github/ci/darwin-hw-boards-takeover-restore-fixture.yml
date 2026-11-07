@@ -1,0 +1,21 @@
+---
+- name: Plant the old restore wrappers, plists, and loaded jobs
+  ansible.builtin.include_tasks: darwin-hw-boards-legacy-fixture.yml
+  vars:
+    hw_legacy_wrappers:
+      - name: hw-vdf
+        content: "{{ fixture_legacy_wrapper }}"
+      - name: hw-vdf-2
+        content: "{{ fixture_hand_wrapper_9098 }}"
+      - name: hw-vdf-3
+        content: "{{ fixture_unloaded_wrapper_9097 }}"
+    hw_legacy_plists:
+      - label: net.chia.timelord.hw-vdf
+        wrapper: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+      - label: net.chia.timelord.hw-vdf-2
+        wrapper: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-2-run.sh"
+      - label: net.chia.timelord.hw-vdf-3
+        wrapper: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-3-run.sh"
+    hw_legacy_loaded:
+      - net.chia.timelord.hw-vdf
+      - net.chia.timelord.hw-vdf-2

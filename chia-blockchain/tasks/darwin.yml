@@ -83,6 +83,9 @@
         exit_timeout: "{{ chia_darwin_timelord_exit_timeout }}"
         enabled: true
 
+- name: Validate shared ASIC options before changing the host
+  ansible.builtin.include_tasks: darwin-hw-vdf-validate.yml
+
 - name: Ensure the timelord service user exists
   become: true
   ansible.builtin.user:
@@ -360,6 +363,11 @@
 
 - name: Resolve ASIC boards and hw-vdf LaunchDaemon slots
   ansible.builtin.include_tasks: darwin-hw-vdf-boards.yml
+
+# Read-only ownership checks. Keep every deterministic refusal before this
+# run rewrites a wrapper or plist.
+- name: Choose which hw-vdf LaunchDaemons this role will change
+  ansible.builtin.include_tasks: darwin-hw-vdf-launchd.yml
 
 - name: Create the chia virtualenv
   become: true
@@ -650,9 +658,6 @@
 
 - name: Install enabled hw_vdf wrappers
   ansible.builtin.include_tasks: darwin-hw-vdf-install.yml
-
-- name: Choose which hw-vdf LaunchDaemons this role will change
-  ansible.builtin.include_tasks: darwin-hw-vdf-launchd.yml
 
 - name: Install and load LaunchDaemons
   ansible.builtin.include_tasks: darwin-launchd-job.yml

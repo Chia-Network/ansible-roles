@@ -1,0 +1,6 @@
+# Example hw_vdf_client --list output for tests only.
+# Row format: https://raw.githubusercontent.com/Chia-Network/chiavdf/1.2.2/src/hw/ftdi_driver.cpp
+# Not captured from real hardware. The same serial as hw-vdf-list-1.txt at a
+# new location after re-cabling.
+List of available devices:
+Device 0: 'Example Chia ASIC A', loc 25901, serial 'CHIA9999999001A'

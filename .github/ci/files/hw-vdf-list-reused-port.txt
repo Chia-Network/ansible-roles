@@ -1,0 +1,6 @@
+# Example hw_vdf_client --list output for tests only.
+# Row format: https://raw.githubusercontent.com/Chia-Network/chiavdf/1.2.2/src/hw/ftdi_driver.cpp
+# Not captured from real hardware. A new board appears in a port a hidden
+# persisted claim still records.
+List of available devices:
+Device 0: 'Example Chia ASIC A', loc 22002, serial 'CHIA9999999009A'
