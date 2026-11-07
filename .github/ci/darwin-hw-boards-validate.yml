@@ -332,3 +332,17 @@
           - "text.index('include_tasks: darwin-hw-vdf-validate.yml') < text.index('Apply pmset so the host stays awake')"
           - "text.index('include_tasks: darwin-hw-vdf-validate.yml') < text.index('Install Homebrew packages as the connecting user')"
           - "text.index('include_tasks: darwin-hw-vdf-validate.yml') < text.index('Install chiavdf from the Chia Homebrew tap')"
+
+    - name: Boards resolution, launchd ownership, and wrapper install keep that order
+      vars:
+        text: "{{ darwin_tasks.content | b64decode }}"
+        boards: "include_tasks: darwin-hw-vdf-boards.yml"
+        ownership: "include_tasks: darwin-hw-vdf-launchd.yml"
+        install: "include_tasks: darwin-hw-vdf-install.yml"
+      ansible.builtin.assert:
+        that:
+          - "text.count(boards) == 1"
+          - "text.count(ownership) == 1"
+          - "text.count(install) == 1"
+          - "text.index(boards) < text.index(ownership)"
+          - "text.index(ownership) < text.index(install)"

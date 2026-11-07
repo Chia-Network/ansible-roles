@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import base64
-import binascii
-import plistlib
 import re
 from collections.abc import Callable
 from typing import Any
-from xml.parsers.expat import ExpatError
 
 from ansible.errors import AnsibleFilterError
 
@@ -68,26 +65,10 @@ def _slot_id(item: Any) -> int:
     return int(item["id"]) if isinstance(item, dict) else int(item)
 
 
-def _plist_label(result: dict[str, Any]) -> str:
-    source = result.get("source", "LaunchDaemon plist")
-    try:
-        document = plistlib.loads(base64.b64decode(result["content"]))
-    except (
-        binascii.Error,
-        ValueError,
-        TypeError,
-        plistlib.InvalidFileException,
-        ExpatError,
-    ) as error:
-        raise AnsibleFilterError(f"Could not parse {source}: {error}") from error
-    label = document.get("Label") if isinstance(document, dict) else None
-    if not isinstance(label, str) or not label:
-        raise AnsibleFilterError(f"{source} has no LaunchDaemon Label.")
-    return label
-
-
-def _claimed(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    boards: list[dict[str, Any]] = []
+def _claim_entries(
+    results: list[dict[str, Any]],
+) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    entries: list[tuple[dict[str, Any], dict[str, Any]]] = []
     for result in results:
         board_id = _slot_id(result["item"])
         if "content" not in result:
@@ -98,8 +79,14 @@ def _claimed(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
             )
         text = base64.b64decode(result["content"]).decode("utf-8", "replace")
         entry = _parse_claim(text, board_id)
-        if entry is None:
-            continue
+        if entry is not None:
+            entries.append((result, entry))
+    return entries
+
+
+def _claimed(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    boards: list[dict[str, Any]] = []
+    for _result, entry in _claim_entries(results):
         serial = entry["expected_serial"]
         for board in boards:
             if _same_serial(serial, board["expected_serial"]):
@@ -107,6 +94,54 @@ def _claimed(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 raise AnsibleFilterError(message)
         boards.append(entry)
     return boards
+
+
+def _claim_labels(results: list[dict[str, Any]]) -> list[str]:
+    labels = []
+    for result, _entry in _claim_entries(results):
+        item = result["item"]
+        if isinstance(item, dict) and item.get("label"):
+            labels.append(item["label"])
+    return labels
+
+
+def _wrapper_serial(content: str) -> str | None:
+    text = base64.b64decode(content).decode("utf-8", "replace")
+    return _last(text, "SERIAL")
+
+
+def _visible_serials(client: dict[str, Any]) -> list[str]:
+    if client.get("rc") != 0:
+        return []
+    serials = []
+    for line in (client.get("stderr") or "").splitlines():
+        if line.startswith(_DEVICE):
+            row = _ROW.match(line)
+            if row:
+                serials.append(row.group(2))
+    return serials
+
+
+def _hidden_takeover(
+    results: list[dict[str, Any]],
+    labels: list[str],
+    client: dict[str, Any],
+) -> list[str]:
+    wanted = set(labels)
+    visible = _visible_serials(client)
+    hidden = []
+    for result in results:
+        item = result.get("item")
+        if not isinstance(item, dict) or item.get("label") not in wanted:
+            continue
+        if "content" not in result:
+            continue
+        serial = _wrapper_serial(result["content"])
+        if not serial:
+            hidden.append(f"{item['label']} (no SERIAL)")
+        elif not any(_matches(serial, seen) for seen in visible):
+            hidden.append(f"{item['label']} ({serial})")
+    return hidden
 
 
 def _stale(boards: list[dict[str, Any]]) -> str:
@@ -188,12 +223,13 @@ def merge_boards(
 
 
 class FilterModule:  # pylint: disable=too-few-public-methods
-    """Expose the board merge, claim, and plist filters to Ansible."""
+    """Expose the board merge, claim, and takeover filters to Ansible."""
 
     def filters(self) -> dict[str, Callable[..., Any]]:
         """Return the filters provided by this plugin."""
         return {
             "chia_hw_vdf_merge_boards": merge_boards,
             "chia_hw_vdf_claims": _claimed,
-            "chia_hw_vdf_plist_label": _plist_label,
+            "chia_hw_vdf_claim_labels": _claim_labels,
+            "chia_hw_vdf_hidden_takeover": _hidden_takeover,
         }

@@ -4,6 +4,7 @@
     hw_client_guard: "{{ hw_client_guard_labels | default([]) }}"
     hw_client_pre: "{{ hw_client_pre_list | default('') }}"
     hw_client_post: "{{ hw_client_post_list | default('') }}"
+    hw_client_plist_dirs: "{{ hw_client_plist_dirs_list | default([chia_darwin_launchd_dir]) }}"
   ansible.builtin.template:
     src: fake-hw-vdf-client-takeover.sh.j2
     dest: "{{ chia_darwin_hw_vdf_client }}"

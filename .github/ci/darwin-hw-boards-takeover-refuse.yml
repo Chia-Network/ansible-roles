@@ -13,11 +13,8 @@
     chia_darwin_hw_vdf_exit_timeout: 0
     chia_darwin_restart_unload_margin: 1
 
-- name: Install a client that records whether enumeration ran
-  ansible.builtin.include_tasks: darwin-hw-boards-takeover-client.yml
-
-- name: Plant the legacy wrapper and its old plist
-  ansible.builtin.include_tasks: darwin-hw-boards-legacy-slot.yml
+- name: Install the client and plant the old wrapper and plist for the takeover
+  ansible.builtin.include_tasks: darwin-hw-boards-takeover-legacy-client.yml
 
 - name: Make bootout fail while the job stays loaded
   when: hw_takeover_failure == 'fail'

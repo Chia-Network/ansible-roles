@@ -29,7 +29,8 @@
   loop: >-
     {{ [chia_darwin_bin_dir, chia_darwin_log_dir, chia_darwin_launchd_dir,
         chia_darwin_home]
-        + ([launch_state ~ '/loaded'] if launch_state is defined else [])
+        + ([launch_state ~ '/loaded', launch_state ~ '/disabled']
+            if launch_state is defined else [])
         + (hw_tree_dirs | default([])) }}
 
 - name: Install the fake launchctl

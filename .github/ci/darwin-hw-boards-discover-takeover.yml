@@ -3,6 +3,8 @@
   ansible.builtin.include_tasks: darwin-hw-boards-discover-wrapper.yml
   vars:
     hw_wrapper_name: chia-hw-vdf-2-run.sh
+    hw_wrapper_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-2.txt"
+    hw_wrapper_expected_count: 2
     hw_wrapper_content: |
       #!/bin/zsh
       # Not managed by this role.
@@ -12,11 +14,11 @@
 - name: The unowned wrapper keeps its takeover slot and the visible board
   vars:
     discovered: "{{ chia_darwin_hw_vdf_discovered_boards | map(attribute='expected_serial') | list }}"
-    slots: "{{ chia_darwin_hw_vdf_takeover_slots | map('int') | list }}"
+    slots: "{{ chia_darwin_hw_vdf_takeover_labels | sort }}"
   ansible.builtin.assert:
     that:
-      - discovered == ['CHIA9999999001A']
-      - slots == [2]
+      - discovered == ['CHIA9999999001A', 'CHIA9999999002A']
+      - slots == ['net.chia.timelord.hw-vdf-2']
 
 - name: Switch to an explicit inventory in the same play
   ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
@@ -33,7 +35,7 @@
 - name: Changing the mode clears the earlier takeover ownership
   ansible.builtin.assert:
     that:
-      - chia_darwin_hw_vdf_takeover_slots | length == 0
+      - chia_darwin_hw_vdf_takeover_labels | length == 0
       - chia_darwin_hw_vdf_active | length == 3
       - chia_darwin_hw_vdf_active | map(attribute='expected_serial') | list == ['FIX-BOARD-0001', 'FIX-BOARD-0002', 'FIX-BOARD-0003']
       - (chia_darwin_bin_dir ~ '/chia-hw-vdf-2-run.sh') is file
@@ -47,6 +49,8 @@
   ansible.builtin.include_tasks: darwin-hw-boards-discover-wrapper.yml
   vars:
     hw_wrapper_name: chia-hw-vdf-run.sh
+    hw_wrapper_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-2.txt"
+    hw_wrapper_expected_count: 2
     hw_wrapper_content: |
       #!/bin/zsh
       # Managed by the chia-blockchain Ansible role.

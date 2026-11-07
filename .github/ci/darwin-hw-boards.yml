@@ -13,8 +13,8 @@
 - name: Apply LaunchDaemons
   ansible.builtin.import_playbook: darwin-hw-boards-launchd.yml
 
+- name: Takeover behavior
+  ansible.builtin.import_playbook: darwin-hw-boards-takeover.yml
+
 - name: Restart handler
   ansible.builtin.import_playbook: darwin-hw-boards-restart.yml
-
-- name: Takeover slot IDs
-  ansible.builtin.import_playbook: darwin-hw-boards-takeover-ids.yml

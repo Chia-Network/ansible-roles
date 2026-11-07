@@ -26,5 +26,5 @@
       - hw_refusal_before == hw_refusal_after
       - names == hw_refusal_names
       - (hw_refusal_client_ran | default(false) | bool) or not ((work ~ '/client-ran') is file)
-      - "'bootout system' not in log_text"
+      - (hw_refusal_allow_bootout | default(false) | bool) or ('bootout system' not in log_text)
       - "'bootstrap system' not in log_text"

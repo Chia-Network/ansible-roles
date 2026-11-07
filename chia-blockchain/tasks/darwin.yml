@@ -364,6 +364,11 @@
 - name: Resolve ASIC boards and hw-vdf LaunchDaemon slots
   ansible.builtin.include_tasks: darwin-hw-vdf-boards.yml
 
+# Read-only ownership checks. Keep every deterministic refusal before this
+# run rewrites a wrapper or plist.
+- name: Choose which hw-vdf LaunchDaemons this role will change
+  ansible.builtin.include_tasks: darwin-hw-vdf-launchd.yml
+
 - name: Create the chia virtualenv
   become: true
   become_user: "{{ user }}"
@@ -653,9 +658,6 @@
 
 - name: Install enabled hw_vdf wrappers
   ansible.builtin.include_tasks: darwin-hw-vdf-install.yml
-
-- name: Choose which hw-vdf LaunchDaemons this role will change
-  ansible.builtin.include_tasks: darwin-hw-vdf-launchd.yml
 
 - name: Install and load LaunchDaemons
   ansible.builtin.include_tasks: darwin-launchd-job.yml

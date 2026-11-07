@@ -63,21 +63,33 @@ Merge is by serial:
 
 Auto-discovery also takes over legacy and hand-written wrappers. With an empty
 board list and an empty legacy serial, any readable wrapper at a role slot
-that is not a managed per-board claim is stopped first: the role boots out
+that is not a managed per-board claim becomes a takeover candidate. For each
+candidate, one `grep` checks every `<launchd_dir>/*.plist` for that wrapper.
+Discovery fails closed when the directory or a plist cannot be read, or when
+any plist other than `<label>.plist` runs the wrapper. Otherwise it boots out
 that slot's LaunchDaemon and waits for it to unload before running `--list`,
-so a board the old client was holding becomes visible. The role only stops a
-slot when that slot's own plist is the only one that runs its wrapper and the
-plist's Label also names that slot; if any other plist runs the same wrapper, a
-Label does not match, or the plist search skips a path, discovery fails closed
-instead of stopping or overwriting a wrapper another job uses. The old plist
+so a board the old client was holding becomes visible. After `--list`, every
+takeover candidate's stored `SERIAL` must be visible; a still-hidden serial
+means another job or process, inside or outside the configured LaunchDaemons
+directory, holds the board (for example a LaunchAgent or a manual run), the
+plist's actual `Label` differs, or the board is detached, so discovery fails
+closed and restores the old jobs. This catches holders the plist grep cannot
+see without scanning the whole filesystem.
+
+The jobs for previously loaded takeover slots are down only while `--list` and
+that visibility check run. Discovery restarts them in an `always` block through
+the normal restart helper (`enable`, `bootstrap`, then `disable` when
+`start_on_boot` is false), whether the takeover succeeds or fails. The old plist
 and wrapper stay until the normal install or retire step replaces or removes
-them. If enumeration or
-merge fails, discovery restarts the old jobs it stopped and leaves the files
-in place. The run does not preserve or fail on a hand-made wrapper;
-interrupting its job is intentional. A managed per-board claim is left running
-and keeps its ID, which is how held-board reruns stay stable. Explicit
-`chia_darwin_hw_vdf_boards` and the legacy serial path do not take anything
-over and keep the existing ownership refusal.
+them. Restored processes keep running after a later task fails, but a crash or
+reboot after some wrapper or plist writes and before the run completes can start
+an incomplete new on-disk set. The ordered restart handler has its own brief
+window after it stops changed boards and before it starts them in ID order, and
+a failed restore reports its real error instead of hiding it. This is not an
+all-role transaction; each step has its own failure window. A managed per-board
+claim is left running and keeps its ID, which is how held-board reruns stay
+stable. Explicit `chia_darwin_hw_vdf_boards` and the legacy serial path do not
+take anything over and keep the existing ownership refusal.
 
 This preserves IDs, masks, wrappers, and loaded jobs when every board is held
 (header-only `--list`) or only some are held. Discovery fails when the merged
@@ -85,7 +97,8 @@ set is empty or has more than the allowed slots, when `--list` exits non-zero
 (including `No FTDI devices connected.`), or when its output cannot be parsed.
 A zero exit with only the header is success when wrappers already claim
 boards; with no claimed boards it fails as an empty merged set. It also fails
-if a role-owned wrapper cannot be read or a per-board wrapper has an invalid
+when a takeover wrapper is still hidden after its job stops, when a
+role-owned wrapper cannot be read, or when a per-board wrapper has an invalid
 SERIAL or DEVICE_LOC, so a partial read cannot silently retire a board.
 
 Limitations: a held board's location cannot be refreshed because `--list`

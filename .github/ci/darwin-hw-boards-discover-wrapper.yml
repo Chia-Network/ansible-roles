@@ -11,7 +11,8 @@
 - name: Discover one board while {{ hw_wrapper_name }} occupies a slot
   ansible.builtin.include_tasks: darwin-hw-boards-client.yml
   vars:
-    hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-1.txt"
+    hw_vdf_list_fixture: >-
+      {{ hw_wrapper_list_fixture | default(hw_vdf_list_dir ~ '/hw-vdf-list-1.txt') }}
 
 - name: Resolve with the {{ hw_wrapper_name }} wrapper present
   ansible.builtin.include_role:
@@ -23,7 +24,7 @@
     board: "{{ chia_darwin_hw_vdf_active | first }}"
   ansible.builtin.assert:
     that:
-      - chia_darwin_hw_vdf_active | length == 1
+      - chia_darwin_hw_vdf_active | length == hw_wrapper_expected_count | default(1) | int
       - (board.id | int) == 1
       - board.expected_serial == "CHIA9999999001A"
       - (chia_darwin_bin_dir ~ '/' ~ hw_wrapper_name) is file

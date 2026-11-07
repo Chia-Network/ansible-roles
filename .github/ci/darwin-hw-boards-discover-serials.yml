@@ -96,7 +96,7 @@
   ansible.builtin.assert:
     that:
       - chia_darwin_hw_vdf_active | length == 2
-      - stored_loc == 23001
+      - (stored_loc | int) == 23001
       - chia_darwin_hw_vdf_active | map(attribute='device_loc') | map('int') | list == [23001, 25901]
       - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2]
 - name: Remove the exact-owner rule wrapper fixture
