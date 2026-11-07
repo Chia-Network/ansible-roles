@@ -39,6 +39,29 @@ jobs:
       - name: Check Darwin restart and pip assumptions
         run: ansible-playbook .github/ci/darwin-assumptions.yml
 
+      - name: Run Darwin database seed tests
+        env:
+          ANSIBLE_ROLES_PATH: ${{ github.workspace }}
+        run: ansible-playbook .github/ci/darwin-db-seed-tests.yml
+
+      - name: Check a second Darwin database seed run is idempotent
+        env:
+          ANSIBLE_ROLES_PATH: ${{ github.workspace }}
+        run: |
+          root="$RUNNER_TEMP/darwin-db-seed-idempotence"
+          rm -rf "$root"
+          ansible-playbook .github/ci/darwin-db-seed-idempotence.yml -e "test_root=$root"
+          ansible-playbook .github/ci/darwin-db-seed-idempotence.yml -e "test_root=$root" | tee "$RUNNER_TEMP/darwin-db-seed-idempotence-second.log"
+          grep -E 'changed=0.*failed=0' "$RUNNER_TEMP/darwin-db-seed-idempotence-second.log"
+
+      - name: Check Darwin database seed check-mode safety
+        env:
+          ANSIBLE_ROLES_PATH: ${{ github.workspace }}
+        run: |
+          root="$RUNNER_TEMP/darwin-db-seed-checkmode"
+          rm -rf "$root"
+          ansible-playbook --check -e "test_root=$root" .github/ci/darwin-db-seed-check-mode.yml
+
       - name: Prove virtualenv pip works without packaging on the module interpreter
         run: |
           python3 -m venv "$RUNNER_TEMP/bare-interpreter"

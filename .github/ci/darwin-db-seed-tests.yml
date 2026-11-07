@@ -1,0 +1,485 @@
+---
+# Local tests for chia-blockchain/tasks/darwin-db-seed.yml. They use a fake aws
+# executable and local fixtures. No S3 bucket, Mac, launchd job, or external
+# volume is touched.
+- name: Test the Darwin database seed without S3 or a Mac
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+  tasks:
+    - name: Create a temporary test root
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: " darwin db seed"
+      register: darwin_db_seed_temp
+
+    - name: Record the test root
+      ansible.builtin.set_fact:
+        test_root: "{{ darwin_db_seed_temp.path }}"
+        mainnet_root: "{{ darwin_db_seed_temp.path }}/internal/mainnet"
+        existing_root: "{{ darwin_db_seed_temp.path }}/existing/mainnet"
+        directory_root: "{{ darwin_db_seed_temp.path }}/directory/mainnet"
+        symlink_root: "{{ darwin_db_seed_temp.path }}/symlink/mainnet"
+        boundary_root: "{{ darwin_db_seed_temp.path }}/boundary/mainnet"
+        stub_root: "{{ darwin_db_seed_temp.path }}/stub/mainnet"
+        wal_root: "{{ darwin_db_seed_temp.path }}/stale-wal/mainnet"
+        large_loaded_root: "{{ darwin_db_seed_temp.path }}/large-loaded/mainnet"
+        running_root: "{{ darwin_db_seed_temp.path }}/running/mainnet"
+        publish_root: "{{ darwin_db_seed_temp.path }}/publish-failure/mainnet"
+        cache_publish_root: "{{ darwin_db_seed_temp.path }}/cache-publish-failure/mainnet"
+        publish_files:
+          - height-to-hash
+          - sub-epoch-summaries
+          - blockchain_v2_mainnet.sqlite
+
+    - name: Create the shared fixtures and fake tools
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-setup.yml"
+
+    - name: Reset the fake tool state
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-reset-tools.yml"
+
+    - name: Prepare the scenario directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ existing_root }}/db"
+        - "{{ directory_root }}/db"
+        - "{{ symlink_root }}/db"
+        - "{{ boundary_root }}/db"
+        - "{{ stub_root }}/db"
+        - "{{ wal_root }}/db"
+        - "{{ large_loaded_root }}/db"
+        - "{{ running_root }}/db"
+        - "{{ publish_root }}/db"
+        - "{{ cache_publish_root }}/db"
+
+    - name: Seed an absent local-internal database
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
+      vars:
+        case:
+          name: absent local-internal
+          root: "{{ mainnet_root }}"
+
+    - name: Assert the local-internal database was seeded
+      ansible.builtin.assert:
+        that:
+          - lookup('file', mainnet_root ~ '/db/blockchain_v2_mainnet.sqlite') == fixture_main
+          - lookup('file', mainnet_root ~ '/db/height-to-hash') == fixture_h2h
+          - lookup('file', mainnet_root ~ '/db/sub-epoch-summaries') == fixture_ses
+          - "'s3://test-bucket/mainnet/blockchain_v2_mainnet.sqlite' in lookup('file', test_root ~ '/aws.log')"
+          - "'s3://test-bucket/mainnet/height-to-hash' in lookup('file', test_root ~ '/aws.log')"
+          - "'s3://test-bucket/mainnet/sub-epoch-summaries' in lookup('file', test_root ~ '/aws.log')"
+
+    - name: Inspect the seeded local-internal database
+      ansible.builtin.stat:
+        path: "{{ mainnet_root }}/db/blockchain_v2_mainnet.sqlite"
+      register: darwin_db_seed_internal_main
+
+    - name: Inspect the local-internal staging directory
+      ansible.builtin.stat:
+        path: "{{ mainnet_root }}/db/.chia-s3-seed-mainnet"
+      register: darwin_db_seed_internal_staging
+
+    - name: Assert ownership, permissions, and staging cleanup
+      ansible.builtin.assert:
+        that:
+          - darwin_db_seed_internal_main.stat.pw_name == test_user
+          - darwin_db_seed_internal_main.stat.gr_name == test_group
+          - darwin_db_seed_internal_main.stat.mode == "0644"
+          - not (darwin_db_seed_internal_staging.stat.exists | default(false))
+
+    - name: Record the first-run database and download state
+      ansible.builtin.set_fact:
+        first_run_log_size: "{{ lookup('file', test_root ~ '/aws.log') | length }}"
+        first_run_inode: "{{ darwin_db_seed_internal_main.stat.inode }}"
+        first_run_size: "{{ darwin_db_seed_internal_main.stat.size }}"
+        first_run_mtime: "{{ darwin_db_seed_internal_main.stat.mtime }}"
+
+    - name: Run the local-internal seed a second time
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
+      vars:
+        case:
+          name: second local-internal run
+          root: "{{ mainnet_root }}"
+
+    - name: Inspect the database after the second run
+      ansible.builtin.stat:
+        path: "{{ mainnet_root }}/db/blockchain_v2_mainnet.sqlite"
+      register: darwin_db_seed_internal_second
+
+    - name: A second successful run does not redownload or change the database
+      ansible.builtin.assert:
+        that:
+          - (lookup('file', test_root ~ '/aws.log') | length) == (first_run_log_size | int)
+          - darwin_db_seed_internal_second.stat.inode == (first_run_inode | int)
+          - darwin_db_seed_internal_second.stat.size == (first_run_size | int)
+          - darwin_db_seed_internal_second.stat.mtime == (first_run_mtime | float)
+
+    - name: Seed an absent local-external testnet11 database through the symlink
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
+      vars:
+        case:
+          name: absent local-external testnet11
+          root: "{{ test_root }}/home ext/.chia/testnet11"
+          topology: local-external
+          network: testnet11
+
+    - name: Assert the external testnet11 database was seeded
+      ansible.builtin.assert:
+        that:
+          - lookup('file', external_root ~ '/testnet11/db/blockchain_v2_testnet11.sqlite') == fixture_main
+          - lookup('file', external_root ~ '/testnet11/db/height-to-hash') == fixture_h2h
+          - lookup('file', external_root ~ '/testnet11/db/sub-epoch-summaries') == fixture_ses
+          - "'s3://test-bucket/testnet11/blockchain_v2_testnet11.sqlite' in lookup('file', test_root ~ '/aws.log')"
+          - "'s3://test-bucket/testnet11/height-to-hash' in lookup('file', test_root ~ '/aws.log')"
+          - "'s3://test-bucket/testnet11/sub-epoch-summaries' in lookup('file', test_root ~ '/aws.log')"
+
+    - name: Reset the fake tool state before the existing database case
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-reset-tools.yml"
+
+    - name: Write the existing large database and sidecars
+      ansible.builtin.copy:
+        content: "{{ item.content }}"
+        dest: "{{ existing_root }}/db/{{ item.name }}"
+        mode: "0644"
+      loop:
+        - name: blockchain_v2_mainnet.sqlite
+          content: "{{ 'K' * 11000 }}"
+        - name: height-to-hash
+          content: old-height-to-hash
+        - name: sub-epoch-summaries
+          content: old-sub-epoch-summaries
+        - name: blockchain_v2_mainnet.sqlite-wal
+          content: old-wal
+        - name: blockchain_v2_mainnet.sqlite-shm
+          content: old-shm
+        - name: blockchain_v2_mainnet.sqlite-journal
+          content: old-journal
+
+    - name: Preserve an existing non-stub database and its sidecars
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
+      vars:
+        case:
+          name: existing large database
+          root: "{{ existing_root }}"
+
+    - name: Assert the existing database, caches, and sidecars were not touched
+      ansible.builtin.assert:
+        that:
+          - lookup('file', existing_root ~ '/db/blockchain_v2_mainnet.sqlite') == ('K' * 11000)
+          - lookup('file', existing_root ~ '/db/height-to-hash') == 'old-height-to-hash'
+          - lookup('file', existing_root ~ '/db/sub-epoch-summaries') == 'old-sub-epoch-summaries'
+          - lookup('file', existing_root ~ '/db/blockchain_v2_mainnet.sqlite-wal') == 'old-wal'
+          - lookup('file', existing_root ~ '/db/blockchain_v2_mainnet.sqlite-shm') == 'old-shm'
+          - lookup('file', existing_root ~ '/db/blockchain_v2_mainnet.sqlite-journal') == 'old-journal'
+          - (lookup('file', test_root ~ '/aws.log') | length) == 0
+
+    - name: Prepare a directory at the main database path
+      ansible.builtin.file:
+        path: "{{ directory_root }}/db/blockchain_v2_mainnet.sqlite"
+        state: directory
+        mode: "0755"
+
+    - name: Preserve a directory at the main database path
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
+      vars:
+        case:
+          name: directory at main path
+          root: "{{ directory_root }}"
+
+    - name: Inspect the directory at the main database path
+      ansible.builtin.stat:
+        path: "{{ directory_root }}/db/blockchain_v2_mainnet.sqlite"
+      register: darwin_db_seed_directory
+
+    - name: Assert the directory was not removed or replaced
+      ansible.builtin.assert:
+        that:
+          - darwin_db_seed_directory.stat.isdir | default(false)
+          - (lookup('file', test_root ~ '/aws.log') | length) == 0
+
+    - name: Prepare a symlink at the main database path
+      ansible.builtin.copy:
+        content: "{{ 'L' * 12000 }}"
+        dest: "{{ symlink_root }}/linked-database.sqlite"
+        mode: "0644"
+
+    - name: Create the main database symlink
+      ansible.builtin.file:
+        src: "{{ symlink_root }}/linked-database.sqlite"
+        dest: "{{ symlink_root }}/db/blockchain_v2_mainnet.sqlite"
+        state: link
+        force: true
+
+    - name: Preserve a symlink at the main database path
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
+      vars:
+        case:
+          name: symlink at main path
+          root: "{{ symlink_root }}"
+
+    - name: Inspect the symlink at the main database path
+      ansible.builtin.stat:
+        path: "{{ symlink_root }}/db/blockchain_v2_mainnet.sqlite"
+        follow: false
+      register: darwin_db_seed_symlink
+
+    - name: Assert the symlink and its target were not replaced
+      ansible.builtin.assert:
+        that:
+          - darwin_db_seed_symlink.stat.islnk | default(false)
+          - lookup('file', symlink_root ~ '/linked-database.sqlite') == ('L' * 12000)
+          - (lookup('file', test_root ~ '/aws.log') | length) == 0
+
+    - name: Prepare a database one byte above the stub limit
+      ansible.builtin.copy:
+        content: "{{ 'B' * 10241 }}"
+        dest: "{{ boundary_root }}/db/blockchain_v2_mainnet.sqlite"
+        mode: "0644"
+
+    - name: Preserve a database one byte above the stub limit
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
+      vars:
+        case:
+          name: boundary database
+          root: "{{ boundary_root }}"
+
+    - name: Assert the 10241-byte database was preserved
+      ansible.builtin.assert:
+        that:
+          - lookup('file', boundary_root ~ '/db/blockchain_v2_mainnet.sqlite') == ('B' * 10241)
+          - (lookup('file', test_root ~ '/aws.log') | length) == 0
+
+    - name: Prepare a database exactly at the stub limit
+      ansible.builtin.copy:
+        content: "{{ 'S' * 10240 }}"
+        dest: "{{ stub_root }}/db/blockchain_v2_mainnet.sqlite"
+        mode: "0644"
+
+    - name: Replace a database exactly at the documented stub limit
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
+      vars:
+        case:
+          name: stub database
+          root: "{{ stub_root }}"
+
+    - name: Assert the stub was replaced with the snapshot
+      ansible.builtin.assert:
+        that:
+          - lookup('file', stub_root ~ '/db/blockchain_v2_mainnet.sqlite') == fixture_main
+          - lookup('file', stub_root ~ '/db/height-to-hash') == fixture_h2h
+          - lookup('file', stub_root ~ '/db/sub-epoch-summaries') == fixture_ses
+          - (lookup('file', test_root ~ '/aws.log') | split('\n') | reject('eq', '') | list | length) == 3
+
+    - name: Reset the fake tool state before the stale-sidecar case
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-reset-tools.yml"
+
+    - name: Prepare a stub with stale WAL, SHM, and journal sidecars
+      ansible.builtin.copy:
+        content: "{{ item.content }}"
+        dest: "{{ wal_root }}/db/{{ item.name }}"
+        mode: "0644"
+      loop:
+        - name: blockchain_v2_mainnet.sqlite
+          content: "{{ 'S' * 8192 }}"
+        - name: blockchain_v2_mainnet.sqlite-wal
+          content: "{{ 'W' * 12392 }}"
+        - name: blockchain_v2_mainnet.sqlite-shm
+          content: stale-shm
+        - name: blockchain_v2_mainnet.sqlite-journal
+          content: stale-journal
+
+    - name: Replace a stub with stale database sidecars
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
+      vars:
+        case:
+          name: stale sidecars
+          root: "{{ wal_root }}"
+
+    - name: Inspect the replaced stub and sidecars
+      ansible.builtin.stat:
+        path: "{{ wal_root }}/db/{{ item }}"
+      loop:
+        - blockchain_v2_mainnet.sqlite
+        - blockchain_v2_mainnet.sqlite-wal
+        - blockchain_v2_mainnet.sqlite-shm
+        - blockchain_v2_mainnet.sqlite-journal
+      register: darwin_db_seed_stale_sidecars
+
+    - name: Assert stale sidecars are gone and the snapshot was published
+      ansible.builtin.assert:
+        that:
+          - lookup('file', wal_root ~ '/db/blockchain_v2_mainnet.sqlite') == fixture_main
+          - darwin_db_seed_stale_sidecars.results[1].stat.exists is false
+          - darwin_db_seed_stale_sidecars.results[2].stat.exists is false
+          - darwin_db_seed_stale_sidecars.results[3].stat.exists is false
+
+    - name: Reset the fake tool state before the loaded large-database case
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-reset-tools.yml"
+
+    - name: Prepare a large database with the full node loaded
+      ansible.builtin.copy:
+        content: "{{ 'K' * 11000 }}"
+        dest: "{{ large_loaded_root }}/db/blockchain_v2_mainnet.sqlite"
+        mode: "0644"
+
+    - name: A loaded full node with a large database is not touched
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
+      vars:
+        case:
+          name: loaded large database
+          root: "{{ large_loaded_root }}"
+          launchctl: loaded
+
+    - name: Assert the loaded large database took no action
+      ansible.builtin.assert:
+        that:
+          - lookup('file', large_loaded_root ~ '/db/blockchain_v2_mainnet.sqlite') == ('K' * 11000)
+          - (lookup('file', test_root ~ '/aws.log') | length) == 0
+          - (lookup('file', test_root ~ '/launchctl.log') | length) == 0
+
+    - name: A loaded full node with a stub is refused before any write
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
+      vars:
+        case:
+          name: loaded stub
+          root: "{{ running_root }}"
+          launchctl: loaded
+          expect_failure: "LaunchDaemon is loaded"
+
+    - name: Inspect the loaded-node database and staging paths
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ running_root }}/db/blockchain_v2_mainnet.sqlite"
+        - "{{ running_root }}/db/.chia-s3-seed-mainnet"
+      register: darwin_db_seed_running
+
+    - name: Assert the loaded-node case wrote nothing
+      ansible.builtin.assert:
+        that:
+          - darwin_db_seed_running.results | rejectattr('stat.exists') | list | length == 2
+          - (lookup('file', test_root ~ '/aws.log') | length) == 0
+          - (lookup('file', test_root ~ '/launchctl.log') | length) > 0
+
+    - name: Each snapshot copy failure is fatal and publishes no partial database
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-failure-case.yml"
+      loop:
+        - name: height-to-hash
+          file: height-to-hash
+        - name: sub-epoch-summaries
+          file: sub-epoch-summaries
+      loop_control:
+        loop_var: failure_case
+        label: "{{ failure_case.name }}"
+
+    - name: Failed publish renames keep the main database and recover
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-publish-failure-case.yml"
+      loop:
+        - name: main database publish failure
+          root: "{{ publish_root }}"
+          file: blockchain_v2_mainnet.sqlite
+          published_before:
+            - height-to-hash
+            - sub-epoch-summaries
+        - name: cache publish failure
+          root: "{{ cache_publish_root }}"
+          file: height-to-hash
+          published_before: []
+      loop_control:
+        loop_var: publish_case
+        label: "{{ publish_case.name }}"
+
+    - name: Report the temporary test root
+      ansible.builtin.debug:
+        msg: "Darwin database seed tests passed under {{ test_root }}"
+
+- name: Verify the Darwin database seed runs as the service user
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+  vars:
+    ansible_pipelining: true
+  tasks:
+    - name: Create a temporary service-user test root
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: "-darwin-db-seed-become"
+      register: darwin_db_seed_become_temp
+
+    - name: Record the service-user test root
+      ansible.builtin.set_fact:
+        test_root: "{{ darwin_db_seed_become_temp.path }}"
+
+    - name: Create the shared fixtures and fake tools
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-setup.yml"
+
+    - name: Use a distinct service user and a logging fake sudo
+      ansible.builtin.set_fact:
+        user: "{{ test_user }}-seed-service"
+        chia_darwin_launchd_become: true
+        ansible_become_exe: "{{ test_root }}/bin/sudo"
+
+    - name: Force a publish failure to exercise cleanup and rescue as the service user
+      ansible.builtin.copy:
+        content: "blockchain_v2_mainnet.sqlite\n"
+        dest: "{{ test_root }}/fail-publish"
+        mode: "0644"
+
+    - name: Run the seed with become on
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
+      vars:
+        case:
+          name: service-user become
+          root: "{{ test_root }}/become/mainnet"
+          expect_failure: "S3 database seed failed"
+
+    - name: Read the fake sudo log
+      ansible.builtin.slurp:
+        path: "{{ test_root }}/sudo.log"
+      register: darwin_db_seed_become_sudo
+
+    # The seed makes one launchctl probe as root, then 18 service-user calls:
+    # staging cleanup/create, 3 downloads, 3 staged stats, 3 permission
+    # changes, 3 stale-sidecar removals, 2 cache renames, the failing main
+    # rename, and the rescue staging cleanup.
+    - name: Assert all seed tasks used the service user except the launchctl probe
+      vars:
+        sudo_lines: "{{ darwin_db_seed_become_sudo.content | b64decode | split('\n') | reject('eq', '') | list }}"
+      ansible.builtin.assert:
+        that:
+          - sudo_lines | length == 19
+          - sudo_lines | select('search', '-u root ') | list | length == 1
+          - sudo_lines[0] is search('-u root ')
+          - sudo_lines | reject('search', '-u (root|' ~ user ~ ') ') | list | length == 0
+          - sudo_lines | select('search', '-u ' ~ user ~ ' ') | list | length == 18
+        fail_msg: >-
+          Expected exactly 19 sudo lines: one launchctl probe as the default
+          become user and 18 seed calls as {{ user }}. Log:
+          {{ sudo_lines | join(' | ') }}
+
+    - name: Inspect the failed service-user main database path
+      ansible.builtin.stat:
+        path: "{{ test_root }}/become/mainnet/db/blockchain_v2_mainnet.sqlite"
+      register: darwin_db_seed_become_main
+
+    - name: Require the main database path to remain the failure obstacle
+      ansible.builtin.assert:
+        that:
+          - darwin_db_seed_become_main.stat.isdir | default(false)
+
+    - name: Inspect the failed service-user staging directory
+      ansible.builtin.stat:
+        path: "{{ test_root }}/become/mainnet/db/.chia-s3-seed-mainnet"
+      register: darwin_db_seed_become_staging
+
+    - name: Require the service-user rescue to remove the staging directory
+      ansible.builtin.assert:
+        that:
+          - not (darwin_db_seed_become_staging.stat.exists | default(false))

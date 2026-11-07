@@ -1,0 +1,12 @@
+---
+# Shared reset for fake tool state. reset_files defaults to the download markers
+# and all tool logs; callers pass a smaller subset to keep intentional failure
+# markers or logs needed by later assertions.
+- name: Reset the fake tool state
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ test_root }}/{{ item }}"
+    mode: "0644"
+  loop: "{{ reset_files | default(['aws.log', 'fail-file', 'fail-publish', 'launchctl.log', 'sudo.log']) }}"
+  loop_control:
+    label: "{{ item }}"
