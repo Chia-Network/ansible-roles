@@ -1,0 +1,38 @@
+---
+# Shared private tree for the Darwin hw-vdf CI plays. The caller sets work to a
+# directory under RUNNER_TEMP, optionally adds hw_tree_dirs, and can turn off
+# the wipe or the fake launchctl when the play only needs paths.
+- name: Start from an empty hw-vdf test tree
+  when: hw_tree_wipe | default(true) | bool
+  ansible.builtin.file:
+    path: "{{ work }}"
+    state: absent
+
+- name: Point hw-vdf test paths at the caller's tree
+  ansible.builtin.set_fact:
+    chia_darwin_home: "{{ work }}/home"
+    chia_darwin_bin_dir: "{{ work }}/home/bin"
+    chia_darwin_log_dir: "{{ work }}/home/Library/Logs/chia"
+    chia_darwin_etc_dir: "{{ work }}/home/etc"
+    chia_root: "{{ work }}/home/.chia/mainnet"
+    chia_darwin_env_script: "{{ work }}/home/bin/chia-env.sh"
+    chia_darwin_launchctl: "{{ work }}/launchctl"
+    chia_darwin_launchd_dir: "{{ work }}/LaunchDaemons"
+    chia_darwin_topology: remote-node
+    chia_darwin_hw_vdf_client: "{{ work }}/hw_vdf_client"
+
+- name: Create the hw-vdf test tree
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: >-
+    {{ [chia_darwin_bin_dir, chia_darwin_log_dir, chia_darwin_launchd_dir,
+        chia_darwin_home]
+        + ([launch_state ~ '/loaded', launch_state ~ '/disabled']
+            if launch_state is defined else [])
+        + (hw_tree_dirs | default([])) }}
+
+- name: Install the fake launchctl
+  when: hw_tree_launchctl | default(true) | bool
+  ansible.builtin.include_tasks: darwin-hw-boards-launchctl.yml

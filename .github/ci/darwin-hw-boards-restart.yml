@@ -6,18 +6,17 @@
   connection: local
   gather_facts: false
   vars:
-    work: /tmp/chia-darwin-hw-restart
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-restart"
     launch_log: "{{ work }}/launchctl.log"
     launch_state: "{{ work }}/state"
   tasks:
-    - name: Start from an empty restart tree
-      ansible.builtin.file:
-        path: "{{ work }}"
-        state: absent
-    - name: Point launchctl at this play
+    - name: Create the shared restart tree
+      vars:
+        hw_tree_dirs:
+          - "{{ launch_state }}/hold"
+      ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
+    - name: Point restart state at this play
       ansible.builtin.set_fact:
-        chia_darwin_launchctl: "{{ work }}/launchctl"
-        chia_darwin_launchd_dir: "{{ work }}/LaunchDaemons"
         chia_darwin_launchd_become: false
         chia_darwin_start_now: true
         chia_darwin_start_on_boot: true
@@ -40,17 +39,6 @@
             throttle: 15
             exit_timeout: 0
             enabled: true
-    - name: Create the restart tree
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: directory
-        mode: "0755"
-      loop:
-        - "{{ chia_darwin_launchd_dir }}"
-        - "{{ launch_state }}/loaded"
-        - "{{ launch_state }}/hold"
-    - name: Install the fake launchctl
-      ansible.builtin.include_tasks: darwin-hw-boards-launchctl.yml
     - name: Plant the board plist and a loaded daemon
       ansible.builtin.copy:
         dest: "{{ item }}"
@@ -109,3 +97,50 @@
           - "'daemon.plist' not in log_text"
           - (launch_state ~ '/loaded/com.example.keep') is file
           - (launch_state ~ '/loaded/net.chia.timelord.daemon') is file
+
+- name: Stop helper accepts a failed bootout after the job is gone
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-stop-gone"
+    launch_log: "{{ work }}/launchctl.log"
+    launch_state: "{{ work }}/state"
+  tasks:
+    - name: Create the shared failed-bootout tree
+      vars:
+        hw_tree_dirs:
+          - "{{ launch_state }}/fail"
+      ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
+    - name: Set short unload wait for the failed-bootout case
+      ansible.builtin.set_fact:
+        chia_darwin_launchd_become: false
+        chia_darwin_restart_unload_margin: 1
+    - name: Make bootout fail for an unloaded job
+      ansible.builtin.copy:
+        dest: "{{ launch_state }}/fail/net.chia.timelord.hw-vdf"
+        mode: "0644"
+        content: "failure\n"
+    - name: Prepare an empty failed-bootout log
+      ansible.builtin.copy:
+        dest: "{{ launch_log }}"
+        mode: "0644"
+        content: ""
+    - name: Stop a job whose bootout fails but which is already gone
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-stop-job.yml
+      vars:
+        chia_job:
+          label: net.chia.timelord.hw-vdf
+          exit_timeout: 0
+    - name: Read the failed-bootout stop log
+      ansible.builtin.slurp:
+        src: "{{ launch_log }}"
+      register: gone_log
+    - name: A failed bootout of a gone job is accepted without bootstrap
+      vars:
+        log_text: "{{ gone_log.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - log_text is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf$')
+          - log_text is search('(?m)^print system/net\\.chia\\.timelord\\.hw-vdf$')
+          - "'bootstrap system' not in log_text"

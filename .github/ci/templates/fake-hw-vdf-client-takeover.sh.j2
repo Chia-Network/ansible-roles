@@ -1,0 +1,45 @@
+#!/bin/sh
+: >"{{ work }}/client-ran"
+{% for label in hw_client_guard %}
+if [ -f "{{ launch_state }}/loaded/{{ label }}" ]; then
+	echo "{{ label }} still holds a board before --list" >&2
+	exit 93
+fi
+{% endfor %}
+{{ hw_client_pre }}
+# Model the real client: a board held by a running job is not listed. Hide
+# the serial of every job that is still loaded, including jobs outside the
+# slots this takeover stopped and plists whose Label differs from their file
+# name.
+hidden="{{ work }}/client-list"
+cp "{{ hw_vdf_list_fixture }}" "$hidden"
+for marker in "{{ launch_state }}"/loaded/*; do
+	[ -f "$marker" ] || continue
+	label=$(basename "$marker")
+	plist=
+	{% for dir in hw_client_plist_dirs %}
+	if [ -z "$plist" ] && [ -f "{{ dir }}/$label.plist" ]; then
+		plist="{{ dir }}/$label.plist"
+	fi
+	if [ -z "$plist" ]; then
+		for candidate in "{{ dir }}"/*.plist; do
+			[ -f "$candidate" ] || continue
+			if grep -q "<string>$label</string>" "$candidate"; then
+				plist=$candidate
+				break
+			fi
+		done
+	fi
+	{% endfor %}
+	[ -n "$plist" ] || continue
+	wrapper=$(sed -n 's:.*<string>\(.*chia-hw-vdf.*-run\.sh\)</string>.*:\1:p' "$plist" | head -n 1)
+	[ -f "$wrapper" ] || continue
+	serial=$(sed -n 's/^SERIAL=//p' "$wrapper" | tail -n 1)
+	serial=$(printf '%s\n' "$serial" | sed -e "s/^[\"']//" -e "s/[\"']$//" -e 's/[[:space:]]*#.*$//')
+	[ -n "$serial" ] || continue
+	grep -v "serial '$serial'" "$hidden" >"$hidden.next" || true
+	grep -v "serial '${serial}A'" "$hidden.next" >"$hidden" || true
+	rm -f "$hidden.next"
+done
+cat "$hidden" >&2
+{{ hw_client_post }}

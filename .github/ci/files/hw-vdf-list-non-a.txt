@@ -1,0 +1,5 @@
+# Example hw_vdf_client --list output for tests only.
+# Not captured from real hardware. This synthetic serial does not end in A,
+# so a loose pattern can select it without the role trimming its last character.
+List of available devices:
+Device 0: 'Example Chia ASIC A', loc 28001, serial 'SYNTH0000000042'

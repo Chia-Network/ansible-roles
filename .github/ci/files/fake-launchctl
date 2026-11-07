@@ -35,6 +35,10 @@ print)
 	;;
 bootout)
 	label=${1#system/}
+	if [ -f "$STATE/fail/$label" ]; then
+		echo "bootout failed $label" >&2
+		exit 5
+	fi
 	if [ ! -f "$STATE/loaded/$label" ]; then
 		echo "not loaded $label" >&2
 		exit 3
@@ -45,6 +49,10 @@ bootout)
 bootstrap)
 	plist=$2
 	label=$(basename "$plist" .plist)
+	if [ -f "$STATE/disabled/$label" ]; then
+		echo "bootstrap failed: $label is disabled" >&2
+		exit 5
+	fi
 	if [ ! -f "$plist" ]; then
 		echo "missing $plist" >&2
 		exit 1
@@ -53,7 +61,15 @@ bootstrap)
 	: >"$STATE/loaded/$label"
 	exit 0
 	;;
-enable | disable)
+enable)
+	label=${1#system/}
+	rm -f "$STATE/disabled/$label"
+	exit 0
+	;;
+disable)
+	label=${1#system/}
+	mkdir -p "$STATE/disabled"
+	: >"$STATE/disabled/$label"
 	exit 0
 	;;
 *)

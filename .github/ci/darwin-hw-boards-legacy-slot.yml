@@ -1,0 +1,13 @@
+---
+- name: Plant the legacy slot wrapper and its plist
+  ansible.builtin.include_tasks: darwin-hw-boards-legacy-fixture.yml
+  vars:
+    hw_legacy_wrappers:
+      - name: hw-vdf
+        content: "{{ fixture_legacy_wrapper }}"
+    hw_legacy_plists:
+      - label: net.chia.timelord.hw-vdf
+        declared_label: "{{ hw_slot_declared_label | default('net.chia.timelord.hw-vdf') }}"
+        wrapper: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+    hw_legacy_loaded:
+      - "{{ hw_slot_loaded | default('net.chia.timelord.hw-vdf') }}"

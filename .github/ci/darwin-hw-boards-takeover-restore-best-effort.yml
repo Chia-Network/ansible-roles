@@ -1,0 +1,56 @@
+---
+- name: Keep restoring after the first old job fails to come back
+  vars:
+    work: "{{ hw_best_effort.work }}"
+    launch_log: "{{ hw_best_effort.work }}/launchctl.log"
+    launch_state: "{{ hw_best_effort.work }}/state"
+    hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-takeover-restore.txt"
+    hw_restore_guard_labels:
+      - net.chia.timelord.hw-vdf
+      - net.chia.timelord.hw-vdf-2
+      - net.chia.timelord.hw-vdf-3
+    hw_apply_start_on_boot: "{{ hw_best_effort.start_on_boot | bool }}"
+  block:
+    - name: Create the best-effort restore tree
+      ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
+
+    - name: Install a client whose --list removes the first old plist
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-client.yml
+      vars:
+        hw_client_guard_labels: "{{ hw_restore_guard_labels }}"
+        hw_client_pre_list: |
+          rm -f "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf.plist"
+
+    - name: Plant the old wrappers, plists, and loaded jobs
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-restore-fixture.yml
+
+    - name: The first restore fails but the takeover still fails closing
+      ansible.builtin.include_tasks: darwin-hw-boards-expect-takeover-failure.yml
+      vars:
+        hw_failure_sentinel: takeover stopped restoring after the first old job failed
+        hw_failure_expect:
+          - Could not restore
+          - net.chia.timelord.hw-vdf
+
+    - name: List loaded jobs after the best-effort restore
+      ansible.builtin.find:
+        paths: "{{ launch_state }}/loaded"
+        patterns: "*"
+        file_type: file
+      register: hw_best_effort_loaded
+
+    - name: Read the best-effort restore log
+      ansible.builtin.slurp:
+        src: "{{ launch_log }}"
+      register: hw_best_effort_log
+
+    - name: The second old job was restored after the first restore failed
+      vars:
+        names: "{{ hw_best_effort_loaded.files | map(attribute='path') | map('basename') | sort }}"
+        log_text: "{{ hw_best_effort_log.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - names == ['net.chia.timelord.hw-vdf-2']
+          - log_text is search('(?m)^bootstrap system .*/net\\.chia\\.timelord\\.hw-vdf\\.plist$')
+          - log_text is search('(?m)^bootstrap system .*/net\\.chia\\.timelord\\.hw-vdf-2\\.plist$')
+          - (hw_best_effort.start_on_boot | bool) or ((launch_state ~ '/disabled/net.chia.timelord.hw-vdf-2') is file)

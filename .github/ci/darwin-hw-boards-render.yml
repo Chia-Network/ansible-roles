@@ -7,7 +7,7 @@
     - ../../chia-blockchain/defaults/main.yml
     - darwin-hw-boards-fixture.yml
   vars:
-    render_out: /tmp/chia-darwin-hw-render
+    render_out: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-render"
   tasks:
     - name: Point rendered paths at the test directory
       ansible.builtin.set_fact:

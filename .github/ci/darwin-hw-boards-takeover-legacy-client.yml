@@ -1,0 +1,6 @@
+---
+- name: Install a client that records whether enumeration ran
+  ansible.builtin.include_tasks: darwin-hw-boards-takeover-client.yml
+
+- name: Plant the legacy wrapper and its old plist
+  ansible.builtin.include_tasks: darwin-hw-boards-legacy-slot.yml

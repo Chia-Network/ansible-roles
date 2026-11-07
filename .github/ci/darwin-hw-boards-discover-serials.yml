@@ -1,0 +1,213 @@
+---
+- name: Create the wrapper directory for the interface-A serial case
+  ansible.builtin.file:
+    path: "{{ chia_darwin_bin_dir }}"
+    state: directory
+    mode: "0755"
+- name: Plant a managed wrapper with the full printed interface-A serial
+  ansible.builtin.copy:
+    dest: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-3-run.sh"
+    mode: "0644"
+    content: |
+      #!/bin/zsh
+      # Managed by the chia-blockchain Ansible role.
+      SERIAL=CHIA9999999003A
+      DEVICE_LOC=23003
+- name: Reset inputs before the full interface-A serial case
+  ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+- name: Discover all three boards while one wrapper stores the printed serial
+  ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+  vars:
+    hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-3.txt"
+- name: Resolve with the full interface-A wrapper present
+  ansible.builtin.include_role:
+    name: chia-blockchain
+    tasks_from: darwin-hw-vdf-boards.yml
+- name: A full interface-A wrapper and the same visible serial are one board
+  vars:
+    board: "{{ chia_darwin_hw_vdf_active | selectattr('expected_serial', 'equalto', 'CHIA9999999003A') | first }}"
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_hw_vdf_active | length == 3
+      - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2, 3]
+      - (board.id | int) == 3
+      - (board.device_loc | int) == 23003
+      - chia_darwin_hw_vdf_active | selectattr('expected_serial', 'equalto', 'CHIA9999999003') | list | length == 0
+- name: Remove the full interface-A wrapper fixture
+  ansible.builtin.file:
+    path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-3-run.sh"
+    state: absent
+
+- name: Plant a base-serial wrapper for the loosened-pattern case
+  ansible.builtin.copy:
+    dest: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+    mode: "0644"
+    content: |
+      #!/bin/zsh
+      # Managed by the chia-blockchain Ansible role.
+      SERIAL=CHIA9999999001
+      DEVICE_LOC=23001
+- name: Reset inputs before the loosened-pattern case
+  ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+- name: Loosen the serial pattern
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_serial_pattern: "^CHIA"
+- name: Discover the recabled board with a loosened pattern
+  ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+  vars:
+    hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-recable-one.txt"
+- name: Resolve the loosened-pattern board
+  ansible.builtin.include_role:
+    name: chia-blockchain
+    tasks_from: darwin-hw-vdf-boards.yml
+- name: A base-serial claim matches one visible board even when the pattern is loose
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_hw_vdf_active | length == 1
+      - (chia_darwin_hw_vdf_active[0].id | int) == 1
+      - chia_darwin_hw_vdf_active[0].expected_serial == "CHIA9999999001"
+      - (chia_darwin_hw_vdf_active[0].device_loc | int) == 25901
+      - (chia_darwin_hw_vdf_active[0].vdfs_mask | int) == 7
+- name: Plant a full-serial wrapper for the exact-owner rule case
+  ansible.builtin.copy:
+    dest: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+    mode: "0644"
+    content: |
+      #!/bin/zsh
+      # Managed by the chia-blockchain Ansible role.
+      SERIAL=CHIA9999999001A
+      DEVICE_LOC=23001
+- name: Reset inputs before the exact-owner rule case
+  ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+- name: Loosen the serial pattern for the exact-owner rule case
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_serial_pattern: "^CHIA"
+- name: Discover a shorter serial with a stored full serial
+  ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+  vars:
+    hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-recable-shorter.txt"
+- name: Resolve the stored full serial and shorter visible serial
+  ansible.builtin.include_role:
+    name: chia-blockchain
+    tasks_from: darwin-hw-vdf-boards.yml
+- name: A stored full serial does not match a shorter visible serial
+  vars:
+    stored_loc: "{{ (chia_darwin_hw_vdf_active | selectattr('expected_serial', 'equalto', 'CHIA9999999001A') | first).device_loc | int }}"
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_hw_vdf_active | length == 2
+      - (stored_loc | int) == 23001
+      - chia_darwin_hw_vdf_active | map(attribute='device_loc') | map('int') | list == [23001, 25901]
+      - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2]
+- name: Remove the exact-owner rule wrapper fixture
+  ansible.builtin.file:
+    path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+    state: absent
+- name: Restore the serial pattern
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_serial_pattern: "^CHIA[0-9]{10}A$"
+
+- name: Reset inputs before the non-A new-serial case
+  ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+- name: Allow a synthetic non-A serial for the new-board case
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_serial_pattern: "^SYNTH[0-9]{10}$"
+- name: Discover a new board whose serial does not end in A
+  ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+  vars:
+    hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-non-a.txt"
+- name: Resolve the new non-A serial board
+  ansible.builtin.include_role:
+    name: chia-blockchain
+    tasks_from: darwin-hw-vdf-boards.yml
+- name: A new board keeps its full printed non-A serial
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_hw_vdf_active | length == 1
+      - (chia_darwin_hw_vdf_active[0].id | int) == 1
+      - chia_darwin_hw_vdf_active[0].expected_serial == "SYNTH0000000042"
+      - chia_darwin_hw_vdf_active[0].expected_serial != "SYNTH000000004"
+      - (chia_darwin_hw_vdf_active[0].device_loc | int) == 28001
+      - (chia_darwin_hw_vdf_active[0].vdfs_mask | int) == 7
+      - (chia_darwin_hw_vdf_active[0].n_vdfs | int) == 3
+- name: Restore the serial pattern after the non-A new-serial case
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_serial_pattern: "^CHIA[0-9]{10}A$"
+
+- name: Plant a stored non-A serial for the no-truncation case
+  ansible.builtin.copy:
+    dest: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+    mode: "0644"
+    content: |
+      #!/bin/zsh
+      # Managed by the chia-blockchain Ansible role.
+      SERIAL=SYNTH000000004
+      DEVICE_LOC=28002
+- name: Reset inputs before the non-A no-truncation case
+  ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+- name: Allow non-A serials for the no-truncation case
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_serial_pattern: "^SYNTH[0-9]{10}$"
+- name: Discover a longer non-A serial next to a stored shorter one
+  ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+  vars:
+    hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-non-a.txt"
+- name: Resolve the non-A non-truncation case
+  ansible.builtin.include_role:
+    name: chia-blockchain
+    tasks_from: darwin-hw-vdf-boards.yml
+- name: A non-A serial is not aliased with a different longer serial
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_hw_vdf_active | length == 2
+      - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2]
+      - chia_darwin_hw_vdf_active | map(attribute='expected_serial') | list == ['SYNTH000000004', 'SYNTH0000000042']
+      - chia_darwin_hw_vdf_active | map(attribute='device_loc') | map('int') | list == [28002, 28001]
+- name: Remove the non-A no-truncation wrapper fixture
+  ansible.builtin.file:
+    path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+    state: absent
+- name: Restore the serial pattern after the non-A no-truncation case
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_serial_pattern: "^CHIA[0-9]{10}A$"
+
+- name: Plant hand-edited claimed wrappers with loose value spacing
+  ansible.builtin.copy:
+    dest: "{{ chia_darwin_bin_dir }}/chia-hw-vdf{{ '' if item.id == 1 else '-' ~ item.id }}-run.sh"
+    mode: "0644"
+    content: |
+      #!/bin/zsh
+      # Managed by the chia-blockchain Ansible role.
+      SERIAL={{ item.serial }}
+      {{ item.assignment }}
+  loop:
+    - id: 1
+      serial: CHIA9999999001
+      assignment: "DEVICE_LOC= 22002"
+    - id: 2
+      serial: CHIA9999999002
+      assignment: "DEVICE_LOC=22003 # moved"
+  loop_control:
+    label: "{{ item.id }}"
+- name: Reset inputs before the hand-edited claim case
+  ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+- name: Use a header-only --list while the hand-edited wrappers are held
+  ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+  vars:
+    hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-header.txt"
+- name: Resolve the hand-edited claims
+  ansible.builtin.include_role:
+    name: chia-blockchain
+    tasks_from: darwin-hw-vdf-boards.yml
+- name: Hand-edited spacing and comments still claim their boards
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_hw_vdf_active | length == 2
+      - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2]
+      - chia_darwin_hw_vdf_active | map(attribute='expected_serial') | list == ['CHIA9999999001', 'CHIA9999999002']
+      - chia_darwin_hw_vdf_active | map(attribute='device_loc') | map('int') | list == [22002, 22003]
+- name: Remove the hand-edited claim wrapper fixtures
+  ansible.builtin.file:
+    path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf{{ '' if item == 1 else '-' ~ item }}-run.sh"
+    state: absent
+  loop: [1, 2]

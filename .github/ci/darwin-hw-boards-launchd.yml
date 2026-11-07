@@ -6,38 +6,12 @@
   vars_files:
     - darwin-hw-boards-fixture.yml
   vars:
-    work: /tmp/chia-darwin-hw-apply
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-apply"
     launch_log: "{{ work }}/launchctl.log"
     launch_state: "{{ work }}/state"
   tasks:
-    - name: Start from an empty launchd tree
-      ansible.builtin.file:
-        path: "{{ work }}"
-        state: absent
-    - name: Keep this play's paths off the render tree
-      ansible.builtin.set_fact:
-        chia_darwin_home: "{{ work }}/home"
-        chia_darwin_bin_dir: "{{ work }}/home/bin"
-        chia_darwin_log_dir: "{{ work }}/home/Library/Logs/chia"
-        chia_darwin_etc_dir: "{{ work }}/home/etc"
-        chia_root: "{{ work }}/home/.chia/mainnet"
-        chia_darwin_env_script: "{{ work }}/home/bin/chia-env.sh"
-        chia_darwin_launchctl: "{{ work }}/launchctl"
-        chia_darwin_launchd_dir: "{{ work }}/LaunchDaemons"
-        chia_darwin_topology: remote-node
-    - name: Create the fake launchd tree
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: directory
-        mode: "0755"
-      loop:
-        - "{{ chia_darwin_bin_dir }}"
-        - "{{ chia_darwin_log_dir }}"
-        - "{{ chia_darwin_launchd_dir }}"
-        - "{{ launch_state }}/loaded"
-        - "{{ chia_darwin_home }}"
-    - name: Install the fake launchctl
-      ansible.builtin.include_tasks: darwin-hw-boards-launchctl.yml
+    - name: Create the shared fake launchd tree
+      ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
     - name: Plant an unrelated job and a hand-made hw-vdf-2
       ansible.builtin.copy:
         dest: "{{ item.dest }}"
@@ -73,6 +47,11 @@
       vars:
         hw_apply_serial: FIX-BOARD-0001
         hw_apply_boards: []
+    - name: Checksum the managed wrapper before the refused claim
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+        checksum_algorithm: sha1
+      register: wrapper_before
     - name: Checksum the hand-made plist again
       ansible.builtin.stat:
         path: "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf-2.plist"
@@ -116,10 +95,18 @@
         path: "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf-2.plist"
         checksum_algorithm: sha1
       register: handmade_still
-    - name: Claiming was refused before the plist changed
+    - name: Checksum the managed wrapper after the refused claim
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+        checksum_algorithm: sha1
+      register: wrapper_after
+    - name: Claiming was refused before the plist or wrapper changed
       ansible.builtin.assert:
         that:
           - handmade_before.stat.checksum == handmade_still.stat.checksum
+          - wrapper_before.stat.checksum == wrapper_after.stat.checksum
+          - not ((chia_darwin_bin_dir ~ '/chia-hw-vdf-2-run.sh') is file)
+          - not ((chia_darwin_bin_dir ~ '/chia-hw-vdf-3-run.sh') is file)
           - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf-2') is file
 
     - name: Claim the existing label and apply three boards
@@ -421,41 +408,13 @@
   vars_files:
     - darwin-hw-boards-fixture.yml
   vars:
-    work: /tmp/chia-darwin-hw-launchd-discover
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-launchd-discover"
     launch_log: "{{ work }}/launchctl.log"
     launch_state: "{{ work }}/state"
-    chia_darwin_hw_vdf_client: "{{ work }}/hw_vdf_client"
     hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-3.txt"
   tasks:
-    - name: Start from an empty discovery apply tree
-      ansible.builtin.file:
-        path: "{{ work }}"
-        state: absent
-    - name: Point discovery apply paths at the test directory
-      ansible.builtin.set_fact:
-        chia_darwin_home: "{{ work }}/home"
-        chia_darwin_bin_dir: "{{ work }}/home/bin"
-        chia_darwin_log_dir: "{{ work }}/home/Library/Logs/chia"
-        chia_darwin_etc_dir: "{{ work }}/home/etc"
-        chia_root: "{{ work }}/home/.chia/mainnet"
-        chia_darwin_env_script: "{{ work }}/home/bin/chia-env.sh"
-        chia_darwin_launchctl: "{{ work }}/launchctl"
-        chia_darwin_launchd_dir: "{{ work }}/LaunchDaemons"
-        chia_darwin_topology: remote-node
-        chia_darwin_hw_vdf_client: "{{ work }}/hw_vdf_client"
-    - name: Create the discovery apply tree
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: directory
-        mode: "0755"
-      loop:
-        - "{{ chia_darwin_bin_dir }}"
-        - "{{ chia_darwin_log_dir }}"
-        - "{{ chia_darwin_launchd_dir }}"
-        - "{{ launch_state }}/loaded"
-        - "{{ chia_darwin_home }}"
-    - name: Install the fake launchctl for discovery
-      ansible.builtin.include_tasks: darwin-hw-boards-launchctl.yml
+    - name: Create the shared discovery apply tree
+      ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
     - name: Install the fake hw_vdf_client for discovery
       ansible.builtin.include_tasks: darwin-hw-boards-client.yml
     - name: Apply boards discovered from hw_vdf_client --list
@@ -484,9 +443,9 @@
       ansible.builtin.assert:
         that:
           - names == ['net.chia.timelord.hw-vdf', 'net.chia.timelord.hw-vdf-2', 'net.chia.timelord.hw-vdf-3']
-          - scripts[0] is search('SERIAL=CHIA9999999001')
-          - scripts[1] is search('SERIAL=CHIA9999999002')
-          - scripts[2] is search('SERIAL=CHIA9999999003')
+          - scripts[0] is search('SERIAL=CHIA9999999001A')
+          - scripts[1] is search('SERIAL=CHIA9999999002A')
+          - scripts[2] is search('SERIAL=CHIA9999999003A')
           - scripts[0] is search('DEVICE_LOC=23001')
           - scripts[1] is search('DEVICE_LOC=23002')
           - scripts[2] is search('DEVICE_LOC=23003')
@@ -521,7 +480,7 @@
     - name: A visible board refreshes its location without changing ID
       vars:
         wrapper: "{{ moved_wrapper.content | b64decode }}"
-        moved: "{{ chia_darwin_hw_vdf_active | selectattr('expected_serial', 'equalto', 'CHIA9999999002') | first }}"
+        moved: "{{ chia_darwin_hw_vdf_active | selectattr('expected_serial', 'equalto', 'CHIA9999999002A') | first }}"
       ansible.builtin.assert:
         that:
           - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2, 3]
@@ -529,7 +488,7 @@
           - (moved.device_loc | int) == 23902
           - chia_darwin_hw_vdf_active | map(attribute='device_loc') | map('int') | list == [23001, 23902, 23003]
           - wrapper is search('DEVICE_LOC=23902')
-          - wrapper is search('SERIAL=CHIA9999999002')
+          - wrapper is search('SERIAL=CHIA9999999002A')
 
     - name: Apply two claimed boards before adding a new one
       ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
@@ -555,7 +514,7 @@
       ansible.builtin.assert:
         that:
           - chia_darwin_hw_vdf_active | map(attribute='id') | map('int') | list == [1, 2, 3]
-          - chia_darwin_hw_vdf_active | map(attribute='expected_serial') | list == ['CHIA9999999001', 'CHIA9999999002', 'CHIA9999999000']
+          - chia_darwin_hw_vdf_active | map(attribute='expected_serial') | list == ['CHIA9999999001', 'CHIA9999999002', 'CHIA9999999000A']
           - chia_darwin_hw_vdf_active | map(attribute='device_loc') | map('int') | list == [22001, 22002, 24000]
           - chia_darwin_hw_vdf_active | map(attribute='vdfs_mask') | map('int') | list == [1, 1, 1]
 
