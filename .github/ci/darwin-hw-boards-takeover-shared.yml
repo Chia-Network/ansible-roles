@@ -1,0 +1,66 @@
+---
+- name: Point the shared-plist takeover at its case tree
+  ansible.builtin.set_fact:
+    work: "{{ hw_foreign_work }}"
+    launch_log: "{{ hw_foreign_work }}/launchctl.log"
+    launch_state: "{{ hw_foreign_work }}/state"
+
+- name: Create the shared foreign-reference takeover tree
+  ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
+
+- name: Install a client that records whether enumeration ran
+  ansible.builtin.include_tasks: darwin-hw-boards-takeover-client.yml
+
+- name: Plant a legacy managed wrapper and two plists that run it
+  ansible.builtin.include_tasks: darwin-hw-boards-legacy-fixture.yml
+  vars:
+    hw_legacy_wrappers:
+      - name: hw-vdf
+        content: "{{ fixture_legacy_wrapper }}"
+    hw_legacy_plists:
+      - label: net.chia.timelord.hw-vdf
+        wrapper: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+      - label: com.example.hw-vdf
+        wrapper: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+    hw_legacy_loaded:
+      - net.chia.timelord.hw-vdf
+      - com.example.hw-vdf
+
+- name: Point the foreign plist at a symlink target outside LaunchDaemons
+  when: hw_foreign_symlink | bool
+  block:
+    - name: Copy the foreign plist outside the LaunchDaemons directory
+      ansible.builtin.copy:
+        src: "{{ chia_darwin_launchd_dir }}/com.example.hw-vdf.plist"
+        dest: "{{ work }}/linked-com.example.hw-vdf.plist"
+        remote_src: true
+        mode: "0644"
+    - name: Replace the foreign plist with a symlink to it
+      ansible.builtin.file:
+        src: "{{ work }}/linked-com.example.hw-vdf.plist"
+        dest: "{{ chia_darwin_launchd_dir }}/com.example.hw-vdf.plist"
+        state: link
+        force: true
+
+- name: Snapshot the files before the ambiguous takeover
+  ansible.builtin.include_tasks: darwin-hw-boards-snapshot.yml
+  vars:
+    hw_snapshot_var: hw_shared_before
+    hw_snapshot_paths: "{{ hw_foreign_paths }}"
+
+- name: Refuse a wrapper shared with another plist
+  ansible.builtin.include_tasks: darwin-hw-boards-expect-takeover-failure.yml
+  vars:
+    hw_failure_sentinel: takeover accepted a wrapper shared by another plist
+    hw_failure_expect:
+      - also runs
+      - com.example.hw-vdf.plist
+
+- name: Check the ambiguous takeover changed nothing
+  ansible.builtin.include_tasks: darwin-hw-boards-refusal-check.yml
+  vars:
+    hw_refusal_before: "{{ hw_shared_before }}"
+    hw_refusal_paths: "{{ hw_foreign_paths }}"
+    hw_refusal_names:
+      - com.example.hw-vdf
+      - net.chia.timelord.hw-vdf

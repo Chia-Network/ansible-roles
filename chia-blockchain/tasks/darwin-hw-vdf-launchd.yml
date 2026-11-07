@@ -49,6 +49,7 @@
     - item.item.enabled | bool
     - not (chia_darwin_hw_vdf_claim_existing | bool)
     - (item.rc | default(2) | int) == 1
+    - item.item.id | default(0) not in (chia_darwin_hw_vdf_takeover_slots | default([]))
 
 - name: Build the LaunchDaemon list
   ansible.builtin.set_fact:
@@ -61,6 +62,13 @@
           | selectattr('rc', 'equalto', 0)
           | map(attribute='item')
           | selectattr('enabled', 'equalto', false)
+          | rejectattr('id', 'in', chia_darwin_hw_vdf_takeover_slots | default([]))
+          | list
+        )
+        + (
+          chia_darwin_hw_vdf_jobs
+          | selectattr('enabled', 'equalto', false)
+          | selectattr('id', 'in', chia_darwin_hw_vdf_takeover_slots | default([]))
           | list
         )
       }}

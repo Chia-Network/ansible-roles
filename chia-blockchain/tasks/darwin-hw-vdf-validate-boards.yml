@@ -15,7 +15,7 @@
       - expected_serial
       - vdf_threads
       - proof_threads
-    allowed_ids: "{{ chia_darwin_hw_vdf_slots | map('string') | list }}"
+    allowed_ids: "{{ chia_darwin_hw_vdf_slots | map(attribute='id') | map('string') | list }}"
     board_vdf_threads: "{{ item.vdf_threads | default(chia_darwin_hw_vdf_vdf_threads) }}"
     board_proof_threads: "{{ item.proof_threads | default(chia_darwin_hw_vdf_proof_threads) }}"
   ansible.builtin.assert:

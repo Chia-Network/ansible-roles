@@ -1,0 +1,29 @@
+---
+- name: Plant a wrapper at a role slot path
+  ansible.builtin.copy:
+    dest: "{{ chia_darwin_bin_dir }}/{{ hw_wrapper_name }}"
+    mode: "0644"
+    content: "{{ hw_wrapper_content }}"
+
+- name: Reset inputs before the {{ hw_wrapper_name }} takeover case
+  ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+
+- name: Discover one board while {{ hw_wrapper_name }} occupies a slot
+  ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+  vars:
+    hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-1.txt"
+
+- name: Resolve with the {{ hw_wrapper_name }} wrapper present
+  ansible.builtin.include_role:
+    name: chia-blockchain
+    tasks_from: darwin-hw-vdf-boards.yml
+
+- name: The {{ hw_wrapper_name }} wrapper is taken over but stays until install or retire
+  vars:
+    board: "{{ chia_darwin_hw_vdf_active | first }}"
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_hw_vdf_active | length == 1
+      - (board.id | int) == 1
+      - board.expected_serial == "CHIA9999999001A"
+      - (chia_darwin_bin_dir ~ '/' ~ hw_wrapper_name) is file

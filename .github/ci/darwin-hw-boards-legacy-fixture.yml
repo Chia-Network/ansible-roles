@@ -1,0 +1,31 @@
+---
+- name: Plant old hw-vdf wrappers
+  ansible.builtin.copy:
+    dest: "{{ chia_darwin_bin_dir }}/chia-{{ item.name }}-run.sh"
+    mode: "0644"
+    content: "{{ item.content }}"
+  loop: "{{ hw_legacy_wrappers | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Plant old LaunchDaemon plists
+  ansible.builtin.copy:
+    dest: "{{ chia_darwin_launchd_dir }}/{{ item.label }}.plist"
+    mode: "0644"
+    content: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <plist version="1.0"><dict>
+      <key>Label</key><string>{{ item.declared_label | default(item.label) }}</string>
+      <key>ProgramArguments</key>
+      <array><string>{{ item.wrapper }}</string></array>
+      </dict></plist>
+  loop: "{{ hw_legacy_plists | default([]) }}"
+  loop_control:
+    label: "{{ item.label }}"
+
+- name: Mark old hw-vdf jobs loaded
+  ansible.builtin.file:
+    path: "{{ launch_state }}/loaded/{{ item }}"
+    state: touch
+    mode: "0644"
+  loop: "{{ hw_legacy_loaded | default([]) }}"

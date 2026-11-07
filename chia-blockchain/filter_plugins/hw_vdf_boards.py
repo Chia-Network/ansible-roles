@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import base64
+import binascii
+import plistlib
 import re
 from collections.abc import Callable
 from typing import Any
+from xml.parsers.expat import ExpatError
 
 from ansible.errors import AnsibleFilterError
 
@@ -13,25 +16,80 @@ _MARKER = "# Managed by the chia-blockchain Ansible role."
 _DEVICE = "Device "
 _NO_BOARDS = "Auto-discovery found 0 boards; set chia_darwin_hw_vdf_boards."
 _ROW = re.compile(r"^Device [0-9]+: '.*', loc ([0-9]+), serial '([^']*)'$")
+_ASSIGNMENT = re.compile(r"^(?P<name>[A-Z_]+)=(?P<value>.*)$", re.MULTILINE)
+_COMMENT = re.compile(r"\s+#.*$")
 
 
 def _last(text: str, name: str) -> str | None:
-    values = re.findall(rf"^{name}=(\S*)$", text, re.MULTILINE)
-    return values[-1].strip("'") if values else None
+    values = []
+    for match in _ASSIGNMENT.finditer(text):
+        if match.group("name") == name:
+            values.append(match.group("value"))
+    if not values:
+        return None
+    value = values[-1].strip()
+    if value[:1] in ("'", '"'):
+        end = value.find(value[0], 1)
+        if end != -1:
+            return value[1:end]
+    return _COMMENT.sub("", value).strip()
+
+
+def _matches(stored: str, visible: str) -> bool:
+    return stored == visible or (visible.endswith("A") and stored == visible[:-1])
 
 
 def _same_serial(left: str, right: str) -> bool:
-    return left == right or left == right[:-1] or right == left[:-1]
+    return _matches(left, right) or _matches(right, left)
 
 
 def _is_expected(board: dict[str, Any], serial: str) -> bool:
-    return board["expected_serial"] in (serial, serial[:-1])
+    return _matches(board["expected_serial"], serial)
+
+
+def _parse_claim(text: str, board_id: int) -> dict[str, Any] | None:
+    if _MARKER not in text:
+        return None
+    location = _last(text, "DEVICE_LOC")
+    if location is None:
+        return None
+    serial = _last(text, "SERIAL")
+    if not serial or not location.isdigit():
+        message = f"Board {board_id} has invalid SERIAL or DEVICE_LOC."
+        raise AnsibleFilterError(message)
+    return {
+        "id": int(board_id),
+        "device_loc": int(location),
+        "expected_serial": serial,
+    }
+
+
+def _slot_id(item: Any) -> int:
+    return int(item["id"]) if isinstance(item, dict) else int(item)
+
+
+def _plist_label(result: dict[str, Any]) -> str:
+    source = result.get("source", "LaunchDaemon plist")
+    try:
+        document = plistlib.loads(base64.b64decode(result["content"]))
+    except (
+        binascii.Error,
+        ValueError,
+        TypeError,
+        plistlib.InvalidFileException,
+        ExpatError,
+    ) as error:
+        raise AnsibleFilterError(f"Could not parse {source}: {error}") from error
+    label = document.get("Label") if isinstance(document, dict) else None
+    if not isinstance(label, str) or not label:
+        raise AnsibleFilterError(f"{source} has no LaunchDaemon Label.")
+    return label
 
 
 def _claimed(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
     boards: list[dict[str, Any]] = []
     for result in results:
-        board_id = result["item"]
+        board_id = _slot_id(result["item"])
         if "content" not in result:
             if "not found" in str(result.get("msg", "")).lower():
                 continue
@@ -39,21 +97,14 @@ def _claimed(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 f"Could not read persisted hw-vdf wrapper for board {board_id}: {result.get('msg')}"
             )
         text = base64.b64decode(result["content"]).decode("utf-8", "replace")
-        location = _last(text, "DEVICE_LOC")
-        if _MARKER not in text or location is None:
+        entry = _parse_claim(text, board_id)
+        if entry is None:
             continue
-        serial = _last(text, "SERIAL")
-        if not serial or not location.isdigit():
-            message = f"Board {board_id} has invalid SERIAL or DEVICE_LOC."
-            raise AnsibleFilterError(message)
-        if any(_same_serial(serial, board["expected_serial"]) for board in boards):
-            message = f"Persisted wrappers claim the same board serial {serial}."
-            raise AnsibleFilterError(message)
-        entry = {
-            "id": int(board_id),
-            "device_loc": int(location),
-            "expected_serial": serial,
-        }
+        serial = entry["expected_serial"]
+        for board in boards:
+            if _same_serial(serial, board["expected_serial"]):
+                message = f"Persisted wrappers claim the same board serial {serial}."
+                raise AnsibleFilterError(message)
         boards.append(entry)
     return boards
 
@@ -137,8 +188,12 @@ def merge_boards(
 
 
 class FilterModule:  # pylint: disable=too-few-public-methods
-    """Expose the board merge filter to Ansible."""
+    """Expose the board merge, claim, and plist filters to Ansible."""
 
     def filters(self) -> dict[str, Callable[..., Any]]:
         """Return the filters provided by this plugin."""
-        return {"chia_hw_vdf_merge_boards": merge_boards}
+        return {
+            "chia_hw_vdf_merge_boards": merge_boards,
+            "chia_hw_vdf_claims": _claimed,
+            "chia_hw_vdf_plist_label": _plist_label,
+        }

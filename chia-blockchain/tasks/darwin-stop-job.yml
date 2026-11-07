@@ -13,8 +13,8 @@
   failed_when: false
 
 # launchctl print returns non-zero once the job is gone. That non-zero
-# status is success here, so ignore the command's own failure. Auto-discovery
-# opts in to checking after a failed bootout so takeover cannot proceed on a
+# status is success here, so ignore the command's own failure. Always check
+# after a bootout attempt, even a failed one, so takeover cannot proceed on a
 # job that is still loaded.
 - name: Wait until LaunchDaemon is unloaded {{ chia_job.label }}
   become: "{{ chia_darwin_launchd_become | bool }}"
@@ -29,9 +29,6 @@
   retries: "{{ (chia_job.exit_timeout | int) + (chia_darwin_restart_unload_margin | int) }}"
   delay: 1
   until: chia_darwin_restart_gone.rc != 0
-  when: >-
-    chia_darwin_restart_bootout.rc == 0 or
-    chia_darwin_restart_verify_after_failed_bootout | default(false) | bool
 
 - name: Stop if LaunchDaemon {{ chia_job.label }} is still loaded
   ansible.builtin.fail:
@@ -40,8 +37,4 @@
       ExitTimeOut of {{ chia_job.exit_timeout }}s plus
       {{ chia_darwin_restart_unload_margin }}s.
       Bootstrap was not attempted.
-  when:
-    - chia_darwin_restart_gone.rc | default(1) | int == 0
-    - >-
-      chia_darwin_restart_bootout.rc | default(1) | int == 0 or
-      chia_darwin_restart_verify_after_failed_bootout | default(false) | bool
+  when: chia_darwin_restart_gone.rc | default(1) | int == 0

@@ -1,0 +1,24 @@
+---
+- name: Expect takeover failure ({{ hw_failure_sentinel }})
+  block:
+    - name: Apply auto-discovery for the failure case
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards: []
+    - name: The failure case was accepted
+      ansible.builtin.fail:
+        msg: "{{ hw_failure_sentinel }}"
+  rescue:
+    - name: The failure has the expected message
+      loop: "{{ hw_failure_expect }}"
+      vars:
+        failure_text: "{{ ansible_failed_result | to_json }}"
+      ansible.builtin.assert:
+        that:
+          - failure_text is search(item)
+        fail_msg: "{{ failure_text }}"
+    - name: The failure did not hide another error
+      ansible.builtin.assert:
+        that:
+          - hw_failure_sentinel not in (ansible_failed_result | to_json)

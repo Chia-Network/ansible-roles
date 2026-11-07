@@ -1,0 +1,10 @@
+---
+- name: Install the takeover test client
+  vars:
+    hw_client_guard: "{{ hw_client_guard_labels | default([]) }}"
+    hw_client_pre: "{{ hw_client_pre_list | default('') }}"
+    hw_client_post: "{{ hw_client_post_list | default('') }}"
+  ansible.builtin.template:
+    src: fake-hw-vdf-client-takeover.sh.j2
+    dest: "{{ chia_darwin_hw_vdf_client }}"
+    mode: "0755"

@@ -31,4 +31,6 @@
   when:
     - not (item.skipped | default(false))
     - not (item.item.enabled | bool)
-    - (item.rc | default(1) | int) == 0
+    - >-
+      (item.rc | default(1) | int) == 0 or
+      (item.item.id | default(0)) in (chia_darwin_hw_vdf_takeover_slots | default([]))

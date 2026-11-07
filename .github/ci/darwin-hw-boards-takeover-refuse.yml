@@ -1,77 +1,23 @@
 ---
 # A legacy slot 1 is loaded. Bootout cannot unload it, so takeover must fail
 # before --list, file removal, or bootstrap.
-- name: Start from an empty {{ hw_takeover_failure }} takeover tree
-  ansible.builtin.file:
-    path: "{{ work }}"
-    state: absent
+- name: Create the shared {{ hw_takeover_failure }} takeover tree
+  vars:
+    hw_tree_dirs:
+      - "{{ launch_state }}/fail"
+      - "{{ launch_state }}/hold"
+  ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
 
-- name: Point {{ hw_takeover_failure }} takeover paths at the test directory
+- name: Give the {{ hw_takeover_failure }} takeover a short unload wait
   ansible.builtin.set_fact:
-    chia_darwin_home: "{{ work }}/home"
-    chia_darwin_bin_dir: "{{ work }}/home/bin"
-    chia_darwin_log_dir: "{{ work }}/home/Library/Logs/chia"
-    chia_darwin_etc_dir: "{{ work }}/home/etc"
-    chia_root: "{{ work }}/home/.chia/mainnet"
-    chia_darwin_env_script: "{{ work }}/home/bin/chia-env.sh"
-    chia_darwin_launchctl: "{{ work }}/launchctl"
-    chia_darwin_launchd_dir: "{{ work }}/LaunchDaemons"
-    chia_darwin_topology: remote-node
-    chia_darwin_hw_vdf_client: "{{ work }}/hw_vdf_client"
     chia_darwin_hw_vdf_exit_timeout: 0
     chia_darwin_restart_unload_margin: 1
 
-- name: Create the {{ hw_takeover_failure }} takeover tree
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: directory
-    mode: "0755"
-  loop:
-    - "{{ chia_darwin_bin_dir }}"
-    - "{{ chia_darwin_log_dir }}"
-    - "{{ chia_darwin_launchd_dir }}"
-    - "{{ launch_state }}/loaded"
-    - "{{ launch_state }}/fail"
-    - "{{ launch_state }}/hold"
-    - "{{ chia_darwin_home }}"
-
-- name: Install the fake launchctl for {{ hw_takeover_failure }} takeover
-  ansible.builtin.include_tasks: darwin-hw-boards-launchctl.yml
-
 - name: Install a client that records whether enumeration ran
-  ansible.builtin.copy:
-    dest: "{{ chia_darwin_hw_vdf_client }}"
-    mode: "0755"
-    content: |
-      #!/bin/sh
-      : > "{{ work }}/client-ran"
-      cat "{{ hw_vdf_list_fixture }}" >&2
+  ansible.builtin.include_tasks: darwin-hw-boards-takeover-client.yml
 
-- name: Plant a legacy managed wrapper in slot 1
-  ansible.builtin.copy:
-    dest: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
-    mode: "0644"
-    content: |
-      #!/bin/zsh
-      # Managed by the chia-blockchain Ansible role.
-      SERIAL=CHIA9999999099
-
-- name: Plant the old LaunchDaemon plist
-  ansible.builtin.copy:
-    dest: "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf.plist"
-    mode: "0644"
-    content: |
-      <?xml version="1.0" encoding="UTF-8"?>
-      <plist version="1.0"><dict>
-      <key>ProgramArguments</key>
-      <array><string>{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh</string></array>
-      </dict></plist>
-
-- name: Mark the old job loaded
-  ansible.builtin.file:
-    path: "{{ launch_state }}/loaded/net.chia.timelord.hw-vdf"
-    state: touch
-    mode: "0644"
+- name: Plant the legacy wrapper and its old plist
+  ansible.builtin.include_tasks: darwin-hw-boards-legacy-slot.yml
 
 - name: Make bootout fail while the job stays loaded
   when: hw_takeover_failure == 'fail'
@@ -88,24 +34,12 @@
     content: "99\n"
 
 - name: Expect takeover to refuse a loaded old job ({{ hw_takeover_failure }})
-  block:
-    - name: Apply auto-discovered boards while the old job cannot stop
-      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
-      vars:
-        hw_apply_serial: ""
-        hw_apply_boards: []
-    - name: Takeover overwrote a loaded old job
-      ansible.builtin.fail:
-        msg: takeover overwrote a loaded old job
-  rescue:
-    - name: The takeover refusal says the job is still loaded
-      vars:
-        failure_text: "{{ ansible_failed_result | to_json }}"
-      ansible.builtin.assert:
-        that:
-          - failure_text is search('still loaded')
-          - failure_text is search('Bootstrap was not attempted')
-          - "'takeover overwrote' not in failure_text"
+  ansible.builtin.include_tasks: darwin-hw-boards-expect-takeover-failure.yml
+  vars:
+    hw_failure_sentinel: takeover overwrote a loaded old job
+    hw_failure_expect:
+      - still loaded
+      - Bootstrap was not attempted
 
 - name: No enumeration, removal, or bootstrap happened ({{ hw_takeover_failure }})
   vars:

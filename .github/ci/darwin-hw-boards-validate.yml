@@ -6,10 +6,11 @@
   vars_files:
     - darwin-hw-boards-fixture.yml
   vars:
-    chia_darwin_home: /tmp/chia-darwin-hw/home
-    chia_darwin_bin_dir: /tmp/chia-darwin-hw/home/bin
-    chia_darwin_log_dir: /tmp/chia-darwin-hw/home/Library/Logs/chia
-    chia_root: /tmp/chia-darwin-hw/home/.chia/mainnet
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-validate"
+    chia_darwin_home: "{{ work }}/home"
+    chia_darwin_bin_dir: "{{ work }}/home/bin"
+    chia_darwin_log_dir: "{{ work }}/home/Library/Logs/chia"
+    chia_root: "{{ work }}/home/.chia/mainnet"
   tasks:
     - name: Reject invalid inventories
       ansible.builtin.include_tasks: darwin-hw-boards-case.yml
@@ -291,10 +292,11 @@
   vars_files:
     - darwin-hw-boards-fixture.yml
   vars:
-    chia_darwin_home: /tmp/chia-darwin-hw-check/home
-    chia_darwin_bin_dir: /tmp/chia-darwin-hw-check/home/bin
-    chia_darwin_log_dir: /tmp/chia-darwin-hw-check/home/Library/Logs/chia
-    chia_root: /tmp/chia-darwin-hw/home/.chia/mainnet
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-check"
+    chia_darwin_home: "{{ work }}/home"
+    chia_darwin_bin_dir: "{{ work }}/home/bin"
+    chia_darwin_log_dir: "{{ work }}/home/Library/Logs/chia"
+    chia_root: "{{ work }}/home/.chia/mainnet"
   tasks:
     - name: Reset inputs for check mode
       ansible.builtin.include_tasks: darwin-hw-boards-reset.yml

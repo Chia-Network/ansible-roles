@@ -1,0 +1,10 @@
+---
+- name: Read the files for the snapshot
+  ansible.builtin.slurp:
+    src: "{{ item }}"
+  loop: "{{ hw_snapshot_paths }}"
+  register: hw_snapshot_result
+
+- name: Record the file snapshot
+  ansible.builtin.set_fact:
+    "{{ hw_snapshot_var }}": "{{ hw_snapshot_result.results | map(attribute='content') | list }}"

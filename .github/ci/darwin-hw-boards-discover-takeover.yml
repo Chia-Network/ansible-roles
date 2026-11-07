@@ -1,0 +1,58 @@
+---
+- name: Exercise an unowned wrapper at a role slot path
+  ansible.builtin.include_tasks: darwin-hw-boards-discover-wrapper.yml
+  vars:
+    hw_wrapper_name: chia-hw-vdf-2-run.sh
+    hw_wrapper_content: |
+      #!/bin/zsh
+      # Not managed by this role.
+      SERIAL=CHIA9999999002
+      DEVICE_LOC=29999
+
+- name: The unowned wrapper keeps its takeover slot and the visible board
+  vars:
+    discovered: "{{ chia_darwin_hw_vdf_discovered_boards | map(attribute='expected_serial') | list }}"
+    slots: "{{ chia_darwin_hw_vdf_takeover_slots | map('int') | list }}"
+  ansible.builtin.assert:
+    that:
+      - discovered == ['CHIA9999999001A']
+      - slots == [2]
+
+- name: Switch to an explicit inventory in the same play
+  ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+
+- name: Pin the explicit fixture boards after discovery
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_boards: "{{ fixture_boards }}"
+
+- name: Resolve the explicit boards after a takeover discovery
+  ansible.builtin.include_role:
+    name: chia-blockchain
+    tasks_from: darwin-hw-vdf-boards.yml
+
+- name: Changing the mode clears the earlier takeover ownership
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_hw_vdf_takeover_slots | length == 0
+      - chia_darwin_hw_vdf_active | length == 3
+      - chia_darwin_hw_vdf_active | map(attribute='expected_serial') | list == ['FIX-BOARD-0001', 'FIX-BOARD-0002', 'FIX-BOARD-0003']
+      - (chia_darwin_bin_dir ~ '/chia-hw-vdf-2-run.sh') is file
+
+- name: Remove the unowned wrapper fixture
+  ansible.builtin.file:
+    path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-2-run.sh"
+    state: absent
+
+- name: Exercise a legacy managed wrapper without a device location
+  ansible.builtin.include_tasks: darwin-hw-boards-discover-wrapper.yml
+  vars:
+    hw_wrapper_name: chia-hw-vdf-run.sh
+    hw_wrapper_content: |
+      #!/bin/zsh
+      # Managed by the chia-blockchain Ansible role.
+      SERIAL=CHIA9999999002
+
+- name: Remove the legacy wrapper fixture
+  ansible.builtin.file:
+    path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+    state: absent

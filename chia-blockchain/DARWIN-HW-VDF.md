@@ -34,8 +34,10 @@ form without that final `A`.
 
 Claimed wrappers and `--list` rows are matched directly, without the serial
 pattern deciding identity. A stored serial matches a listed serial when they
-are equal or the stored serial equals the listed serial with its final
-character removed. The pattern only selects which visible rows are Chia boards.
+are equal, or when the listed serial ends in `A` and the stored serial equals
+it without that `A`. A stored full serial does not match a shorter listed
+serial, and other final characters are never dropped. The pattern only selects
+which visible rows are Chia boards.
 Newly discovered boards keep the full serial printed by `--list`, and an
 already claimed wrapper keeps the SERIAL spelling it already has. That keeps
 existing wrappers stable while a wrapper written from an explicit full
@@ -47,6 +49,7 @@ Discovery therefore treats this role's installed wrappers at the role-owned
 slot paths as the persisted board inventory. It reads them as text; it never
 sources or executes them. A wrapper is a claim when it is at one of those exact
 paths and carries the role's management marker and a `DEVICE_LOC` assignment.
+Whitespace around the assigned value and a trailing `#` comment are accepted.
 Merge is by serial:
 
 - A claimed board keeps its existing ID. If `--list` can see it, the printed
@@ -62,14 +65,19 @@ Auto-discovery also takes over legacy and hand-written wrappers. With an empty
 board list and an empty legacy serial, any readable wrapper at a role slot
 that is not a managed per-board claim is stopped first: the role boots out
 that slot's LaunchDaemon and waits for it to unload before running `--list`,
-so a board the old client was holding becomes visible. The old plist and
-wrapper are removed only after enumeration and merge succeed; an enumeration
-failure leaves them in place, although the old client remains stopped. The run
-does not preserve or fail on a hand-made wrapper; interrupting its job is
-intentional. A managed per-board claim is left running and keeps its ID, which
-is how held-board reruns stay stable. Explicit `chia_darwin_hw_vdf_boards` and
-the legacy serial path do not take anything over and keep the existing
-ownership refusal.
+so a board the old client was holding becomes visible. The role only stops a
+slot when that slot's own plist is the only one that runs its wrapper and the
+plist's Label also names that slot; if any other plist runs the same wrapper, a
+Label does not match, or the plist search skips a path, discovery fails closed
+instead of stopping or overwriting a wrapper another job uses. The old plist
+and wrapper stay until the normal install or retire step replaces or removes
+them. If enumeration or
+merge fails, discovery restarts the old jobs it stopped and leaves the files
+in place. The run does not preserve or fail on a hand-made wrapper;
+interrupting its job is intentional. A managed per-board claim is left running
+and keeps its ID, which is how held-board reruns stay stable. Explicit
+`chia_darwin_hw_vdf_boards` and the legacy serial path do not take anything
+over and keep the existing ownership refusal.
 
 This preserves IDs, masks, wrappers, and loaded jobs when every board is held
 (header-only `--list`) or only some are held. Discovery fails when the merged
@@ -160,7 +168,8 @@ Launchd also writes `<name>.out.log` and `<name>.err.log`. Client logs are under
 `chia_darwin_log_dir`. Removing a board from an explicit
 `chia_darwin_hw_vdf_boards` list, or switching back to the legacy single-board
 path, retires that role-owned slot: it stops the job and deletes the plist and
-wrapper only when that plist runs this role's wrapper. A managed board that is
+wrapper only when that plist runs this role's wrapper, or when discovery took
+that slot over. A managed board that is
 only physically detached remains claimed by its wrapper, so auto-discovery
 keeps it and its masks until an explicit list retires it. If an enabled label
 already has some other plist, the run fails until
@@ -172,9 +181,10 @@ Rollout: leave `chia_darwin_hw_vdf_boards` empty and clear
 `chia_darwin_hw_vdf_expected_serial` to let the role discover boards with
 `hw_vdf_client --list` and its installed wrappers. A first auto-discovery run
 from the legacy single-board path takes over slot 1: it stops the old job,
-re-enumerates, and removes the legacy wrapper and plist only after the merge
-succeeds, so slot 1 goes to whichever board discovery assigns. It also takes
-over hand-written wrappers at the other role slots. To pin locations, run
+re-enumerates, and replaces or retires the legacy wrapper and plist at the
+normal install point, so slot 1 goes to whichever board discovery assigns. If
+the merge fails, it restarts the old job. It also takes over hand-written
+wrappers at the other role slots. To pin locations, run
 `hw_vdf_client --list`, set
 `chia_darwin_hw_vdf_boards`, and clear `chia_darwin_hw_vdf_expected_serial`.
 Use an explicit list to remove a board that discovery still sees in a retained

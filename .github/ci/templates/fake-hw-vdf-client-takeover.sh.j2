@@ -1,0 +1,11 @@
+#!/bin/sh
+: >"{{ work }}/client-ran"
+{% for label in hw_client_guard %}
+if [ -f "{{ launch_state }}/loaded/{{ label }}" ]; then
+	echo "{{ label }} still holds a board before --list" >&2
+	exit 93
+fi
+{% endfor %}
+{{ hw_client_pre }}
+cat "{{ hw_vdf_list_fixture }}" >&2
+{{ hw_client_post }}

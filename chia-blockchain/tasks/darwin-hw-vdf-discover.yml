@@ -5,8 +5,9 @@
 # managed per-board claim on its existing ID, refresh only boards that --list
 # can see, and give new serials the next free ID. Auto-discovery takes over
 # legacy and hand-written wrappers: their jobs are stopped before --list so a
-# held board becomes visible, and their files are removed only after the merge
-# succeeds. Explicit boards and the legacy serial still bypass discovery and
+# held board becomes visible. The old plist and wrapper stay until the normal
+# install or retire step replaces or removes them, so a failed run leaves them
+# in place. Explicit boards and the legacy serial still bypass discovery and
 # keep the old ownership rules.
 - name: Discover attached ASIC boards
   when:
@@ -14,93 +15,246 @@
     - chia_darwin_hw_vdf_boards | length == 0
     - chia_darwin_hw_vdf_expected_serial | length == 0
   block:
-    - name: Start the auto-discovery takeover list
-      ansible.builtin.set_fact:
-        chia_darwin_hw_vdf_takeover_slots: []
-      changed_when: false
-
     - name: Read the role's installed hw-vdf wrappers
       become: "{{ chia_darwin_launchd_become | bool }}"
       become_user: "{{ user }}"
       ansible.builtin.slurp:
-        src: "{{ chia_darwin_bin_dir }}/chia-{{ 'hw-vdf' if item == 1 else 'hw-vdf-' ~ item }}-run.sh"
+        src: "{{ item.wrapper }}"
       loop: "{{ chia_darwin_hw_vdf_slots }}"
       loop_control:
-        label: "{{ item }}"
+        label: "{{ item.id }}"
       register: chia_darwin_hw_vdf_persisted_wrappers
       failed_when: false
 
+    - name: Identify managed board claims in installed wrappers
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_claims: "{{ chia_darwin_hw_vdf_persisted_wrappers.results | chia_hw_vdf_claims }}"
+      changed_when: false
+
     - name: Classify installed wrappers as takeover candidates
       vars:
-        text: "{{ (item.content | default('')) | b64decode }}"
-        is_claim: >-
-          {{
-            item.content is defined and
-            '# Managed by the chia-blockchain Ansible role.' in text and
-            text is search('(?m)^DEVICE_LOC=')
-          }}
+        claim_ids: "{{ chia_darwin_hw_vdf_claims | map(attribute='id') | map('int') | list }}"
       ansible.builtin.set_fact:
         chia_darwin_hw_vdf_takeover_slots: >-
-          {{ chia_darwin_hw_vdf_takeover_slots
-            + ([item.item] if (item.content is defined and not (is_claim | bool)) else []) }}
-      loop: "{{ chia_darwin_hw_vdf_persisted_wrappers.results }}"
-      loop_control:
-        label: "{{ item.item }}"
+          {{ chia_darwin_hw_vdf_persisted_wrappers.results
+            | selectattr('content', 'defined')
+            | map(attribute='item')
+            | rejectattr('id', 'in', claim_ids)
+            | map(attribute='id') | map('int') | list }}
       changed_when: false
 
     - name: Check privileged launchctl settings before takeover
       when: chia_darwin_hw_vdf_takeover_slots | length > 0
       ansible.builtin.include_tasks: darwin-hw-vdf-launchd-guard.yml
 
-    - name: Stop LaunchDaemons auto-discovery takes over
-      ansible.builtin.include_tasks: darwin-stop-job.yml
-      loop: "{{ chia_darwin_hw_vdf_takeover_slots }}"
-      loop_control:
-        loop_var: takeover_id
-      vars:
-        chia_job:
-          label: "{{ chia_darwin_launchd_prefix }}.hw-vdf{{ '' if takeover_id == 1 else '-' ~ takeover_id }}"
-          exit_timeout: "{{ chia_darwin_hw_vdf_exit_timeout }}"
-        chia_darwin_restart_verify_after_failed_bootout: true
+    - name: Find installed hw-vdf LaunchDaemon plists
+      when: chia_darwin_hw_vdf_takeover_slots | length > 0
+      become: "{{ chia_darwin_launchd_become | bool }}"
+      ansible.builtin.find:
+        paths: "{{ chia_darwin_launchd_dir }}"
+        patterns: "*.plist"
+        file_type: any
+      register: chia_darwin_hw_vdf_plists
 
-    - name: List attached ASIC boards
-      become: false
+    - name: Refuse takeover when plist enumeration skipped paths
+      when:
+        - chia_darwin_hw_vdf_takeover_slots | length > 0
+        - chia_darwin_hw_vdf_plists.skipped_paths | default({}) | length > 0
+      ansible.builtin.fail:
+        msg: >-
+          Could not check every LaunchDaemon plist under
+          {{ chia_darwin_launchd_dir }} for wrapper ownership:
+          {{ chia_darwin_hw_vdf_plists.skipped_paths }}.
+          Refusing the takeover.
+
+    - name: Find plists that run each takeover wrapper
+      when: chia_darwin_hw_vdf_takeover_slots | length > 0
+      become: "{{ chia_darwin_launchd_become | bool }}"
       ansible.builtin.command:
         argv:
-          - "{{ chia_darwin_hw_vdf_client }}"
-          - --list
-      register: chia_darwin_hw_vdf_list
+          - grep
+          - -l
+          - -F
+          - "{{ item.0.wrapper }}"
+          - "{{ item.1.path }}"
+      loop: >-
+        {{ (chia_darwin_hw_vdf_slots
+            | selectattr('id', 'in', chia_darwin_hw_vdf_takeover_slots) | list)
+           | product(chia_darwin_hw_vdf_plists.files | default([])) | list }}
+      loop_control:
+        label: "{{ item.0.label }}: {{ item.1.path | basename }}"
+      register: chia_darwin_hw_vdf_wrapper_refs
       changed_when: false
       failed_when: false
 
-    - name: Merge attached boards with previously claimed boards
+    - name: Refuse takeover when a wrapper owner cannot be checked
+      loop: "{{ chia_darwin_hw_vdf_wrapper_refs.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item.0.label }}: {{ item.item.1.path | basename }}"
+      when: item.rc | int not in [0, 1]
+      ansible.builtin.fail:
+        msg: >-
+          Could not check whether {{ item.item.1.path }} runs
+          {{ item.item.0.wrapper }}: {{ item.stderr | default(item.msg) }}.
+          Refusing the takeover.
+
+    - name: Refuse takeover when another plist runs a slot wrapper
+      loop: "{{ chia_darwin_hw_vdf_wrapper_refs.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item.0.label }}: {{ item.item.1.path | basename }}"
+      when:
+        - item.rc | int == 0
+        - (item.item.1.path | basename) != (item.item.0.label ~ '.plist')
+      ansible.builtin.fail:
+        msg: >-
+          {{ item.item.0.label }} is not safe to take over:
+          {{ item.item.1.path }} also runs {{ item.item.0.wrapper }}.
+          Refusing until only that slot's own plist runs the wrapper.
+
+    - name: Read plists that run a takeover wrapper
+      when: chia_darwin_hw_vdf_takeover_slots | length > 0
+      become: "{{ chia_darwin_launchd_become | bool }}"
+      ansible.builtin.slurp:
+        src: "{{ item.item.1.path }}"
+      loop: >-
+        {{ chia_darwin_hw_vdf_wrapper_refs.results
+           | selectattr('rc', 'equalto', 0) | list }}
+      loop_control:
+        label: "{{ item.item.0.label }}: {{ item.item.1.path | basename }}"
+      register: chia_darwin_hw_vdf_wrapper_owner_plists
+      failed_when: false
+
+    - name: Refuse takeover when a wrapper owner cannot be read
+      loop: "{{ chia_darwin_hw_vdf_wrapper_owner_plists.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item.item.1.path | basename }}"
+      when: "'content' not in item"
+      ansible.builtin.fail:
+        msg: >-
+          Could not read {{ item.item.item.1.path }} to check its Label:
+          {{ item.msg | default('unknown error') }}. Refusing the takeover.
+
+    - name: Refuse takeover when a wrapper owner has a different Label
+      loop: "{{ chia_darwin_hw_vdf_wrapper_owner_plists.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item.item.1.path | basename }}"
+      vars:
+        actual_label: "{{ item | chia_hw_vdf_plist_label }}"
+      when: actual_label != item.item.item.0.label
+      ansible.builtin.fail:
+        msg: >-
+          {{ item.item.item.1.path }} declares Label {{ actual_label }}, not
+          {{ item.item.item.0.label }}. Refusing the takeover.
+
+    - name: Check whether old takeover jobs are loaded
+      become: "{{ chia_darwin_launchd_become | bool }}"
+      ansible.builtin.command:
+        argv:
+          - "{{ chia_darwin_launchctl }}"
+          - print
+          - "system/{{ item.label }}"
+      loop: >-
+        {{ chia_darwin_hw_vdf_slots
+           | selectattr('id', 'in', chia_darwin_hw_vdf_takeover_slots) | list }}
+      loop_control:
+        label: "{{ item.label }}"
+      register: chia_darwin_hw_vdf_takeover_loaded
+      changed_when: false
+      failed_when: false
+
+    - name: Remember old takeover jobs that were loaded
       ansible.builtin.set_fact:
-        chia_darwin_hw_vdf_discovered_boards: >-
-          {{
-            chia_darwin_hw_vdf_list
-            | chia_hw_vdf_merge_boards(
-                chia_darwin_hw_vdf_persisted_wrappers.results,
-                chia_darwin_hw_vdf_serial_pattern,
-                chia_darwin_hw_vdf_client,
-                chia_darwin_hw_vdf_slots
-              )
-          }}
+        chia_darwin_hw_vdf_takeover_was_loaded: >-
+          {{ chia_darwin_hw_vdf_takeover_loaded.results
+             | selectattr('rc', 'equalto', 0)
+             | map(attribute='item') | list }}
       changed_when: false
 
-    # The old clients are intentionally interrupted before --list, but their
-    # files stay until enumeration and merge succeed so a failed run does not
-    # destroy the original wrapper or plist.
-    - name: Remove LaunchDaemon plists auto-discovery takes over
-      become: "{{ chia_darwin_launchd_become | bool }}"
-      ansible.builtin.file:
-        path: "{{ chia_darwin_launchd_dir }}/{{ chia_darwin_launchd_prefix }}.hw-vdf{{ '' if item == 1 else '-' ~ item }}.plist"
-        state: absent
-      loop: "{{ chia_darwin_hw_vdf_takeover_slots }}"
+    - name: Stop, enumerate, and merge takeover boards
+      block:
+        - name: Stop LaunchDaemons auto-discovery takes over
+          ansible.builtin.include_tasks: darwin-stop-job.yml
+          loop: >-
+            {{ chia_darwin_hw_vdf_slots
+               | selectattr('id', 'in', chia_darwin_hw_vdf_takeover_slots) | list }}
+          loop_control:
+            loop_var: takeover_slot
+            label: "{{ takeover_slot.label }}"
+          vars:
+            chia_job:
+              label: "{{ takeover_slot.label }}"
+              exit_timeout: "{{ chia_darwin_hw_vdf_exit_timeout }}"
 
-    - name: Remove wrappers auto-discovery takes over
-      become: "{{ chia_darwin_launchd_become | bool }}"
-      become_user: "{{ user }}"
-      ansible.builtin.file:
-        path: "{{ chia_darwin_bin_dir }}/chia-{{ 'hw-vdf' if item == 1 else 'hw-vdf-' ~ item }}-run.sh"
-        state: absent
-      loop: "{{ chia_darwin_hw_vdf_takeover_slots }}"
+        - name: List attached ASIC boards
+          become: false
+          ansible.builtin.command:
+            argv:
+              - "{{ chia_darwin_hw_vdf_client }}"
+              - --list
+          register: chia_darwin_hw_vdf_list
+          changed_when: false
+          failed_when: false
+
+        - name: Merge attached boards with previously claimed boards
+          ansible.builtin.set_fact:
+            chia_darwin_hw_vdf_discovered_boards: >-
+              {{
+                chia_darwin_hw_vdf_list
+                | chia_hw_vdf_merge_boards(
+                    chia_darwin_hw_vdf_persisted_wrappers.results,
+                    chia_darwin_hw_vdf_serial_pattern,
+                    chia_darwin_hw_vdf_client,
+                    chia_darwin_hw_vdf_slots | map(attribute='id') | list
+                  )
+              }}
+          changed_when: false
+      rescue:
+        - name: Remember the failed takeover
+          ansible.builtin.set_fact:
+            chia_darwin_hw_vdf_takeover_failure: "{{ ansible_failed_result }}"
+          changed_when: false
+
+        - name: Restore old hw-vdf jobs after the failed takeover
+          block:
+            - name: Check whether old takeover jobs are still loaded
+              become: "{{ chia_darwin_launchd_become | bool }}"
+              ansible.builtin.command:
+                argv:
+                  - "{{ chia_darwin_launchctl }}"
+                  - print
+                  - "system/{{ item.label }}"
+              loop: "{{ chia_darwin_hw_vdf_takeover_was_loaded }}"
+              loop_control:
+                label: "{{ item.label }}"
+              register: chia_darwin_hw_vdf_takeover_still_loaded
+              changed_when: false
+              failed_when: false
+
+            - name: Bootstrap old hw-vdf jobs that were stopped
+              become: "{{ chia_darwin_launchd_become | bool }}"
+              ansible.builtin.command:
+                argv:
+                  - "{{ chia_darwin_launchctl }}"
+                  - bootstrap
+                  - system
+                  - "{{ chia_darwin_launchd_dir }}/{{ item.item.label }}.plist"
+              loop: "{{ chia_darwin_hw_vdf_takeover_still_loaded.results }}"
+              loop_control:
+                label: "{{ item.item.label }}"
+              when: item.rc | default(1) | int != 0
+              changed_when: true
+          rescue:
+            - name: Report that restoring old hw-vdf jobs also failed
+              ansible.builtin.fail:
+                msg: >-
+                  Auto-discovery failed
+                  ({{ chia_darwin_hw_vdf_takeover_failure.msg
+                  | default(chia_darwin_hw_vdf_takeover_failure) }}) and
+                  restoring the old hw-vdf jobs also failed:
+                  {{ ansible_failed_result.msg | default(ansible_failed_result) }}
+
+        - name: Report the original auto-discovery failure
+          ansible.builtin.fail:
+            msg: >-
+              {{ chia_darwin_hw_vdf_takeover_failure.msg
+              | default(chia_darwin_hw_vdf_takeover_failure) }}
