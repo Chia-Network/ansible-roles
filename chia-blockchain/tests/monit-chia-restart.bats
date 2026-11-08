@@ -109,6 +109,7 @@ render_script() {
 		-e "chia_monit_restart_verify_seconds=90" \
 		-e "chia_monit_restart_state_dir=${STATE_DIR}" \
 		-e "user=chia-test" \
+		-e "chia_root=/home/chia-test/.chia" \
 		-e "full_node_port=8444" \
 		-e "chia_timelord_port=8446" \
 		-e "{\"chia_enabled_services\": ${enabled}}" \
@@ -141,10 +142,20 @@ restart_count() {
 }
 
 make_proc() {
-	local pid=$1 name=$2 cgroup=$3
+	local pid=$1 name=$2 cgroup=$3 environ=${4:-}
 	mkdir -p "$BATS_TEST_TMPDIR/proc/$pid"
 	printf '%s\0' "$name" >"$BATS_TEST_TMPDIR/proc/$pid/cmdline"
 	printf '%s\n' "$cgroup" >"$BATS_TEST_TMPDIR/proc/$pid/cgroup"
+	[ -z "$environ" ] || printf '%s\0' "$environ" >"$BATS_TEST_TMPDIR/proc/$pid/environ"
+}
+
+make_proc_args() {
+	local pid=$1 cgroup=$2 environ=${3:-}
+	shift 3
+	mkdir -p "$BATS_TEST_TMPDIR/proc/$pid"
+	printf '%s\0' "$@" >"$BATS_TEST_TMPDIR/proc/$pid/cmdline"
+	printf '%s\n' "$cgroup" >"$BATS_TEST_TMPDIR/proc/$pid/cgroup"
+	[ -z "$environ" ] || printf '%s\0' "$environ" >"$BATS_TEST_TMPDIR/proc/$pid/environ"
 }
 
 require_non_root() {
@@ -375,7 +386,7 @@ start chia.target" ]
 
 @test "a listed stray outside managed units is terminated then killed" {
 	require_non_root
-	make_proc 9003 chia_full_node '0::/user.slice/user-1000.slice/session-3.scope'
+	make_proc 9003 chia_full_node '0::/user.slice/user-1000.slice/session-3.scope' 'CHIA_ROOT=/home/chia-test/.chia'
 	run "$SCRIPT" target
 	[ "$status" -eq 0 ]
 	[ "$(cat "$KILL_LOG")" = "-s TERM 9003
@@ -401,7 +412,7 @@ start chia.target" ]
 
 @test "an exact start_ stray name is signalled" {
 	require_non_root
-	make_proc 9007 start_full_node '0::/user.slice/user-1000.slice/session-3.scope'
+	make_proc 9007 start_full_node '0::/user.slice/user-1000.slice/session-3.scope' 'CHIA_ROOT=/home/chia-test/.chia'
 	run "$SCRIPT" target
 	[ "$status" -eq 0 ]
 	[[ "$(cat "$KILL_LOG")" == *"-s TERM 9007"* ]]
@@ -415,6 +426,47 @@ start chia.target" ]
 	run "$SCRIPT" target
 	[ "$status" -eq 0 ]
 	[[ "$(cat "$KILL_LOG")" == *"-s TERM 9008"* ]]
+}
+
+@test "a process in another instance's service is not signalled" {
+	require_non_root
+	make_proc 9009 chia_full_node '0::/system.slice/chia2-full-node.service'
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[ ! -s "$KILL_LOG" ]
+}
+
+@test "a process outside systemd with another CHIA_ROOT is not signalled" {
+	require_non_root
+	make_proc 9010 chia_full_node '0::/user.slice/user-1000.slice/session-3.scope' 'CHIA_ROOT=/home/chia-test/.chia-other'
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[ ! -s "$KILL_LOG" ]
+}
+
+@test "a process outside systemd without CHIA_ROOT is not signalled" {
+	require_non_root
+	make_proc 9011 chia_full_node '0::/user.slice/user-1000.slice/session-3.scope'
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[ ! -s "$KILL_LOG" ]
+}
+
+@test "a source daemon that has not set its title is signalled" {
+	require_non_root
+	make_proc_args 9012 '0::/user.slice/user-1000.slice/session-3.scope' 'CHIA_ROOT=/home/chia-test/.chia' \
+		python -m chia.daemon.server
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[[ "$(cat "$KILL_LOG")" == *"-s TERM 9012"* ]]
+}
+
+@test "an apt daemon that has not set its title is signalled" {
+	require_non_root
+	make_proc 9013 /opt/chia/daemon '0::/user.slice/user-1000.slice/session-3.scope' 'CHIA_ROOT=/home/chia-test/.chia'
+	run "$SCRIPT" target
+	[ "$status" -eq 0 ]
+	[[ "$(cat "$KILL_LOG")" == *"-s TERM 9013"* ]]
 }
 
 @test "verify failure names the only enabled unit" {

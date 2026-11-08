@@ -24,6 +24,7 @@ ALERT_ON_RESTART={{ 1 if chia_monit_alert_on_restart else 0 }}
 HW_RESTART="/etc/monit/monit-hw-vdf-restart-alert.sh"
 VERIFY_SECONDS={{ chia_monit_restart_verify_seconds }}
 CHIA_USER="{{ user }}"
+CHIA_ROOT="{{ chia_root }}"
 READY=(
 	{% if 'full-node' in chia_enabled_services %}
 	"${SERVICE_BASE}-full-node.service:{{ full_node_port }}"
@@ -36,6 +37,12 @@ MANAGED_UNITS=(
 	"${SERVICE_BASE}.target"
 	"${SERVICE_BASE}-daemon.service"
 	{% for service in chia_enabled_services %}
+	"${SERVICE_BASE}-{{ service }}.service"
+	{% endfor %}
+)
+INSTANCE_UNITS=(
+	"${SERVICE_BASE}.target"
+	{% for service in chia_all_services %}
 	"${SERVICE_BASE}-{{ service }}.service"
 	{% endfor %}
 )
@@ -187,14 +194,53 @@ prepare() {
 	load_state || repair_state
 	reset_counters "$(date +%s)"
 }
+proc_cmdline() {
+	local pid=$1
+	tr '\0' ' ' <"${PROC}/${pid}/cmdline" 2>/dev/null || true
+}
 proc_name() {
 	local pid=$1 word
 	IFS= read -r -d '' word <"${PROC}/${pid}/cmdline" 2>/dev/null || true
+	case "${word##*/}" in
+	daemon)
+		# The apt daemon is /opt/chia/daemon until it sets its process title.
+		case "$word" in
+		*/opt/chia/daemon) word=chia_daemon ;;
+		esac
+		;;
+	python | python[0-9]*)
+		# Chia sets chia_daemon as its title, but catch a daemon that has not reached that yet.
+		case "$(proc_cmdline "$pid")" in
+		*"chia.daemon.server"*) word=chia_daemon ;;
+		esac
+		;;
+	esac
 	printf '%s\n' "${word##*/}"
+}
+proc_root() {
+	local pid=$1 entry
+	while IFS= read -r -d '' entry; do
+		case "$entry" in
+		CHIA_ROOT=*)
+			printf '%s\n' "${entry#CHIA_ROOT=}"
+			return 0
+			;;
+		esac
+	done <"${PROC}/${pid}/environ" 2>/dev/null
+	return 1
+}
+unit_for() {
+	local cgroup=$1 unit
+	for unit in "${INSTANCE_UNITS[@]}"; do
+		case "$cgroup" in
+		*"$unit"*) return 0 ;;
+		esac
+	done
+	return 1
 }
 unit_active_for() {
 	local cgroup=$1 unit
-	for unit in "${MANAGED_UNITS[@]}"; do
+	for unit in "${INSTANCE_UNITS[@]}"; do
 		case "$cgroup" in
 		*"$unit"*)
 			if "$SYSTEMCTL" is-active --quiet "$unit"; then return 0; fi
@@ -204,7 +250,7 @@ unit_active_for() {
 	return 1
 }
 is_stray() {
-	local pid=$1 name cgroup stray found=0
+	local pid=$1 name cgroup stray root found=0
 	[ -d "${PROC}/${pid}" ] || return 1
 	[ "$(stat -c %u "${PROC}/${pid}" 2>/dev/null)" = "$CHIA_UID" ] || return 1
 	name=$(proc_name "$pid")
@@ -213,10 +259,20 @@ is_stray() {
 	done
 	[ "$found" -eq 1 ] || return 1
 	cgroup=$(tr '\0' ' ' <"${PROC}/${pid}/cgroup" 2>/dev/null || true)
-	unit_active_for "$cgroup" && return 1
+	if unit_for "$cgroup"; then
+		unit_active_for "$cgroup" && return 1
+		return 0
+	fi
+	# Processes managed by another systemd service belong to another instance.
+	case "$cgroup" in
+	*".service"*) return 1 ;;
+	esac
+	# Outside systemd, only processes using this instance's CHIA_ROOT are ours.
+	root=$(proc_root "$pid") || return 1
+	[ "$root" = "$CHIA_ROOT" ] || return 1
 	return 0
 }
-# Processes owned by the chia user that are not in an active managed unit (for example started outside systemd) are terminated after the stop so the start is clean; processes of other users are not touched.
+# Processes owned by the chia user and belonging to this instance that are not in an active managed unit (for example started outside systemd) are terminated after the stop so the start is clean. Other users and other chia instances that share the user are not touched.
 kill_strays() {
 	local uid pid found=0
 	local -a pids=()
