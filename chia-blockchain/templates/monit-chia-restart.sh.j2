@@ -192,31 +192,17 @@ proc_name() {
 	IFS= read -r -d '' word <"${PROC}/${pid}/cmdline" 2>/dev/null || true
 	printf '%s\n' "${word##*/}"
 }
-unit_active_for() {
-	local cgroup=$1 unit
-	for unit in "${MANAGED_UNITS[@]}"; do
-		case "$cgroup" in
-		*"$unit"*)
-			if "$SYSTEMCTL" is-active --quiet "$unit"; then return 0; fi
-			;;
-		esac
-	done
-	return 1
-}
 is_stray() {
-	local pid=$1 name cgroup stray found=0
+	local pid=$1 name stray found=0
 	[ -d "${PROC}/${pid}" ] || return 1
 	[ "$(stat -c %u "${PROC}/${pid}" 2>/dev/null)" = "$CHIA_UID" ] || return 1
 	name=$(proc_name "$pid")
 	for stray in "${STRAY_NAMES[@]}"; do
 		[ "$name" = "$stray" ] && found=1
 	done
-	[ "$found" -eq 1 ] || return 1
-	cgroup=$(tr '\0' ' ' <"${PROC}/${pid}/cgroup" 2>/dev/null || true)
-	unit_active_for "$cgroup" && return 1
-	return 0
+	[ "$found" -eq 1 ]
 }
-# Processes owned by the chia user that are not in an active managed unit (for example started outside systemd) are terminated after the stop so the start is clean; processes of other users are not touched.
+# Processes owned by the chia user that carry a chia process name are terminated after the stop so the start is clean, including instances not started by systemd. Only one chia instance per host is supported; processes of other users are not touched.
 kill_strays() {
 	local uid pid found=0
 	local -a pids=()

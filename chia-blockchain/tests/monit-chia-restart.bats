@@ -30,12 +30,6 @@ if [ "${1:-}" = show ]; then
 	esac
 	exit 0
 fi
-if [ "${1:-}" = is-active ]; then
-	unit=${!#}
-	for inactive in ${FAKE_INACTIVE_UNITS:-}; do
-		[ "$unit" = "$inactive" ] && exit 3
-	done
-fi
 exit 0
 EOF
 
@@ -382,14 +376,6 @@ start chia.target" ]
 -s KILL 9003" ]
 }
 
-@test "a listed process in an active managed unit is not signalled" {
-	require_non_root
-	make_proc 9004 chia_full_node '0::/system.slice/chia-full-node.service'
-	run "$SCRIPT" target
-	[ "$status" -eq 0 ]
-	[ ! -s "$KILL_LOG" ]
-}
-
 @test "unlisted process names are not signalled" {
 	require_non_root
 	make_proc 9005 sleep '0::/user.slice/user-1000.slice/session-3.scope'
@@ -407,9 +393,8 @@ start chia.target" ]
 	[[ "$(cat "$KILL_LOG")" == *"-s TERM 9007"* ]]
 }
 
-@test "a process in an inactive managed unit is signalled" {
+@test "a listed process in a managed unit is signalled" {
 	require_non_root
-	export FAKE_INACTIVE_UNITS="chia-full-node.service"
 	make_proc 9008 chia_full_node '0::/system.slice/chia-full-node.service'
 	sed -i 's/^VERIFY_SECONDS=.*/VERIFY_SECONDS=0/' "$SCRIPT"
 	run "$SCRIPT" target
