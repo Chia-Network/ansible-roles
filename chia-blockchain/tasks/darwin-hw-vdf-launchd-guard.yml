@@ -1,0 +1,13 @@
+---
+# Keep the test overrides out of any privileged launchctl path. Run this before
+# the first command that becomes root for a takeover or a LaunchDaemon change.
+- name: Require the system launchctl when the role becomes root
+  when: chia_darwin_launchd_become | bool
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_launchctl in ["launchctl", "/bin/launchctl"]
+      - chia_darwin_launchd_dir == "/Library/LaunchDaemons"
+    fail_msg: >-
+      chia_darwin_launchd_become is true, so chia_darwin_launchctl must be
+      launchctl or /bin/launchctl and chia_darwin_launchd_dir must be
+      /Library/LaunchDaemons.

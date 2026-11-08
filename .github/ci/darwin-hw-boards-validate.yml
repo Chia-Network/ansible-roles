@@ -1,0 +1,348 @@
+---
+- name: Validate Darwin ASIC board inventory
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-validate"
+    chia_darwin_home: "{{ work }}/home"
+    chia_darwin_bin_dir: "{{ work }}/home/bin"
+    chia_darwin_log_dir: "{{ work }}/home/Library/Logs/chia"
+    chia_root: "{{ work }}/home/.chia/mainnet"
+  tasks:
+    - name: Reject invalid inventories
+      ansible.builtin.include_tasks: darwin-hw-boards-case.yml
+      vars:
+        hw_case_serial: "{{ item.serial | default('') }}"
+        hw_case_boards: "{{ item.boards | default([]) }}"
+        hw_case_expect: "{{ item.expect }}"
+        hw_case_freq: "{{ item.freq | default(1540) }}"
+        hw_case_voltage: "{{ item.voltage | default('1.0') }}"
+        hw_case_checkpoint: "{{ item.checkpoint | default(500000) }}"
+      loop:
+        - expect: not both
+          serial: FIX-BOARD-0001
+          boards: "{{ fixture_boards }}"
+        - expect: must be a list
+          boards: not-a-list
+        - expect: must be unique
+          boards:
+            - id: 1
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
+            - id: 1
+              device_loc: 1102
+              expected_serial: FIX-BOARD-0002
+        - expect: "1, 2, or 3"
+          boards:
+            - id: 4
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
+        - expect: "1, 2, or 3"
+          boards:
+            - id: "01"
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
+        - expect: "1, 2, or 3"
+          boards:
+            - id: 1.0
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
+        - expect: "1, 2, or 3"
+          boards:
+            - id: "1.0"
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
+        - expect: only allows
+          boards:
+            - id: 1
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
+              mask: 1
+        - expect: must be unique
+          boards:
+            - id: 1
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
+            - id: 2
+              device_loc: 1102
+              expected_serial: FIX-BOARD-0001
+        - expect: must be unique
+          boards:
+            - id: 1
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
+            - id: 2
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0002
+        - expect: device_loc 0
+          boards:
+            - id: 1
+              device_loc: 0
+              expected_serial: FIX-BOARD-0001
+            - id: 2
+              device_loc: 1102
+              expected_serial: FIX-BOARD-0002
+        - expect: expected_serial
+          boards:
+            - id: 1
+              device_loc: 1101
+              expected_serial: "FIX BOARD 00001"
+        - expect: expected_serial
+          boards:
+            - id: 1
+              device_loc: 1101
+              expected_serial: FIX-BOARD-000001
+        - expect: device_loc
+          boards:
+            - id: 1
+              device_loc: abc
+              expected_serial: FIX-BOARD-0001
+        - expect: device_loc
+          boards:
+            - id: 1
+              device_loc: 4294967296
+              expected_serial: FIX-BOARD-0001
+        - expect: proof_threads
+          boards:
+            - id: 1
+              device_loc: 1101
+              expected_serial: FIX-BOARD-0001
+              vdf_threads: 8
+              proof_threads: 8
+        - expect: out of range
+          serial: FIX-BOARD-0001
+          freq: 199
+        - expect: out of range
+          serial: FIX-BOARD-0001
+          voltage: "1.01"
+        - expect: out of range
+          serial: FIX-BOARD-0001
+          checkpoint: 7999
+      loop_control:
+        label: "{{ item.expect }}"
+
+    - name: Accept the legacy single-board settings
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Use legacy mask 5
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_expected_serial: FIX-BOARD-0001
+        chia_darwin_hw_vdf_mask: 5
+    - name: Resolve legacy mask 5
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: Legacy mask 5 keeps two engines and does not pass a device location
+      vars:
+        legacy_board: "{{ chia_darwin_hw_vdf_active[0] }}"
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | length == 1
+          - (legacy_board.id | int) == 1
+          - legacy_board.legacy | bool
+          - (legacy_board.open_delay | int) == 0
+          - legacy_board.device_loc | string | length == 0
+          - (legacy_board.vdfs_mask | int) == 5
+          - (legacy_board.n_vdfs | int) == 2
+          - (legacy_board.vdf_threads | int) == 12
+          - (legacy_board.proof_threads | int) == 11
+          - (chia_darwin_hw_vdf_jobs | selectattr('name', 'equalto', 'hw-vdf') | first).enabled | bool
+          - not ((chia_darwin_hw_vdf_jobs | selectattr('name', 'equalto', 'hw-vdf-2') | first).enabled | bool)
+          - not ((chia_darwin_hw_vdf_jobs | selectattr('name', 'equalto', 'hw-vdf-3') | first).enabled | bool)
+
+    - name: Accept mask 1 and mask 7 on the legacy path
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Use a 15 character legacy serial and mask 1
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_expected_serial: AAAAAAAAAAAAAAA
+        chia_darwin_hw_vdf_mask: 1
+    - name: Resolve legacy mask 1
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: Mask 1 publishes one engine
+      ansible.builtin.assert:
+        that:
+          - (chia_darwin_hw_vdf_active[0].n_vdfs | int) == 1
+          - (chia_darwin_hw_vdf_active[0].vdfs_mask | int) == 1
+          - chia_darwin_hw_vdf_active[0].expected_serial == "AAAAAAAAAAAAAAA"
+    - name: Switch the legacy mask to 7
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_mask: 7
+    - name: Resolve legacy mask 7
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: Mask 7 publishes three engines
+      ansible.builtin.assert:
+        that:
+          - (chia_darwin_hw_vdf_active[0].n_vdfs | int) == 3
+          - (chia_darwin_hw_vdf_active[0].vdfs_mask | int) == 7
+
+    - name: Accept one inventoried board, including device_loc 0
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Use one board at device_loc 0
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_boards:
+          - id: "1"
+            device_loc: 0
+            expected_serial: FIX-BOARD-0001
+    - name: Resolve one inventoried board
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: One inventoried board uses mask 7 and passes device_loc
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | length == 1
+          - not (chia_darwin_hw_vdf_active[0].legacy | bool)
+          - (chia_darwin_hw_vdf_active[0].device_loc | int) == 0
+          - (chia_darwin_hw_vdf_active[0].vdfs_mask | int) == 7
+          - (chia_darwin_hw_vdf_active[0].n_vdfs | int) == 3
+          - (chia_darwin_hw_vdf_active[0].open_delay | int) == 0
+
+    - name: Accept two boards in any list order and give the lowest ID two engines
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Use boards 3 and 1
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_boards:
+          - id: 3
+            device_loc: 1103
+            expected_serial: FIX-BOARD-0003
+          - id: 1
+            device_loc: 1101
+            expected_serial: FIX-BOARD-0001
+    - name: Resolve two boards
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: Lowest ID gets mask 3 and the later slot waits one stagger
+      vars:
+        first: "{{ chia_darwin_hw_vdf_active[0] }}"
+        second: "{{ chia_darwin_hw_vdf_active[1] }}"
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | length == 2
+          - (first.id | int) == 1
+          - (first.vdfs_mask | int) == 3
+          - (first.n_vdfs | int) == 2
+          - (first.open_delay | int) == 0
+          - (second.id | int) == 3
+          - (second.vdfs_mask | int) == 1
+          - (second.n_vdfs | int) == 1
+          - (second.open_delay | int) == (chia_darwin_hw_vdf_open_stagger | int)
+          - (chia_darwin_hw_vdf_jobs | selectattr('name', 'equalto', 'hw-vdf') | first).enabled | bool
+          - not ((chia_darwin_hw_vdf_jobs | selectattr('name', 'equalto', 'hw-vdf-2') | first).enabled | bool)
+          - (chia_darwin_hw_vdf_jobs | selectattr('name', 'equalto', 'hw-vdf-3') | first).enabled | bool
+          - chia_darwin_hw_vdf_jobs | map(attribute='enabled') | map('type_debug') | unique | list == ['bool']
+
+    - name: Accept three boards and a per-board thread override
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Use the three-board fixture at the client limits
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_boards: "{{ fixture_boards }}"
+        chia_darwin_hw_vdf_freq: 2200
+        chia_darwin_hw_vdf_voltage: "0.7"
+        chia_darwin_hw_vdf_checkpoint_threshold: 8000
+    - name: Resolve three boards
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: Three boards are one engine each and the stagger steps by slot
+      vars:
+        board_two: "{{ chia_darwin_hw_vdf_active | selectattr('name', 'equalto', 'hw-vdf-2') | first }}"
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | length == 3
+          - chia_darwin_hw_vdf_active | map(attribute='n_vdfs') | map('int') | unique | list == [1]
+          - chia_darwin_hw_vdf_active | map(attribute='vdfs_mask') | map('int') | unique | list == [1]
+          - (chia_darwin_hw_vdf_active[0].open_delay | int) == 0
+          - (chia_darwin_hw_vdf_active[1].open_delay | int) == 15
+          - (chia_darwin_hw_vdf_active[2].open_delay | int) == 30
+          - (board_two.vdf_threads | int) == 8
+          - (board_two.proof_threads | int) == 4
+          - (chia_darwin_hw_vdf_active[0].vdf_threads | int) == 12
+          - (chia_darwin_hw_vdf_freq | int) == 2200
+          - chia_darwin_hw_vdf_voltage | string == "0.7"
+
+    - name: Disabling the client ignores inventory and retires every slot
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Turn the ASIC client off
+      ansible.builtin.set_fact:
+        chia_darwin_enable_hw_vdf: false
+        chia_darwin_hw_vdf_boards: "{{ fixture_boards }}"
+    - name: Resolve with the client disabled
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: No board is enabled
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | length == 0
+          - chia_darwin_hw_vdf_jobs | map(attribute='enabled') | map('bool') | select('equalto', true) | list | length == 0
+          - chia_darwin_hw_vdf_jobs | length == 3
+
+- name: Check mode still resolves three boards
+  tags: [checkmode]
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-check"
+    chia_darwin_home: "{{ work }}/home"
+    chia_darwin_bin_dir: "{{ work }}/home/bin"
+    chia_darwin_log_dir: "{{ work }}/home/Library/Logs/chia"
+    chia_root: "{{ work }}/home/.chia/mainnet"
+  tasks:
+    - name: Reset inputs for check mode
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: Use three fixture boards
+      ansible.builtin.set_fact:
+        chia_darwin_hw_vdf_boards: "{{ fixture_boards }}"
+    - name: Resolve three boards in check mode
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: Check mode does not write a wrapper
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | map(attribute='n_vdfs') | map('int') | sum == 3
+          - not ((chia_darwin_bin_dir ~ '/chia-hw-vdf-run.sh') is file)
+
+- name: Check ASIC validation order
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Read the Darwin role tasks
+      ansible.builtin.slurp:
+        src: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin.yml"
+      register: darwin_tasks
+    - name: Shared ASIC validation runs before the host changes
+      vars:
+        text: "{{ darwin_tasks.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - "text.count('include_tasks: darwin-hw-vdf-validate.yml') == 1"
+          - "text.index('include_tasks: darwin-hw-vdf-validate.yml') < text.index('Ensure the timelord service user exists')"
+          - "text.index('include_tasks: darwin-hw-vdf-validate.yml') < text.index('Apply pmset so the host stays awake')"
+          - "text.index('include_tasks: darwin-hw-vdf-validate.yml') < text.index('Install Homebrew packages as the connecting user')"
+          - "text.index('include_tasks: darwin-hw-vdf-validate.yml') < text.index('Install chiavdf from the Chia Homebrew tap')"
+
+    - name: Boards resolution, launchd ownership, and wrapper install keep that order
+      vars:
+        text: "{{ darwin_tasks.content | b64decode }}"
+        boards: "include_tasks: darwin-hw-vdf-boards.yml"
+        ownership: "include_tasks: darwin-hw-vdf-launchd.yml"
+        install: "include_tasks: darwin-hw-vdf-install.yml"
+      ansible.builtin.assert:
+        that:
+          - "text.count(boards) == 1"
+          - "text.count(ownership) == 1"
+          - "text.count(install) == 1"
+          - "text.index(boards) < text.index(ownership)"
+          - "text.index(ownership) < text.index(install)"

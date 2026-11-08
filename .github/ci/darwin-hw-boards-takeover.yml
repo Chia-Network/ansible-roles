@@ -1,0 +1,584 @@
+---
+- name: Apply auto-discovered boards over legacy and hand-written wrappers
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-takeover"
+    launch_log: "{{ work }}/launchctl.log"
+    launch_state: "{{ work }}/state"
+    hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-takeover-legacy.txt"
+  tasks:
+    - name: Create the shared takeover tree
+      ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
+    - name: Install a client that requires the old jobs to be gone before --list
+      ansible.builtin.copy:
+        dest: "{{ chia_darwin_hw_vdf_client }}"
+        mode: "0755"
+        content: |
+          #!/bin/sh
+          log="{{ work }}/client.log"
+          printf 'client %s\n' "$*" >>"$log"
+          for path in \
+            "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh" \
+            "{{ chia_darwin_bin_dir }}/chia-hw-vdf-2-run.sh" \
+            "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf.plist" \
+            "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf-2.plist"; do
+            if [ -f "$path" ]; then
+              printf 'present %s\n' "$path" >>"$log"
+              grep -H '^SERIAL=' "$path" >>"$log" 2>/dev/null || true
+            fi
+          done
+          for label in net.chia.timelord.hw-vdf net.chia.timelord.hw-vdf-2; do
+            if [ -f "{{ launch_state }}/loaded/$label" ]; then
+              echo "$label still holds a board before --list" >&2
+              exit 93
+            fi
+          done
+          cat "{{ hw_vdf_list_fixture }}" >&2
+    - name: Plant the old wrappers and LaunchDaemon plists
+      ansible.builtin.include_tasks: darwin-hw-boards-legacy-fixture.yml
+      vars:
+        hw_legacy_wrappers:
+          - name: hw-vdf
+            content: "{{ fixture_legacy_wrapper }}"
+          - name: hw-vdf-2
+            content: "{{ fixture_hand_wrapper_29999 }}"
+        hw_legacy_plists:
+          - label: net.chia.timelord.hw-vdf
+            wrapper: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+          - label: net.chia.timelord.hw-vdf-2
+            wrapper: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-2-run.sh"
+        hw_legacy_loaded:
+          - net.chia.timelord.hw-vdf
+          - net.chia.timelord.hw-vdf-2
+    - name: Apply auto-discovered boards over the old wrappers
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards: []
+    - name: Read the takeover wrappers
+      ansible.builtin.slurp:
+        src: "{{ chia_darwin_bin_dir }}/chia-{{ item }}-run.sh"
+      loop:
+        - hw-vdf
+        - hw-vdf-2
+        - hw-vdf-3
+      register: takeover_scripts
+    - name: List loaded takeover jobs
+      ansible.builtin.find:
+        paths: "{{ launch_state }}/loaded"
+        patterns: "*"
+        file_type: file
+      register: takeover_loaded
+    - name: Read the takeover client log
+      ansible.builtin.slurp:
+        src: "{{ work }}/client.log"
+      register: takeover_client_log
+    - name: Auto-discovery replaces the old jobs with three discovered boards
+      vars:
+        names: "{{ takeover_loaded.files | map(attribute='path') | map('basename') | sort }}"
+        scripts: "{{ takeover_scripts.results | map(attribute='content') | map('b64decode') | list }}"
+        log_text: "{{ hw_apply_log.content | b64decode }}"
+        client_log: "{{ takeover_client_log.content | b64decode }}"
+        before_bootstrap: "{{ log_text.split('bootstrap')[0] }}"
+      ansible.builtin.assert:
+        that:
+          - names == ['net.chia.timelord.hw-vdf', 'net.chia.timelord.hw-vdf-2', 'net.chia.timelord.hw-vdf-3']
+          - scripts[0] is search('# Managed by the chia-blockchain Ansible role.')
+          - scripts[0] is search('SERIAL=CHIA9999999001A')
+          - scripts[0] is search('DEVICE_LOC=22001')
+          - scripts[0] is search('VDFS_MASK=1')
+          - scripts[0] is not search('CHIA9999999099')
+          - scripts[1] is search('# Managed by the chia-blockchain Ansible role.')
+          - scripts[1] is search('SERIAL=CHIA9999999002A')
+          - scripts[1] is search('DEVICE_LOC=22002')
+          - scripts[1] is search('VDFS_MASK=1')
+          - scripts[2] is search('# Managed by the chia-blockchain Ansible role.')
+          - scripts[2] is search('SERIAL=CHIA9999999099A')
+          - scripts[2] is search('DEVICE_LOC=22999')
+          - scripts[2] is search('VDFS_MASK=1')
+          - before_bootstrap is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf$')
+          - before_bootstrap is search('(?m)^bootout system/net\\.chia\\.timelord\\.hw-vdf-2$')
+          - client_log is search('client --list')
+          - client_log is search('SERIAL=CHIA9999999099')
+          - client_log is search('SERIAL=CHIA9999999002')
+          - client_log is search('net.chia.timelord.hw-vdf.plist')
+          - client_log is search('net.chia.timelord.hw-vdf-2.plist')
+          - (chia_darwin_launchd_dir ~ '/net.chia.timelord.hw-vdf-3.plist') is file
+
+- name: Refuse takeover when another plist runs a slot wrapper
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-takeover-foreign"
+    hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-2.txt"
+  tasks:
+    - name: Refuse takeover for a regular and a symlinked foreign plist
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-shared.yml
+      loop:
+        - work: "{{ work }}/regular"
+          symlink: false
+        - work: "{{ work }}/symlink"
+          symlink: true
+        - work: "{{ work }}/dangling"
+          symlink: false
+          dangling: true
+          load_foreign: false
+          sentinel: takeover skipped a dangling first plist
+          failure_expect:
+            - Could not check every LaunchDaemon plist
+            - Refusing the takeover
+          refusal_names:
+            - net.chia.timelord.hw-vdf
+        - work: "{{ work }}/spaced foreign"
+          symlink: false
+      loop_control:
+        loop_var: hw_foreign_scenario
+        label: "{{ 'symlink' if hw_foreign_scenario.symlink else 'regular' }}"
+
+- name: Refuse takeover when the slot plist declares a different Label
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-takeover-label"
+    launch_log: "{{ work }}/launchctl.log"
+    launch_state: "{{ work }}/state"
+    hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-takeover-wrong-label.txt"
+    hw_label_paths:
+      - "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+      - "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf.plist"
+  tasks:
+    - name: Create the shared wrong-label takeover tree
+      ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
+    - name: Install a client that records whether enumeration ran
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-client.yml
+    - name: Plant the legacy wrapper and its wrong-Label plist
+      ansible.builtin.include_tasks: darwin-hw-boards-legacy-slot.yml
+      vars:
+        hw_slot_declared_label: com.example.hw-vdf
+        hw_slot_loaded: com.example.hw-vdf
+    - name: Snapshot the files before the wrong-label takeover
+      ansible.builtin.include_tasks: darwin-hw-boards-snapshot.yml
+      vars:
+        hw_snapshot_var: hw_label_before
+        hw_snapshot_paths: "{{ hw_label_paths }}"
+    - name: Refuse a slot plist whose Label is not the slot label
+      ansible.builtin.include_tasks: darwin-hw-boards-expect-takeover-failure.yml
+      vars:
+        hw_failure_sentinel: takeover accepted a board another job still holds
+        hw_failure_expect:
+          - net.chia.timelord.hw-vdf
+          - CHIA9999999099
+          - still hidden
+    - name: Check the wrong-label takeover changed nothing
+      ansible.builtin.include_tasks: darwin-hw-boards-refusal-check.yml
+      vars:
+        hw_refusal_before: "{{ hw_label_before }}"
+        hw_refusal_paths: "{{ hw_label_paths }}"
+        hw_refusal_names:
+          - com.example.hw-vdf
+        hw_refusal_client_ran: true
+        hw_refusal_allow_bootout: true
+
+- name: Refuse takeover when a LaunchAgent holds a board
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-takeover-agent"
+    launch_log: "{{ work }}/launchctl.log"
+    launch_state: "{{ work }}/state"
+    hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-1.txt"
+    hw_agent_dir: "{{ work }}/LaunchAgents"
+  tasks:
+    - name: Create the shared LaunchAgent takeover tree
+      vars:
+        hw_tree_dirs:
+          - "{{ hw_agent_dir }}"
+      ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
+    - name: Install a client that also hides boards held by LaunchAgents
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-client.yml
+      vars:
+        hw_client_plist_dirs_list:
+          - "{{ chia_darwin_launchd_dir }}"
+          - "{{ hw_agent_dir }}"
+    - name: Plant an unowned slot wrapper
+      ansible.builtin.include_tasks: darwin-hw-boards-legacy-fixture.yml
+      vars:
+        hw_legacy_wrappers:
+          - name: hw-vdf
+            content: |
+              #!/bin/zsh
+              # Hand-written, not managed by this role.
+              SERIAL=CHIA9999999001
+        hw_legacy_plists: []
+        hw_legacy_loaded: []
+    - name: Write a LaunchAgent plist that runs the slot wrapper
+      ansible.builtin.copy:
+        dest: "{{ hw_agent_dir }}/com.example.hw-vdf-agent.plist"
+        mode: "0644"
+        content: |
+          <?xml version="1.0" encoding="UTF-8"?>
+          <plist version="1.0"><dict>
+          <key>Label</key><string>com.example.hw-vdf-agent</string>
+          <key>ProgramArguments</key>
+          <array><string>{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh</string></array>
+          </dict></plist>
+    - name: Mark the LaunchAgent job loaded
+      ansible.builtin.file:
+        path: "{{ launch_state }}/loaded/com.example.hw-vdf-agent"
+        state: touch
+        mode: "0644"
+    - name: A LaunchAgent holder keeps the takeover board hidden
+      ansible.builtin.include_tasks: darwin-hw-boards-expect-takeover-failure.yml
+      vars:
+        hw_failure_sentinel: takeover accepted a board held by a LaunchAgent
+        hw_failure_expect:
+          - net.chia.timelord.hw-vdf
+          - CHIA9999999001
+          - still hidden
+    - name: The LaunchAgent holder and the wrapper were left alone
+      vars:
+        wrapper: "{{ lookup('ansible.builtin.file', chia_darwin_bin_dir ~ '/chia-hw-vdf-run.sh') }}"
+      ansible.builtin.assert:
+        that:
+          - wrapper is search('SERIAL=CHIA9999999001')
+          - (hw_agent_dir ~ '/com.example.hw-vdf-agent.plist') is file
+          - (launch_state ~ '/loaded/com.example.hw-vdf-agent') is file
+
+- name: Take over a hand-written wrapper with a quoted serial
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-takeover-quoted"
+    launch_log: "{{ work }}/launchctl.log"
+    launch_state: "{{ work }}/state"
+    hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-1.txt"
+  tasks:
+    - name: Create the shared quoted-serial takeover tree
+      ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
+    - name: Install a client that hides boards held by loaded jobs
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-client.yml
+    - name: Plant a hand-written wrapper with a quoted serial
+      ansible.builtin.include_tasks: darwin-hw-boards-legacy-fixture.yml
+      vars:
+        hw_legacy_wrappers:
+          - name: hw-vdf
+            content: |
+              #!/bin/zsh
+              # Hand-written, not managed by this role.
+              SERIAL='CHIA9999999001A'
+              DEVICE_LOC=29999
+        hw_legacy_plists: []
+        hw_legacy_loaded: []
+    - name: Apply auto-discovery over the quoted serial
+      ansible.builtin.include_tasks: darwin-hw-boards-apply.yml
+      vars:
+        hw_apply_serial: ""
+        hw_apply_boards: []
+    - name: The quoted serial is visible and taken over
+      vars:
+        board: "{{ chia_darwin_hw_vdf_active | first }}"
+        wrapper: "{{ lookup('ansible.builtin.file', chia_darwin_bin_dir ~ '/chia-hw-vdf-run.sh') }}"
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_hw_vdf_active | length == 1
+          - board.expected_serial == 'CHIA9999999001A'
+          - wrapper is search('SERIAL=CHIA9999999001A')
+          - wrapper is search('DEVICE_LOC=21001')
+
+- name: Refuse takeover when the plist directory cannot be read
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-takeover-skip"
+    launch_log: "{{ work }}/launchctl.log"
+    launch_state: "{{ work }}/state"
+    hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-2.txt"
+    hw_skip_paths:
+      - "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+      - "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf.plist"
+  tasks:
+    - name: Create the shared skipped-path takeover tree
+      ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
+    - name: Install the client and plant the old wrapper and plist
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-legacy-client.yml
+    - name: Snapshot the files before the skipped-path takeover
+      ansible.builtin.include_tasks: darwin-hw-boards-snapshot.yml
+      vars:
+        hw_snapshot_var: hw_skip_before
+        hw_snapshot_paths: "{{ hw_skip_paths }}"
+    - name: Make the plist directory unreadable
+      ansible.builtin.file:
+        path: "{{ chia_darwin_launchd_dir }}"
+        state: directory
+        mode: "0000"
+    - name: Expect takeover to fail when the plist directory is unreadable
+      ansible.builtin.include_tasks: darwin-hw-boards-expect-takeover-failure.yml
+      vars:
+        hw_failure_sentinel: takeover accepted a plist search that skipped a path
+        hw_failure_expect:
+          - Could not check every LaunchDaemon plist
+          - Permission denied
+    - name: Restore the plist directory permissions
+      ansible.builtin.file:
+        path: "{{ chia_darwin_launchd_dir }}"
+        state: directory
+        mode: "0755"
+    - name: Check the skipped-path takeover changed nothing
+      ansible.builtin.include_tasks: darwin-hw-boards-refusal-check.yml
+      vars:
+        hw_refusal_before: "{{ hw_skip_before }}"
+        hw_refusal_paths: "{{ hw_skip_paths }}"
+        hw_refusal_names:
+          - net.chia.timelord.hw-vdf
+
+- name: Restore old jobs when takeover fails after stopping them
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin hw takeover restore"
+    launch_log: "{{ work }}/launchctl.log"
+    launch_state: "{{ work }}/state"
+    hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-takeover-restore.txt"
+    hw_restore_paths:
+      - "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+      - "{{ chia_darwin_bin_dir }}/chia-hw-vdf-2-run.sh"
+      - "{{ chia_darwin_bin_dir }}/chia-hw-vdf-3-run.sh"
+      - "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf.plist"
+      - "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf-2.plist"
+      - "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf-3.plist"
+    hw_restore_names:
+      - net.chia.timelord.hw-vdf
+      - net.chia.timelord.hw-vdf-2
+    hw_restore_guard_labels:
+      - net.chia.timelord.hw-vdf
+      - net.chia.timelord.hw-vdf-2
+      - net.chia.timelord.hw-vdf-3
+  tasks:
+    - name: Create the shared takeover restoration tree
+      ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
+    - name: Install a client that requires the old jobs to be gone first
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-client.yml
+      vars:
+        hw_client_guard_labels: "{{ hw_restore_guard_labels }}"
+    - name: Plant the old wrappers, plists, and loaded jobs
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-restore-fixture.yml
+    - name: Snapshot the old files before the failed takeover
+      ansible.builtin.include_tasks: darwin-hw-boards-snapshot.yml
+      vars:
+        hw_snapshot_var: hw_restore_before
+        hw_snapshot_paths: "{{ hw_restore_paths }}"
+    - name: Too many visible boards fails after the old jobs stop
+      ansible.builtin.include_tasks: darwin-hw-boards-expect-takeover-failure.yml
+      vars:
+        hw_failure_sentinel: takeover accepted more than three boards
+        hw_failure_expect:
+          - supports 1 to at most 3
+          - found 4 boards
+    - name: Check the overcapacity failure restored the old jobs
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-restore-check.yml
+    - name: Install a client whose --list command fails after the old jobs stop
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-client.yml
+      vars:
+        hw_client_guard_labels: "{{ hw_restore_guard_labels }}"
+        hw_client_post_list: |
+          echo "synthetic --list failure" >&2
+          exit 42
+    - name: A failing --list command fails after the old jobs stop
+      ansible.builtin.include_tasks: darwin-hw-boards-expect-takeover-failure.yml
+      vars:
+        hw_failure_sentinel: takeover accepted a failing --list command
+        hw_failure_expect:
+          - rc 42
+          - synthetic --list failure
+    - name: Check the failed --list command restored the old jobs
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-restore-check.yml
+    - name: Install a client that removes one old plist before the merge fails
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-client.yml
+      vars:
+        hw_client_guard_labels: "{{ hw_restore_guard_labels }}"
+        hw_client_pre_list: |
+          rm -f "{{ chia_darwin_launchd_dir }}/net.chia.timelord.hw-vdf-2.plist"
+    - name: A failed restore names the job left down after a failed takeover
+      ansible.builtin.include_tasks: darwin-hw-boards-expect-takeover-failure.yml
+      vars:
+        hw_failure_sentinel: takeover hid a failed old-job restore
+        hw_failure_expect:
+          - Could not restore
+          - net.chia.timelord.hw-vdf-2
+
+- name: Restore later old jobs when an earlier restore fails
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    hw_best_effort_base: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-takeover-best-effort"
+  tasks:
+    - name: Keep restoring after the first old job fails to come back
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-restore-best-effort.yml
+      loop:
+        - work: "{{ hw_best_effort_base }}/boot"
+          start_on_boot: true
+        - work: "{{ hw_best_effort_base }}/no-boot"
+          start_on_boot: false
+      loop_control:
+        loop_var: hw_best_effort
+        label: "{{ hw_best_effort.work | basename }}"
+
+- name: Restore disabled-at-boot jobs after a failed takeover
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-takeover-disabled"
+    launch_log: "{{ work }}/launchctl.log"
+    launch_state: "{{ work }}/state"
+    hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-2.txt"
+    hw_apply_start_on_boot: false
+    hw_disabled_guard_labels:
+      - net.chia.timelord.hw-vdf
+      - net.chia.timelord.hw-vdf-2
+  tasks:
+    - name: Create the shared disabled-at-boot takeover tree
+      ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
+    - name: Install a client whose --list command fails after the old jobs stop
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-client.yml
+      vars:
+        hw_client_post_list: |
+          echo "synthetic --list failure" >&2
+          exit 42
+    - name: Plant the old wrappers, plists, and loaded jobs
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-restore-fixture.yml
+    - name: Mark the loaded old jobs disabled at boot
+      ansible.builtin.file:
+        path: "{{ launch_state }}/disabled/{{ item }}"
+        state: touch
+        mode: "0644"
+      loop: "{{ hw_disabled_guard_labels }}"
+    - name: The failing --list still restores the disabled old jobs
+      ansible.builtin.include_tasks: darwin-hw-boards-expect-takeover-failure.yml
+      vars:
+        hw_failure_sentinel: takeover left the disabled old jobs down
+        hw_failure_expect:
+          - rc 42
+          - synthetic --list failure
+    - name: List the jobs after the disabled-at-boot restore
+      ansible.builtin.find:
+        paths: "{{ launch_state }}/loaded"
+        patterns: "*"
+        file_type: file
+      register: hw_disabled_loaded
+    - name: Read the disabled-at-boot restore log
+      ansible.builtin.slurp:
+        src: "{{ launch_log }}"
+      register: hw_disabled_log
+    - name: Disabled-at-boot jobs are enabled, started, and disabled again
+      vars:
+        names: "{{ hw_disabled_loaded.files | map(attribute='path') | map('basename') | sort }}"
+        log_text: "{{ hw_disabled_log.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - names == hw_disabled_guard_labels
+          - log_text is search('(?m)^enable system/net\\.chia\\.timelord\\.hw-vdf$')
+          - log_text is search('(?m)^enable system/net\\.chia\\.timelord\\.hw-vdf-2$')
+          - log_text is search('(?m)^bootstrap system .*/net\\.chia\\.timelord\\.hw-vdf\\.plist$')
+          - log_text is search('(?m)^bootstrap system .*/net\\.chia\\.timelord\\.hw-vdf-2\\.plist$')
+          - log_text is search('(?m)^disable system/net\\.chia\\.timelord\\.hw-vdf$')
+          - log_text is search('(?m)^disable system/net\\.chia\\.timelord\\.hw-vdf-2$')
+          - not (log_text is search('bootstrap system .*/net\\.chia\\.timelord\\.hw-vdf-3\\.plist'))
+          - (launch_state ~ '/disabled/net.chia.timelord.hw-vdf') is file
+          - (launch_state ~ '/disabled/net.chia.timelord.hw-vdf-2') is file
+          - not ((launch_state ~ '/disabled/net.chia.timelord.hw-vdf-3') is file)
+
+- name: Keep old jobs running when a later step fails
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-inject"
+    launch_log: "{{ work }}/launchctl.log"
+    launch_state: "{{ work }}/state"
+    hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-1.txt"
+  tasks:
+    - name: Create the shared failure-injection tree
+      ansible.builtin.include_tasks: darwin-hw-boards-tree.yml
+    - name: Install a client that hides boards held by loaded jobs
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-client.yml
+    - name: Plant a loaded legacy wrapper for the failure injection
+      ansible.builtin.include_tasks: darwin-hw-boards-legacy-fixture.yml
+      vars:
+        hw_legacy_wrappers:
+          - name: hw-vdf
+            content: |
+              #!/bin/zsh
+              # Managed by the chia-blockchain Ansible role.
+              SERIAL=CHIA9999999001
+        hw_legacy_plists:
+          - label: net.chia.timelord.hw-vdf
+            wrapper: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-run.sh"
+        hw_legacy_loaded:
+          - net.chia.timelord.hw-vdf
+    - name: Reset inputs before the failure injection
+      ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+    - name: A failure after discovery leaves the old job running
+      block:
+        - name: Discover the boards before the injected failure
+          ansible.builtin.include_role:
+            name: chia-blockchain
+            tasks_from: darwin-hw-vdf-boards.yml
+        - name: Inject a failure between discovery and install
+          ansible.builtin.fail:
+            msg: synthetic downstream failure
+      rescue:
+        - name: The old job is still loaded after the downstream failure
+          ansible.builtin.assert:
+            that:
+              - (launch_state ~ '/loaded/net.chia.timelord.hw-vdf') is file
+              - (chia_darwin_bin_dir ~ '/chia-hw-vdf-run.sh') is file
+
+- name: Refuse takeover while an old job stays loaded
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - darwin-hw-boards-fixture.yml
+  vars:
+    work: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-takeover-stuck"
+    launch_log: "{{ work }}/launchctl.log"
+    launch_state: "{{ work }}/state"
+    hw_vdf_list_fixture: "{{ playbook_dir }}/files/hw-vdf-list-2.txt"
+  tasks:
+    - name: Refuse each stuck or failed bootout
+      ansible.builtin.include_tasks: darwin-hw-boards-takeover-refuse.yml
+      loop:
+        - hold
+        - fail
+      loop_control:
+        loop_var: hw_takeover_failure

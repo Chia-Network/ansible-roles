@@ -1,0 +1,139 @@
+---
+# The pip module imports packaging or setuptools from the interpreter that
+# runs modules. This play uses an interpreter that has neither, which is what
+# discovery selects on a fresh Homebrew python@3.13, and installs the way
+# tasks/darwin.yml does.
+- name: Install through the virtualenv when the module interpreter is bare
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ mod_python }}"
+  tasks:
+    - name: Assume the pip module succeeded until it does not
+      ansible.builtin.set_fact:
+        bare_pip_failed: false
+        bare_pip_msg: ""
+
+    - name: The pip module requires packaging or setuptools
+      block:
+        - name: Try the pip module against a bare interpreter
+          ansible.builtin.pip:
+            name: wheel
+            state: present
+            virtualenv: "{{ work_venv }}"
+      rescue:
+        - name: Record the pip module failure
+          ansible.builtin.set_fact:
+            bare_pip_failed: true
+            bare_pip_msg: "{{ ansible_failed_result.msg | default('') }}"
+
+    - name: The bare interpreter is missing packaging
+      ansible.builtin.assert:
+        that:
+          - bare_pip_failed | bool
+          - bare_pip_msg is search('Failed to import the required Python library \\(packaging\\)')
+          - mod_python in bare_pip_msg
+        fail_msg: >-
+          ansible.builtin.pip on {{ mod_python }} did not fail the way a
+          Homebrew python without packaging does. Result: {{ bare_pip_msg }}
+
+    - name: Create a virtualenv with the bare interpreter
+      ansible.builtin.command:
+        argv:
+          - "{{ mod_python }}"
+          - -m
+          - venv
+          - "{{ work_venv }}"
+        creates: "{{ work_venv }}/bin/python"
+
+    - name: Ensure pip, setuptools, and wheel are in the virtualenv
+      ansible.builtin.command:
+        argv:
+          - "{{ work_venv }}/bin/python"
+          - -m
+          - pip
+          - install
+          - --extra-index-url
+          - https://pypi.chia.net/simple
+          - pip
+          - setuptools
+          - wheel
+      register: pip_bootstrap
+      changed_when: "'Successfully installed' in pip_bootstrap.stdout"
+
+    - name: The virtualenv install changed and kept both indexes
+      ansible.builtin.assert:
+        that:
+          - pip_bootstrap is changed
+          - "'https://pypi.org/simple' in pip_bootstrap.stdout"
+          - "'https://pypi.chia.net/simple' in pip_bootstrap.stdout"
+
+    - name: A second install of the same packages is already satisfied
+      ansible.builtin.command:
+        argv:
+          - "{{ work_venv }}/bin/python"
+          - -m
+          - pip
+          - install
+          - --extra-index-url
+          - https://pypi.chia.net/simple
+          - pip
+          - setuptools
+          - wheel
+      register: pip_bootstrap_again
+      changed_when: "'Successfully installed' in pip_bootstrap_again.stdout"
+
+    - name: The second install does not report a change
+      ansible.builtin.assert:
+        that:
+          - pip_bootstrap_again is not changed
+          - "'already satisfied' in (pip_bootstrap_again.stdout | lower)"
+
+    - name: Install a pinned distribution
+      ansible.builtin.command:
+        argv:
+          - "{{ work_venv }}/bin/python"
+          - -m
+          - pip
+          - install
+          - --extra-index-url
+          - https://pypi.chia.net/simple
+          - six==1.16.0
+      register: pin_old
+      changed_when: "'Successfully installed' in pin_old.stdout"
+
+    - name: Move that pin to another version
+      ansible.builtin.command:
+        argv:
+          - "{{ work_venv }}/bin/python"
+          - -m
+          - pip
+          - install
+          - --extra-index-url
+          - https://pypi.chia.net/simple
+          - six==1.17.0
+      register: pin_new
+      changed_when: "'Successfully installed' in pin_new.stdout"
+
+    - name: Reinstall the same pin
+      ansible.builtin.command:
+        argv:
+          - "{{ work_venv }}/bin/python"
+          - -m
+          - pip
+          - install
+          - --extra-index-url
+          - https://pypi.chia.net/simple
+          - six==1.17.0
+      register: pin_same
+      changed_when: "'Successfully installed' in pin_same.stdout"
+
+    - name: A version pin installs, replaces, and then stays
+      ansible.builtin.assert:
+        that:
+          - pin_old is changed
+          - pin_new is changed
+          - pin_same is not changed
+          - "'https://pypi.org/simple' in pin_same.stdout"
+          - "'https://pypi.chia.net/simple' in pin_same.stdout"

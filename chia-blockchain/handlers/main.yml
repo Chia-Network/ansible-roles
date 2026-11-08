@@ -22,3 +22,14 @@
   register: systemd_action
   retries: 10
   until: systemd_action is success
+
+- name: Note that the Darwin service jobs must restart
+  ansible.builtin.set_fact:
+    chia_darwin_restart_services: true
+  listen: restart-chia-darwin
+
+- name: restart-chia-darwin-ordered
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/darwin-restart-ordered.yml"
+  listen:
+    - restart-chia-darwin
+    - restart-chia-darwin-boards

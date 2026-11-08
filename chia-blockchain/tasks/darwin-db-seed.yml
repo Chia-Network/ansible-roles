@@ -1,0 +1,271 @@
+---
+# Initial database seeding for a Darwin full node. This is not an ongoing
+# snapshot refresh and it is not integrity repair. It runs after chia init and
+# before the LaunchDaemons are installed.
+#
+# The main database is replaced only when it is absent or a regular file of at
+# most chia_darwin_db_seed_stub_bytes (the stub chia init creates). An existing
+# larger database, directory, or symlink is left in place. The two cache files
+# are published with the main database because they must match it. Chia can
+# regenerate them when they are missing, but replacing them here keeps a fresh
+# seed from starting with a cache left over from an old database.
+#
+# The include in darwin.yml already requires a local topology, a nonempty
+# bucket, and download_blockchain_db. This file decides from the database stat
+# whether there is anything to do, then acts once.
+
+- name: Resolve the Darwin S3 database seed paths
+  ansible.builtin.set_fact:
+    chia_darwin_db_seed_db_dir: "{{ chia_root }}/db"
+    chia_darwin_db_seed_main_name: "blockchain_{{ db_version }}_{{ network }}.sqlite"
+    chia_darwin_db_seed_staging_dir: "{{ chia_root }}/db/.chia-s3-seed-{{ network }}"
+    chia_darwin_db_seed_caches:
+      - height-to-hash
+      - sub-epoch-summaries
+
+- name: List the Darwin S3 database seed files, main database last
+  ansible.builtin.set_fact:
+    chia_darwin_db_seed_files: "{{ chia_darwin_db_seed_caches + [chia_darwin_db_seed_main_name] }}"
+
+- name: Inspect the current Darwin database
+  ansible.builtin.stat:
+    path: "{{ chia_darwin_db_seed_db_dir }}/{{ chia_darwin_db_seed_main_name }}"
+    follow: false
+  register: chia_darwin_db_seed_main
+
+- name: Decide whether the Darwin database needs an initial seed
+  ansible.builtin.set_fact:
+    chia_darwin_db_seed_needed: >-
+      {{
+        not (chia_darwin_db_seed_main.stat.exists | default(false)) or
+        (
+          (chia_darwin_db_seed_main.stat.isreg | default(false)) and
+          (chia_darwin_db_seed_main.stat.size | default(0) | int)
+          <= (chia_darwin_db_seed_stub_bytes | int)
+        )
+      }}
+
+- name: Explain why an existing Darwin database will not be replaced
+  ansible.builtin.debug:
+    msg: >-
+      {{ chia_darwin_db_seed_db_dir }}/{{ chia_darwin_db_seed_main_name }}
+      already exists and is not a regular file of at most
+      {{ chia_darwin_db_seed_stub_bytes }} bytes. Leaving it untouched. This
+      role seeds an absent database or a chia init stub, and does not repair or
+      refresh an existing database.
+  when: not (chia_darwin_db_seed_needed | bool)
+
+- name: Seed the Darwin full-node database when it is absent or a stub
+  when: chia_darwin_db_seed_needed | bool
+  block:
+    - name: Report a Darwin database seed skipped by check mode
+      ansible.builtin.debug:
+        msg: >-
+          Check mode: would seed the {{ chia_darwin_topology }} database at
+          {{ chia_darwin_db_seed_db_dir }}/{{ chia_darwin_db_seed_main_name }}
+          from s3://{{ blockchain_backup_bucket }}/{{ network }}/ after staging
+          all snapshot files.
+      changed_when: true
+      when: ansible_check_mode
+
+    - name: Inspect the snapshot cache destinations
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_db_seed_db_dir }}/{{ item }}"
+        follow: false
+      loop: "{{ chia_darwin_db_seed_caches }}"
+      register: chia_darwin_db_seed_cache_stats
+
+    - name: Refuse to replace a directory or symlink at a cache path
+      ansible.builtin.assert:
+        that:
+          - not (item.stat.isdir | default(false))
+          - not (item.stat.islnk | default(false))
+        fail_msg: >-
+          {{ item.stat.path | default(item.item) }} is a directory or symlink.
+          Refusing to remove it. Move it aside before seeding.
+      loop: "{{ chia_darwin_db_seed_cache_stats.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Check whether the full node is loaded before replacing its database
+      ansible.builtin.command:
+        argv:
+          - "{{ chia_darwin_launchctl }}"
+          - print
+          - "system/{{ chia_darwin_launchd_prefix }}.full-node"
+      register: chia_darwin_db_seed_node
+      changed_when: false
+      failed_when: false
+      check_mode: false
+      become: "{{ chia_darwin_launchd_become | bool }}"
+
+    - name: Refuse to replace a database under a loaded full node
+      ansible.builtin.fail:
+        msg: >-
+          The {{ chia_darwin_launchd_prefix }}.full-node LaunchDaemon is loaded.
+          Refusing to replace its database while the node may be running. Stop it
+          with "sudo launchctl bootout system/{{ chia_darwin_launchd_prefix }}.full-node"
+          and rerun. This role never replaces a live node's database.
+      when: chia_darwin_db_seed_node.rc | default(1) == 0
+
+    - name: Ensure the AWS CLI is available for the database seed
+      when: not ansible_check_mode
+      become: false
+      block:
+        - name: Check whether the AWS CLI formula is installed
+          ansible.builtin.command:
+            argv:
+              - "{{ chia_darwin_brew }}"
+              - list
+              - --versions
+              - "{{ chia_darwin_awscli_formula }}"
+          register: chia_darwin_db_seed_aws_list
+          changed_when: false
+          failed_when: false
+
+        - name: Install the AWS CLI with Homebrew
+          ansible.builtin.command:
+            argv:
+              - "{{ chia_darwin_brew }}"
+              - install
+              - "{{ chia_darwin_awscli_formula }}"
+          when: chia_darwin_db_seed_aws_list.rc != 0
+          changed_when: true
+
+        - name: Require the AWS CLI binary
+          ansible.builtin.stat:
+            path: "{{ chia_darwin_aws }}"
+          register: chia_darwin_db_seed_aws
+
+        - name: Fail when the AWS CLI is missing or not executable
+          ansible.builtin.assert:
+            that:
+              - chia_darwin_db_seed_aws.stat.exists | default(false)
+              - chia_darwin_db_seed_aws.stat.executable | default(false)
+            fail_msg: >-
+              The AWS CLI was not found or is not executable at
+              {{ chia_darwin_aws }}. Install {{ chia_darwin_awscli_formula }} with
+              Homebrew or set chia_darwin_aws. Credentials must be available to
+              the service user through the AWS CLI's normal discovery.
+
+    - name: Download and publish the Darwin database seed
+      when: not ansible_check_mode
+      become: "{{ chia_darwin_launchd_become | bool }}"
+      become_user: "{{ user }}"
+      block:
+        - name: Remove a leftover database seed staging directory
+          ansible.builtin.file:
+            path: "{{ chia_darwin_db_seed_staging_dir }}"
+            state: absent
+
+        - name: Create the database seed staging directory
+          ansible.builtin.file:
+            path: "{{ chia_darwin_db_seed_staging_dir }}"
+            state: directory
+            mode: "0755"
+
+        - name: Download the snapshot files into staging
+          ansible.builtin.command:
+            argv:
+              - "{{ chia_darwin_aws }}"
+              - --no-progress
+              - s3
+              - cp
+              - "s3://{{ blockchain_backup_bucket }}/{{ network }}/{{ item }}"
+              - "{{ chia_darwin_db_seed_staging_dir }}/{{ item }}"
+          environment:
+            HOME: "{{ chia_darwin_home }}"
+          loop: "{{ chia_darwin_db_seed_files }}"
+          loop_control:
+            label: "{{ item }}"
+          register: chia_darwin_db_seed_downloads
+          changed_when: true
+
+        - name: Inspect each staged snapshot file
+          ansible.builtin.stat:
+            path: "{{ chia_darwin_db_seed_staging_dir }}/{{ item }}"
+          loop: "{{ chia_darwin_db_seed_files }}"
+          register: chia_darwin_db_seed_staged
+
+        - name: Require complete staged snapshot files before publishing
+          ansible.builtin.assert:
+            that:
+              - item.stat.isreg | default(false)
+              - (item.stat.size | default(0) | int) > 0
+            fail_msg: >-
+              {{ item.item }} was not downloaded completely. Nothing was published.
+          loop: "{{ chia_darwin_db_seed_staged.results }}"
+          loop_control:
+            label: "{{ item.item }}"
+
+        - name: Set snapshot permissions for the service user
+          ansible.builtin.file:
+            path: "{{ chia_darwin_db_seed_staging_dir }}/{{ item }}"
+            mode: "0644"
+          loop: "{{ chia_darwin_db_seed_files }}"
+          loop_control:
+            label: "{{ item }}"
+
+        - name: Remove stale database sidecars before publishing the snapshot
+          ansible.builtin.file:
+            path: "{{ chia_darwin_db_seed_db_dir }}/{{ chia_darwin_db_seed_main_name }}{{ item }}"
+            state: absent
+          loop:
+            - -wal
+            - -shm
+            - -journal
+
+        # Each mv is an atomic rename on the destination filesystem, so a
+        # partial download is never at the final path. A failed cache rename
+        # fails this loop before the main database task runs, so the main
+        # database is never published after a failed rename.
+        - name: Publish the snapshot cache files
+          ansible.builtin.command:
+            argv:
+              - /bin/mv
+              - -f
+              - "{{ chia_darwin_db_seed_staging_dir }}/{{ item }}"
+              - "{{ chia_darwin_db_seed_db_dir }}/{{ item }}"
+          loop: "{{ chia_darwin_db_seed_caches }}"
+          loop_control:
+            label: "{{ item }}"
+          changed_when: true
+
+        - name: Publish the snapshot main database last
+          ansible.builtin.command:
+            argv:
+              - /bin/mv
+              - -f
+              - "{{ chia_darwin_db_seed_staging_dir }}/{{ chia_darwin_db_seed_main_name }}"
+              - "{{ chia_darwin_db_seed_db_dir }}/{{ chia_darwin_db_seed_main_name }}"
+          changed_when: true
+
+        - name: Remove the database seed staging directory
+          ansible.builtin.file:
+            path: "{{ chia_darwin_db_seed_staging_dir }}"
+            state: absent
+
+      rescue:
+        - name: Remove a failed database seed staging directory
+          ansible.builtin.file:
+            path: "{{ chia_darwin_db_seed_staging_dir }}"
+            state: absent
+
+        - name: Fail the database seed without publishing a partial database
+          ansible.builtin.fail:
+            msg: "{{ chia_darwin_db_seed_failure | regex_replace('\\s+', ' ') | trim }}"
+          vars:
+            chia_darwin_db_seed_failure: >-
+              The S3 database seed failed while running
+              "{{ ansible_failed_task.name | default('a seed task') }}"{% if ansible_failed_result.item | default('') %} for {{ ansible_failed_result.item }}{% endif %}:
+              {{ ansible_failed_result.msg | default('no further detail') }}
+              {% if ansible_failed_result.stderr | default('') | trim %}
+              {{ ansible_failed_result.stderr | trim }}.
+              {% endif %}
+              {% for failed_item in ansible_failed_result.results | default([]) if failed_item.failed | default(false) %}
+              Failed item {{ failed_item.item }}: {{ (failed_item.stderr | default(failed_item.msg)) | trim }}{% if (failed_item.stderr | default(failed_item.msg)) | trim %}.{% endif %}
+              {% endfor %}
+              No partial main database was published at
+              {{ chia_darwin_db_seed_db_dir }}/{{ chia_darwin_db_seed_main_name }}.
+              The previous file (or no file) remains. Recheck S3 access and free
+              disk space, then rerun.

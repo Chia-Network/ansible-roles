@@ -1,0 +1,27 @@
+---
+# Render one wrapper per enabled board from darwin/chia-hw-vdf-run.sh.j2.
+- name: Install enabled hw_vdf wrappers
+  become: "{{ chia_darwin_launchd_become | bool }}"
+  become_user: "{{ user }}"
+  ansible.builtin.template:
+    src: darwin/chia-hw-vdf-run.sh.j2
+    dest: "{{ item.wrapper }}"
+    mode: "0755"
+  vars:
+    chia_hw_board: "{{ item.board }}"
+    chia_hw_show_device: "{{ not (item.board.legacy | bool) }}"
+  loop: "{{ chia_darwin_hw_vdf_jobs }}"
+  loop_control:
+    label: "{{ item.wrapper }}"
+  when: item.enabled | bool
+  register: chia_darwin_hw_vdf_wrappers
+  notify: restart-chia-darwin-boards
+
+- name: Remember hw-vdf wrappers that changed
+  ansible.builtin.set_fact:
+    chia_darwin_hw_vdf_changed_labels: "{{ chia_darwin_hw_vdf_changed_labels | default([]) + [item.item.label] }}"
+  when: item.changed | default(false)
+  loop: "{{ chia_darwin_hw_vdf_wrappers.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.label | default('skipped') }}"
+  changed_when: false

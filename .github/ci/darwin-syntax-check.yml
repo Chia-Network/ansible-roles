@@ -1,0 +1,30 @@
+---
+# Used by .github/workflows/darwin-role-check.yml for ansible-playbook --syntax-check.
+- name: Syntax check the Darwin tasks
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Import the Darwin role tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin.yml
+    - name: Import the Darwin database seed tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-db-seed.yml
+    - name: Import the Darwin hw-vdf board tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-hw-vdf-boards.yml
+    - name: Import the Darwin hw-vdf install tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-hw-vdf-install.yml
+    - name: Import the Darwin hw-vdf launchd tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-hw-vdf-launchd.yml
+    - name: Import the Darwin hw-vdf retire tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-hw-vdf-retire.yml
+    - name: Import the Darwin LaunchDaemon tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-launchd-job.yml
+    - name: Import the Darwin restart tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-restart-job.yml
+
+- name: Syntax check the chia-blockchain role on Darwin
+  hosts: localhost
+  gather_facts: false
+  vars:
+    ansible_os_family: Darwin
+  roles:
+    - chia-blockchain

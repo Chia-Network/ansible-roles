@@ -1,0 +1,57 @@
+#!/bin/zsh
+{% set per_board = chia_hw_show_device | default(false) | bool %}
+# Managed by the chia-blockchain Ansible role.
+# hw_vdf_client for one Chia VDF ASIC board (Homebrew chiavdf).
+# Linux systemd passes a shorter argv (threads, freq, optional auto-freq/max-freq, mask, ip, port, n_vdfs).
+# Darwin adds voltage, retain-asic-values, checkpoint-threshold, and expected-serial.
+# The FTDI D2XX driver is not installed by this role; the board will not enumerate without it.
+. {{ chia_darwin_env_script | quote }}
+
+FREQ={{ chia_darwin_hw_vdf_freq | quote }}
+VOLTAGE={{ chia_darwin_hw_vdf_voltage | quote }}
+VDF_THREADS={{ chia_darwin_hw_vdf_vdf_threads | quote }}
+PROOF_THREADS={{ chia_darwin_hw_vdf_proof_threads | quote }}
+CHECKPOINT_THRESHOLD={{ chia_darwin_hw_vdf_checkpoint_threshold | quote }}
+VDFS_MASK={{ chia_darwin_hw_vdf_mask | quote }}
+N_VDFS={{ chia_darwin_hw_num_vdfs | quote }}
+SERIAL={{ chia_darwin_hw_vdf_expected_serial | quote }}
+IP={{ chia_darwin_hw_vdf_ip | quote }}
+PORT={{ chia_darwin_hw_vdf_port | quote }}
+RETAIN_ASIC_VALUES={{ 1 if chia_darwin_hw_vdf_retain_asic_values | bool else 0 }}
+HW_VDF_CLIENT={{ chia_darwin_hw_vdf_client | quote }}
+{% if per_board %}
+VDF_THREADS={{ chia_hw_board.vdf_threads | quote }}
+PROOF_THREADS={{ chia_hw_board.proof_threads | quote }}
+VDFS_MASK={{ chia_hw_board.vdfs_mask | quote }}
+N_VDFS={{ chia_hw_board.n_vdfs | quote }}
+SERIAL={{ chia_hw_board.expected_serial | quote }}
+{% endif %}
+
+wait_for_db_volume
+wait_for_listen "$PORT" # timelord vdf_server must be up (hw_vdf_client exits if it can't connect)
+sleep {{ chia_darwin_hw_vdf_settle_seconds | int }}
+{% if per_board %}
+OPEN_DELAY={{ chia_hw_board.open_delay | int }}
+[ "$OPEN_DELAY" -eq 0 ] || sleep "$OPEN_DELAY"
+{% endif %}
+
+LOG={{ chia_darwin_log_dir | quote }}/{{ chia_hw_board.log_name if per_board else 'hw-vdf.log' }}
+log "starting hw_vdf_client freq=$FREQ voltage=$VOLTAGE vdf-threads=$VDF_THREADS proof-threads=$PROOF_THREADS mask=$VDFS_MASK serial=$SERIAL -> $IP:$PORT x$N_VDFS" >>"$LOG"
+
+cmd=("$HW_VDF_CLIENT" --freq "$FREQ")
+[ -n "$VOLTAGE" ] && cmd+=(--voltage "$VOLTAGE")
+cmd+=(--vdf-threads "$VDF_THREADS" --proof-threads "$PROOF_THREADS")
+[ "$RETAIN_ASIC_VALUES" = "1" ] && cmd+=(--retain-asic-values)
+{% if per_board %}
+DEVICE_LOC={{ chia_hw_board.device_loc | quote }}
+{% endif %}
+cmd+=(
+	--checkpoint-threshold "$CHECKPOINT_THRESHOLD"
+	--vdfs-mask "$VDFS_MASK"
+	--expected-serial "$SERIAL"
+	--ip "$IP"
+	{% if per_board %}--device-loc "$DEVICE_LOC" {% endif %}"$PORT"
+	"$N_VDFS"
+)
+# exec keeps hw_vdf_client as the launchd-tracked PID (SIGTERM goes straight to it).
+exec "${cmd[@]}" > >({{ chia_darwin_bin_dir | quote }}/rotpipe.py "$LOG" {{ chia_darwin_rotpipe_max_bytes | quote }} {{ chia_darwin_rotpipe_backups | quote }}) 2>&1

@@ -1,0 +1,5 @@
+#!/bin/sh
+export CHIA_LAUNCHCTL_LOG={{ launch_log | quote }}
+export CHIA_LAUNCHCTL_STATE={{ launch_state | quote }}
+export CHIA_LAUNCHCTL_DIR={{ chia_darwin_launchd_dir | quote }}
+exec "{{ playbook_dir }}/files/fake-launchctl" "$@"

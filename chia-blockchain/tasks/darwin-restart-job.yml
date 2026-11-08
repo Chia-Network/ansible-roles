@@ -1,0 +1,46 @@
+---
+# Restart one LaunchDaemon from the restart-chia-darwin handler. bootout plus
+# bootstrap (rather than kickstart) so a changed plist is picked up too.
+# launchctl bootout returns before the job is fully unregistered. A full node
+# may keep running until its ExitTimeOut (default 300s), so wait that long
+# plus chia_darwin_restart_unload_margin before bootstrap. The bootstrap
+# retries only cover the short race after launchctl print has already failed.
+- name: Restart LaunchDaemon {{ chia_job.label }}
+  when:
+    - chia_job.enabled | bool
+    - chia_darwin_start_now | bool
+    - chia_job.label not in (chia_darwin_fresh_bootstraps | default([]))
+  become: "{{ chia_darwin_launchd_become | bool }}"
+  block:
+    - name: Stop {{ chia_job.label }} before bootstrap
+      ansible.builtin.include_tasks: darwin-stop-job.yml
+
+    - name: Enable LaunchDaemon before starting {{ chia_job.label }}
+      ansible.builtin.command:
+        argv:
+          - "{{ chia_darwin_launchctl }}"
+          - enable
+          - "system/{{ chia_job.label }}"
+      changed_when: false
+
+    - name: Start LaunchDaemon {{ chia_job.label }}
+      ansible.builtin.command:
+        argv:
+          - "{{ chia_darwin_launchctl }}"
+          - bootstrap
+          - system
+          - "{{ chia_darwin_launchd_dir }}/{{ chia_job.label }}.plist"
+      register: chia_darwin_restart_bootstrap
+      changed_when: chia_darwin_restart_bootstrap.rc == 0
+      retries: 10
+      delay: 3
+      until: chia_darwin_restart_bootstrap.rc == 0
+
+    - name: Disable LaunchDaemon at boot {{ chia_job.label }}
+      ansible.builtin.command:
+        argv:
+          - "{{ chia_darwin_launchctl }}"
+          - disable
+          - "system/{{ chia_job.label }}"
+      changed_when: false
+      when: not (chia_darwin_start_on_boot | bool)

@@ -1,0 +1,6 @@
+#!/bin/zsh
+# Managed by the chia-blockchain Ansible role.
+. {{ chia_darwin_env_script | quote }}
+wait_for_db_volume
+log "starting chia_daemon (CHIA_ROOT=$CHIA_ROOT)"
+exec {{ chia_darwin_venv | quote }}/bin/chia_daemon

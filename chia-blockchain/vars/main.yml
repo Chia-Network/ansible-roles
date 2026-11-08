@@ -1,0 +1,10 @@
+---
+# Role-owned ASIC board slots. IDs and names are fixed. The board tasks build
+# the label and wrapper paths from the current prefix and bin directory once.
+chia_darwin_hw_vdf_slot_specs:
+  - id: 1
+    name: hw-vdf
+  - id: 2
+    name: hw-vdf-2
+  - id: 3
+    name: hw-vdf-3

@@ -1,0 +1,16 @@
+---
+# Delete wrappers this role wrote for slots that are no longer enabled.
+# A script without the role header is left alone, except a takeover wrapper,
+# which discovery replaces or retires deliberately.
+- name: Remove retired role-owned hw_vdf wrappers
+  become: "{{ chia_darwin_launchd_become | bool }}"
+  become_user: "{{ user }}"
+  ansible.builtin.file:
+    path: "{{ item.wrapper }}"
+    state: absent
+  loop: "{{ chia_darwin_hw_vdf_jobs }}"
+  loop_control:
+    label: "{{ item.wrapper }}"
+  when:
+    - not (item.enabled | bool)
+    - item.label in (chia_darwin_hw_vdf_retire_labels | default([]))

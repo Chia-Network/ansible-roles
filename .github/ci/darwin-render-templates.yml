@@ -1,0 +1,55 @@
+---
+# Render the Darwin templates for every topology for CI linting.
+- name: Render the Darwin templates
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+  vars:
+    render_out: /tmp/darwin
+    topologies:
+      - local-internal
+      - local-external
+      - remote-node
+    templates:
+      - chia-daemon-run.sh
+      - chia-env.sh
+      - chia-full-node-run.sh
+      - chia-hw-vdf-run.sh
+      - chia-timelord-run.sh
+      - launchdaemon.plist
+      - pppc.mobileconfig
+      - rotpipe.py
+      - FULL-DISK-ACCESS.txt
+  tasks:
+    - name: Set the render variables
+      ansible.builtin.set_fact:
+        user: timelord
+        chia_root: /Users/timelord/.chia
+        chia_darwin_hw_vdf_expected_serial: "FT'TEST 01"
+        chia_timelord_full_node_peer_host: 10.0.0.5
+        chia_job:
+          name: timelord
+          label: net.chia.timelord
+          wrapper: /Users/timelord/bin/chia-timelord-run.sh
+          throttle: 10
+          exit_timeout: 30
+
+    - name: Create the topology output directories
+      ansible.builtin.file:
+        path: "{{ render_out }}/{{ item }}"
+        state: directory
+        mode: "0755"
+      loop: "{{ topologies }}"
+
+    - name: Render the templates
+      ansible.builtin.template:
+        src: "../../chia-blockchain/templates/darwin/{{ item.1 }}.j2"
+        dest: "{{ render_out }}/{{ item.0 }}/{{ item.1 }}"
+        mode: "0644"
+      vars:
+        chia_darwin_topology: "{{ item.0 }}"
+      loop: "{{ topologies | product(templates) | list }}"
+      loop_control:
+        label: "{{ item.0 }}/{{ item.1 }}"

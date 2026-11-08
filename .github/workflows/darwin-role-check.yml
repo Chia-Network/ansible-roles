@@ -1,0 +1,94 @@
+name: Darwin role check
+
+on:
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Darwin role check (${{ matrix.ansible }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ansible:
+          - ">=2.18,<2.19"
+          - ">=2.22,<2.23"
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh shellcheck python3-venv
+          python3 -m pip install --user 'ansible-core${{ matrix.ansible }}'
+
+      - name: Syntax check
+        env:
+          ANSIBLE_ROLES_PATH: ${{ github.workspace }}
+        run: |
+          ansible-playbook --syntax-check .github/ci/darwin-syntax-check.yml
+          ansible-playbook --syntax-check .github/ci/darwin-assumptions.yml
+          ansible-playbook --syntax-check .github/ci/darwin-bare-interpreter.yml
+          ansible-playbook --syntax-check .github/ci/darwin-hw-boards.yml
+
+      - name: Check Darwin restart and pip assumptions
+        run: ansible-playbook .github/ci/darwin-assumptions.yml
+
+      - name: Run Darwin database seed tests
+        env:
+          ANSIBLE_ROLES_PATH: ${{ github.workspace }}
+        run: ansible-playbook .github/ci/darwin-db-seed-tests.yml
+
+      - name: Check a second Darwin database seed run is idempotent
+        env:
+          ANSIBLE_ROLES_PATH: ${{ github.workspace }}
+        run: |
+          root="$RUNNER_TEMP/darwin-db-seed-idempotence"
+          rm -rf "$root"
+          ansible-playbook .github/ci/darwin-db-seed-idempotence.yml -e "test_root=$root"
+          ansible-playbook .github/ci/darwin-db-seed-idempotence.yml -e "test_root=$root" | tee "$RUNNER_TEMP/darwin-db-seed-idempotence-second.log"
+          grep -E 'changed=0.*failed=0' "$RUNNER_TEMP/darwin-db-seed-idempotence-second.log"
+
+      - name: Check Darwin database seed check-mode safety
+        env:
+          ANSIBLE_ROLES_PATH: ${{ github.workspace }}
+        run: |
+          root="$RUNNER_TEMP/darwin-db-seed-checkmode"
+          rm -rf "$root"
+          ansible-playbook --check -e "test_root=$root" .github/ci/darwin-db-seed-check-mode.yml
+
+      - name: Prove virtualenv pip works without packaging on the module interpreter
+        run: |
+          python3 -m venv "$RUNNER_TEMP/bare-interpreter"
+          "$RUNNER_TEMP/bare-interpreter/bin/python" -m pip uninstall -y setuptools packaging wheel
+          ansible-playbook \
+            -e mod_python="$RUNNER_TEMP/bare-interpreter/bin/python" \
+            -e work_venv="$RUNNER_TEMP/work-venv" \
+            .github/ci/darwin-bare-interpreter.yml
+
+      - name: Render Darwin templates
+        run: ansible-playbook -e render_out="$RUNNER_TEMP/darwin" .github/ci/darwin-render-templates.yml
+
+      - name: Check Darwin ASIC board inventory
+        run: ansible-playbook -e render_out="$RUNNER_TEMP/darwin" .github/ci/darwin-hw-boards.yml
+
+      - name: Lint rendered output
+        working-directory: ${{ runner.temp }}/darwin
+        run: |
+          for f in ./*/*.sh; do zsh -n "$f"; done
+          shellcheck -s bash -S warning ./*/*.sh
+          for f in ./*/*.plist ./*/*.mobileconfig; do
+            python3 -c 'import plistlib, sys; plistlib.load(open(sys.argv[1], "rb"))' "$f"
+          done
+          python3 -m py_compile ./*/rotpipe.py

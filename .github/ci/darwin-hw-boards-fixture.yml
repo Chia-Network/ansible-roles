@@ -1,0 +1,60 @@
+ansible_os_family: Darwin
+ansible_architecture: arm64
+user: timelord
+chia_enable_hw_vdf: false
+chia_darwin_launchd_become: false
+fixture_service_jobs:
+  - name: daemon
+    label: net.chia.timelord.daemon
+    wrapper: "{{ chia_darwin_bin_dir }}/chia-daemon-run.sh"
+    throttle: 15
+    exit_timeout: 60
+    enabled: true
+  - name: full-node
+    label: net.chia.timelord.full-node
+    wrapper: "{{ chia_darwin_bin_dir }}/chia-full-node-run.sh"
+    throttle: 30
+    exit_timeout: 300
+    enabled: true
+  - name: timelord
+    label: net.chia.timelord.timelord
+    wrapper: "{{ chia_darwin_bin_dir }}/chia-timelord-run.sh"
+    throttle: 15
+    exit_timeout: 60
+    enabled: true
+fixture_legacy_wrapper: |
+  #!/bin/zsh
+  # Managed by the chia-blockchain Ansible role.
+  SERIAL=CHIA9999999099
+fixture_hand_wrapper_29999: |
+  #!/bin/zsh
+  # Hand-written, not managed by this role.
+  SERIAL=CHIA9999999002
+  DEVICE_LOC=29999
+fixture_hand_wrapper_9098: |
+  #!/bin/zsh
+  # Hand-written, not managed by this role.
+  SERIAL=CHIA9999999098
+fixture_unloaded_wrapper_9097: |
+  #!/bin/zsh
+  # Hand-written and not loaded before the failed takeover.
+  SERIAL=CHIA9999999097
+fixture_two_boards:
+  - id: 1
+    device_loc: 1101
+    expected_serial: FIX-BOARD-0001
+  - id: 2
+    device_loc: 1102
+    expected_serial: FIX-BOARD-0002
+fixture_boards:
+  - id: 1
+    device_loc: 1101
+    expected_serial: FIX-BOARD-0001
+  - id: 2
+    device_loc: 1102
+    expected_serial: FIX-BOARD-0002
+    vdf_threads: 8
+    proof_threads: 4
+  - id: 3
+    device_loc: 1103
+    expected_serial: FIX-BOARD-0003

@@ -1,0 +1,45 @@
+Chia timelord on macOS — Full Disk Access
+==========================================
+
+Required only for topology local-external (CHIA_ROOT on {{ chia_darwin_db_volume }}).
+local-internal and remote-node keep CHIA_ROOT on the internal disk ({{ chia_root }})
+and do not need this grant.
+
+Why
+---
+LaunchDaemons run outside a user GUI session and have no Transparency, Consent,
+and Control (TCC) grants of their own. A job whose program is a script is
+attributed to its shebang interpreter. These wrappers use {{ chia_darwin_interpreter }}.
+Until that interpreter has Full Disk Access, the job can see that {{ chia_darwin_db_volume }}
+is mounted and still fail to read {{ chia_darwin_db_marker }}. The wrapper then
+loops on "waiting for {{ chia_darwin_db_volume }}" and the log's ls= line is
+"Operation not permitted". An interactive SSH session can read the same path
+while launchd cannot. That mismatch is TCC, not a missing mount.
+
+How to grant it
+---------------
+1. GUI (this Mac):
+   System Settings -> Privacy & Security -> Full Disk Access -> add
+   {{ chia_darwin_interpreter }} (Cmd-Shift-G if it is hidden) and enable it.
+   Then restart the LaunchDaemons (launchctl kickstart -k system/<label>).
+
+2. MDM: install the sibling profile
+   {{ chia_darwin_pppc_dest }}
+   through user-approved MDM or Automated Device Enrollment.
+   Opening the .mobileconfig locally does not grant SystemPolicyAllFiles
+   on modern macOS.
+
+Do not edit TCC.db. It is SIP-protected, and writing it does not grant
+Full Disk Access to launchd jobs.
+
+Scope
+-----
+The grant is for {{ chia_darwin_interpreter }} itself (identifier path,
+code requirement: {{ chia_darwin_pppc_code_requirement }}). Any other
+LaunchDaemon that starts through that interpreter can then read protected
+files, including external volumes. That is the interpreter the running
+deployment uses. This role will not swap in a different interpreter or a
+custom Mach-O stub.
+
+This role only writes this note and the profile template. It never runs
+`profiles`, `tccutil`, or SQL against TCC.db.

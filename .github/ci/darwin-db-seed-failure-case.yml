@@ -1,0 +1,44 @@
+---
+# One failed snapshot copy must fail the seed and leave no main database at the
+# final path, even when other copies would succeed. Included with a
+# failure_case loop item from darwin-db-seed-tests.yml.
+- name: Reset the fake AWS state for {{ failure_case.name }}
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-reset-tools.yml"
+  vars:
+    reset_files: ["aws.log", "fail-publish"]
+
+- name: Set the fake AWS failure
+  ansible.builtin.copy:
+    content: "{{ failure_case.file }}\n"
+    dest: "{{ test_root }}/fail-file"
+    mode: "0644"
+
+- name: A failed snapshot copy fails the operation
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
+  vars:
+    case:
+      name: "failed {{ failure_case.file }} copy"
+      root: "{{ test_root }}/failure/{{ failure_case.name }}"
+      expect_failure: "(?s)S3 database seed failed.*{{ failure_case.file }}"
+
+- name: Inspect the failed seed destination
+  ansible.builtin.stat:
+    path: "{{ test_root }}/failure/{{ failure_case.name }}/db/blockchain_v2_mainnet.sqlite"
+  register: darwin_db_seed_failure_main
+
+- name: Inspect the failed seed staging directory
+  ansible.builtin.stat:
+    path: "{{ test_root }}/failure/{{ failure_case.name }}/db/.chia-s3-seed-mainnet"
+  register: darwin_db_seed_failure_staging
+
+- name: Read the failed seed AWS log
+  ansible.builtin.slurp:
+    path: "{{ test_root }}/aws.log"
+  register: darwin_db_seed_failure_log
+
+- name: Assert no partial main database or staging directory was published
+  ansible.builtin.assert:
+    that:
+      - not (darwin_db_seed_failure_main.stat.exists | default(false))
+      - not (darwin_db_seed_failure_staging.stat.exists | default(false))
+      - failure_case.file in (darwin_db_seed_failure_log.content | b64decode)

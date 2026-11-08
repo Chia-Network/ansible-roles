@@ -1,0 +1,194 @@
+---
+# Shared identity, fixtures, and fake tools for the Darwin database seed tests.
+# These tasks never touch S3, launchd, or a real Mac.
+- name: Set the test identity, fixtures, and tool paths
+  ansible.builtin.set_fact:
+    test_user: "{{ lookup('env', 'USER') }}"
+    test_group: "{{ lookup('pipe', 'id -gn') }}"
+    user: "{{ lookup('env', 'USER') }}"
+    chia_darwin_group: "{{ lookup('pipe', 'id -gn') }}"
+    chia_darwin_home: "{{ test_root }}/home"
+    chia_darwin_aws: "{{ test_root }}/bin/aws"
+    chia_darwin_brew: "{{ test_root }}/bin/brew"
+    chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
+    chia_darwin_launchd_prefix: net.chia.seedtest
+    chia_darwin_db_volume: "{{ test_root }}/Volumes/Chia DB"
+    chia_darwin_launchd_become: false
+    chia_darwin_db_seed_stub_bytes: 10240
+    external_volume: "{{ test_root }}/Volumes/Chia DB"
+    external_root: "{{ test_root }}/Volumes/Chia DB/dot-chia"
+    fixture_main: "{{ 'M' * 20000 }}"
+    fixture_h2h: "height-to-hash fixture"
+    fixture_ses: "sub-epoch-summaries fixture"
+
+- name: Create the Darwin database seed test directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ test_root }}/bin"
+    - "{{ test_root }}/fixtures/mainnet"
+    - "{{ test_root }}/fixtures/testnet11"
+    - "{{ test_root }}/home"
+    - "{{ test_root }}/home ext"
+    - "{{ external_root }}/mainnet/db"
+    - "{{ external_root }}/testnet11/db"
+
+- name: Link the external test CHIA_ROOT
+  ansible.builtin.file:
+    src: "{{ external_root }}"
+    dest: "{{ test_root }}/home ext/.chia"
+    state: link
+    force: true
+
+- name: Write the mainnet and testnet11 snapshot fixtures
+  ansible.builtin.copy:
+    content: "{{ fixture_main }}"
+    dest: "{{ test_root }}/fixtures/{{ item }}/blockchain_v2_{{ item }}.sqlite"
+    mode: "0644"
+  loop:
+    - mainnet
+    - testnet11
+
+- name: Write the snapshot cache fixtures
+  ansible.builtin.copy:
+    content: "{{ fixture_h2h if item.1 == 'height-to-hash' else fixture_ses }}"
+    dest: "{{ test_root }}/fixtures/{{ item.0 }}/{{ item.1 }}"
+    mode: "0644"
+  loop: "{{ ['mainnet', 'testnet11'] | product(['height-to-hash', 'sub-epoch-summaries']) | list }}"
+  loop_control:
+    label: "{{ item.0 }}/{{ item.1 }}"
+
+- name: Write the fake aws executable
+  ansible.builtin.copy:
+    content: |
+      #!/bin/sh
+      set -eu
+      root='{{ test_root }}'
+      if [ "${1:-}" = "--version" ]; then
+        echo "aws-cli/2-test"
+        exit 0
+      fi
+      if [ "${1:-}" = "--no-progress" ]; then
+        shift
+      fi
+      if [ "${1:-}" != "s3" ] || [ "${2:-}" != "cp" ]; then
+        echo "fake aws: unsupported arguments: $*" >&2
+        exit 2
+      fi
+      src=$3
+      dest=$4
+      case "$src" in
+        s3://*) ;;
+        *) echo "fake aws: not an S3 URI: $src" >&2; exit 2 ;;
+      esac
+      printf '%s\n' "$src" >> "$root/aws.log"
+      relative=${src#s3://}
+      relative=${relative#*/}
+      name=${src##*/}
+      if [ -s "$root/fail-file" ] && [ "$(cat "$root/fail-file")" = "$name" ]; then
+        mkdir -p "$(dirname "$dest")"
+        printf 'partial download\n' > "$dest"
+        echo "fake aws: simulated failure copying $name" >&2
+        exit 23
+      fi
+      fixture="$root/fixtures/$relative"
+      if [ ! -f "$fixture" ]; then
+        echo "fake aws: no fixture at $fixture" >&2
+        exit 24
+      fi
+      cp "$fixture" "$dest"
+      if [ -s "$root/fail-publish" ] && [ "$(cat "$root/fail-publish")" = "$name" ]; then
+        db=$(dirname "$(dirname "$dest")")
+        rm -f "$db/$name"
+        mkdir -p "$db/$name"
+        chmod 0555 "$db/$name"
+      fi
+    dest: "{{ test_root }}/bin/aws"
+    mode: "0755"
+
+- name: Write the fake Homebrew executable
+  ansible.builtin.copy:
+    content: |
+      #!/bin/sh
+      root='{{ test_root }}'
+      printf '%s\n' "$*" >> "$root/brew.log"
+      exit 0
+    dest: "{{ test_root }}/bin/brew"
+    mode: "0755"
+
+- name: Write the fake launchctl executables
+  ansible.builtin.copy:
+    content: |
+      #!/bin/sh
+      root='{{ test_root }}'
+      printf '%s\n' "$*" >> "$root/launchctl.log"
+      if [ "${1:-}" = "print" ]; then
+        echo "loaded"
+        exit 0
+      fi
+      exit 0
+    dest: "{{ test_root }}/bin/launchctl-loaded"
+    mode: "0755"
+
+- name: Write the fake launchctl executable for an unloaded job
+  ansible.builtin.copy:
+    content: |
+      #!/bin/sh
+      printf '%s\n' "$*" >> '{{ test_root }}/launchctl.log'
+      exit 1
+    dest: "{{ test_root }}/bin/launchctl-notloaded"
+    mode: "0755"
+
+- name: Write the fake sudo executable
+  ansible.builtin.copy:
+    content: |
+      #!/bin/sh
+      root='{{ test_root }}'
+      printf '%s\n' "$*" >> "$root/sudo.log"
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          -u) shift 2 ;;
+          -H|-S|-n|-E) shift ;;
+          -p) shift 2 ;;
+          --) shift; break ;;
+          -*) shift ;;
+          *) break ;;
+        esac
+      done
+      exec "$@"
+    dest: "{{ test_root }}/bin/sudo"
+    mode: "0755"
+
+- name: Create an empty fake AWS log without truncating it on reruns
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ test_root }}/aws.log"
+    force: false
+    mode: "0644"
+
+- name: Create an empty fake AWS failure marker without truncating it on reruns
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ test_root }}/fail-file"
+    force: false
+    mode: "0644"
+
+- name: Create an empty fake AWS publish-failure marker without truncating it on reruns
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ test_root }}/fail-publish"
+    force: false
+    mode: "0644"
+
+- name: Create empty fake tool logs without truncating them on reruns
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ test_root }}/{{ item }}"
+    force: false
+    mode: "0644"
+  loop:
+    - brew.log
+    - launchctl.log
+    - sudo.log

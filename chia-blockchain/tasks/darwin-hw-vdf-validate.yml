@@ -1,0 +1,49 @@
+---
+# Shared inventory checks that do not need the selected board list. darwin.yml
+# includes this before it creates the user, changes pmset, or installs anything.
+- name: Require shared hw_vdf_client options and one inventory source
+  when: chia_darwin_enable_hw_vdf | bool
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_hw_vdf_freq | string is match('^[0-9]+$')
+      - (chia_darwin_hw_vdf_freq | int) >= 200
+      - (chia_darwin_hw_vdf_freq | int) <= 2200
+      - chia_darwin_hw_vdf_voltage | string is match('^[0-9]+(\\.[0-9]+)?$')
+      - (chia_darwin_hw_vdf_voltage | float) >= 0.7
+      - (chia_darwin_hw_vdf_voltage | float) <= 1.0
+      - chia_darwin_hw_vdf_vdf_threads | string is match('^[0-9]+$')
+      - (chia_darwin_hw_vdf_vdf_threads | int) >= 2
+      - (chia_darwin_hw_vdf_vdf_threads | int) <= 64
+      - chia_darwin_hw_vdf_proof_threads | string is match('^[0-9]+$')
+      - (chia_darwin_hw_vdf_proof_threads | int) >= 1
+      - (chia_darwin_hw_vdf_proof_threads | int) < (chia_darwin_hw_vdf_vdf_threads | int)
+      - chia_darwin_hw_vdf_checkpoint_threshold | string is match('^[0-9]+$')
+      - (chia_darwin_hw_vdf_checkpoint_threshold | int) >= 8000
+      - (chia_darwin_hw_vdf_checkpoint_threshold | int) <= 4294967295
+      - (chia_darwin_hw_vdf_open_stagger | int) >= 0
+      - chia_darwin_hw_vdf_boards is sequence
+      - chia_darwin_hw_vdf_boards is not string
+      - chia_darwin_hw_vdf_boards is not mapping
+      - not ((chia_darwin_hw_vdf_boards | length > 0) and (chia_darwin_hw_vdf_expected_serial | length > 0))
+    fail_msg: >-
+      Set chia_darwin_hw_vdf_boards or chia_darwin_hw_vdf_expected_serial, not
+      both. chia_darwin_hw_vdf_boards must be a list. Shared options are out
+      of range when freq is outside 200-2200, voltage is outside 0.70-1.00,
+      vdf_threads are outside 2-64, proof_threads are not lower than
+      vdf_threads, or checkpoint_threshold is below 8000. An empty board list
+      uses chia_darwin_hw_vdf_mask (1-7) and does not pass --device-loc. With
+      both empty, the role discovers boards with hw_vdf_client --list.
+
+- name: Require a legacy serial and mask
+  when:
+    - chia_darwin_enable_hw_vdf | bool
+    - chia_darwin_hw_vdf_boards | length == 0
+    - chia_darwin_hw_vdf_expected_serial | length > 0
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_hw_vdf_expected_serial is string
+      - chia_darwin_hw_vdf_expected_serial is match('^[!-~]{1,15}$')
+      - chia_darwin_hw_vdf_mask | string is match('^[1-7]$')
+    fail_msg: >-
+      chia_darwin_hw_vdf_expected_serial must be 1-15 printable non-space
+      characters, and chia_darwin_hw_vdf_mask must be 1-7.

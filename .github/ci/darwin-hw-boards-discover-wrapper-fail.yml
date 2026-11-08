@@ -1,0 +1,59 @@
+---
+# Plant a role-managed wrapper at a board slot and expect discovery to fail
+# instead of silently dropping the claimed board.
+- name: Reset inputs before expecting {{ hw_wrapper_expect }}
+  ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
+
+- name: Create the wrapper directory before {{ hw_wrapper_expect }}
+  ansible.builtin.file:
+    path: "{{ chia_darwin_bin_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Remove any wrapper at the test slot
+  ansible.builtin.file:
+    path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-2-run.sh"
+    state: absent
+
+- name: Plant the bad wrapper for {{ hw_wrapper_expect }}
+  when: hw_wrapper_content is defined
+  ansible.builtin.copy:
+    dest: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-2-run.sh"
+    mode: "0644"
+    content: "{{ hw_wrapper_content }}"
+
+- name: Replace the test wrapper with a directory for {{ hw_wrapper_expect }}
+  when: hw_wrapper_content is not defined
+  ansible.builtin.file:
+    path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-2-run.sh"
+    state: directory
+    mode: "0755"
+
+- name: Install the fake client before {{ hw_wrapper_expect }}
+  ansible.builtin.include_tasks: darwin-hw-boards-client.yml
+  vars:
+    hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-1.txt"
+
+- name: Expect discovery to fail ({{ hw_wrapper_expect }})
+  block:
+    - name: Resolve with the bad persisted wrapper
+      ansible.builtin.include_role:
+        name: chia-blockchain
+        tasks_from: darwin-hw-vdf-boards.yml
+    - name: Discovery accepted the bad persisted wrapper
+      ansible.builtin.fail:
+        msg: "discovery accepted {{ hw_wrapper_expect }}"
+  rescue:
+    - name: The wrapper failure mentions {{ hw_wrapper_expect }}
+      vars:
+        failure_text: "{{ ansible_failed_result | to_json }}"
+      ansible.builtin.assert:
+        that:
+          - failure_text is search(hw_wrapper_expect)
+          - "'discovery accepted' not in failure_text"
+        fail_msg: "{{ ansible_failed_result.msg | default('no failure message') }}"
+
+- name: Remove the bad wrapper fixture
+  ansible.builtin.file:
+    path: "{{ chia_darwin_bin_dir }}/chia-hw-vdf-2-run.sh"
+    state: absent
