@@ -4,11 +4,9 @@
 # and the same port the watchdog polls.
 . {{ chia_darwin_env_script | quote }}
 export CHIA_ROOT={{ chia_darwin_companion_chia_root | quote }}
-{% if chia_darwin_chia_healthcheck_dns_hostname | length > 0 %}
 export CHIA_HEALTHCHECK_DNS_HOSTNAME={{ chia_darwin_chia_healthcheck_dns_hostname | quote }}
-{% endif %}
 wait_for_db_volume
 wait_for_listen {{ chia_daemon_port | quote }}
 LOG={{ chia_darwin_log_dir | quote }}/chia-healthcheck.log
-log "starting chia-healthcheck (CHIA_ROOT=$CHIA_ROOT)" >> "$LOG"
+log "starting chia-healthcheck (CHIA_ROOT=$CHIA_ROOT)" >>"$LOG"
 exec {{ chia_darwin_companion_bin_dir | quote }}/chia-healthcheck serve --healthcheck-port {{ chia_darwin_chia_healthcheck_port | int }} > >({{ chia_darwin_bin_dir | quote }}/rotpipe.py "$LOG" {{ chia_darwin_companion_rotpipe_max_bytes | quote }} {{ chia_darwin_companion_rotpipe_backups | quote }}) 2>&1

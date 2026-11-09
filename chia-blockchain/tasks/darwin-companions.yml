@@ -8,7 +8,7 @@
   ansible.builtin.set_fact:
     chia_darwin_watchdog_expected_vdfs: >-
       {{ chia_darwin_hw_vdf_jobs | selectattr('enabled', 'equalto', true)
-         | map(attribute='board') | map(attribute='n_vdfs') | map('int') | sum }}
+        | map(attribute='board') | map(attribute='n_vdfs') | map('int') | sum }}
   changed_when: false
 
 - name: Confirm the companion CHIA_ROOT is readable by the service user

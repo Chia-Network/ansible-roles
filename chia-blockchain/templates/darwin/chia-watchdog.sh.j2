@@ -28,19 +28,22 @@ TOKEN_FILE=$CONF_DIR/alert-token
 URL_FILE=$CONF_DIR/webhook-url
 LOG=${WATCHDOG_LOG:-{{ chia_darwin_watchdog_log }}}
 DRY=${WATCHDOG_DRY_RUN:-0}
-HW_JOBS=({{ chia_darwin_hw_vdf_jobs | default([]) | selectattr('enabled', 'equalto', true) | map(attribute='name') | map('quote') | join(' ') }})
-SERVICE_JOBS=({{ chia_darwin_service_jobs | default([]) | selectattr('enabled', 'equalto', true) | map(attribute='name') | map('quote') | join(' ') }})
+HW_JOB_LIST="{{ chia_darwin_hw_vdf_jobs | default([]) | selectattr('enabled', 'equalto', true) | map(attribute='name') | join(' ') }}"
+SERVICE_JOB_LIST="{{ chia_darwin_service_jobs | default([]) | selectattr('enabled', 'equalto', true) | map(attribute='name') | join(' ') }}"
+read -r -a HW_JOBS <<<"$HW_JOB_LIST"
+read -r -a SERVICE_JOBS <<<"$SERVICE_JOB_LIST"
 CHECK_HEALTHCHECK={{ 1 if chia_darwin_enable_chia_healthcheck | bool else 0 }}
 CHECK_EXPORTER={{ 1 if chia_darwin_enable_chia_exporter | bool else 0 }}
 CHECK_NODE={{ 1 if chia_darwin_enable_node_exporter | bool else 0 }}
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 
 log() {
-  local ts; ts=$(date '+%Y-%m-%dT%H:%M:%S%z')
-  echo "$ts $*" >> "$LOG" 2>/dev/null || echo "$ts $*"
-  if [ -f "$LOG" ] && [ "$(stat -f %z "$LOG" 2>/dev/null || echo 0)" -gt 5242880 ]; then
-    mv -f "$LOG" "$LOG.1"
-  fi
+	local ts
+	ts=$(date '+%Y-%m-%dT%H:%M:%S%z')
+	echo "$ts $*" >>"$LOG" 2>/dev/null || echo "$ts $*"
+	if [ -f "$LOG" ] && [ "$(stat -f %z "$LOG" 2>/dev/null || echo 0)" -gt 5242880 ]; then
+		mv -f "$LOG" "$LOG.1"
+	fi
 }
 
 http_code() { curl -s -o /dev/null -m 10 -w '%{http_code}' "$HC$1" 2>/dev/null; }
@@ -52,103 +55,173 @@ vdf_conns() { netstat -an -p tcp | awk -v p=".$VDF_PORT" '$6=="ESTABLISHED" && s
 job_running() { launchctl print "system/$PREFIX.$1" 2>/dev/null | grep -q "state = running"; }
 
 hw_jobs_running() {
-  local j
-  for j in "${HW_JOBS[@]}"; do
-    job_running "$j" || return 1
-  done
-  return 0
+	local j
+	for j in "${HW_JOBS[@]}"; do
+		job_running "$j" || return 1
+	done
+	return 0
 }
 
 alert() {
-  local desc="$1" url payload
-  [ "$DRY" = 1 ] && { log "DRY alert: $desc"; return; }
-  [ -r "$TOKEN_FILE" ] && [ -r "$URL_FILE" ] || { log "alert skipped (no $TOKEN_FILE / $URL_FILE)"; return; }
-  url=$(head -n1 "$URL_FILE")
-  payload="{\"alerts\":[{\"status\":\"warning\",\"annotations\":{\"title\":\"Monit Alert\",\"description\":\"$desc\"}}]}"
-  # token goes to curl via stdin config so it never appears in argv, logs or ps
-  code=$( { printf 'header = "Authorization: Bearer '; tr -d '\r\n' < "$TOKEN_FILE"; printf '"\n'; } | \
-    curl -s -o /dev/null -m 20 -w '%{http_code}' -K - -X POST -H 'Content-Type: application/json' -d "$payload" "$url" 2>/dev/null )
-  log "alert sent, HTTP ${code:-none}"
+	local desc="$1" url payload
+	[ "$DRY" = 1 ] && {
+		log "DRY alert: $desc"
+		return
+	}
+	[ -r "$TOKEN_FILE" ] && [ -r "$URL_FILE" ] || {
+		log "alert skipped (no $TOKEN_FILE / $URL_FILE)"
+		return
+	}
+	url=$(head -n1 "$URL_FILE")
+	payload="{\"alerts\":[{\"status\":\"warning\",\"annotations\":{\"title\":\"Monit Alert\",\"description\":\"$desc\"}}]}"
+	# token goes to curl via stdin config so it never appears in argv, logs or ps
+	code=$({
+		printf 'header = "Authorization: Bearer '
+		tr -d '\r\n' <"$TOKEN_FILE"
+		printf '"\n'
+	} |
+		curl -s -o /dev/null -m 20 -w '%{http_code}' -K - -X POST -H 'Content-Type: application/json' -d "$payload" "$url" 2>/dev/null)
+	log "alert sent, HTTP ${code:-none}"
 }
 
 kick() { # label
-  if [ "$DRY" = 1 ]; then log "DRY kickstart $PREFIX.$1"; return 0; fi
-  launchctl kickstart -k "system/$PREFIX.$1" >> "$LOG" 2>&1 || log "kickstart $1 failed"
+	if [ "$DRY" = 1 ]; then
+		log "DRY kickstart $PREFIX.$1"
+		return 0
+	fi
+	launchctl kickstart -k "system/$PREFIX.$1" >>"$LOG" 2>&1 || log "kickstart $1 failed"
 }
 
 restart_full() {
-  local j
-  log "RESTART full stack: $1"
-  for j in "${SERVICE_JOBS[@]}" "${HW_JOBS[@]}"; do kick "$j"; sleep 8; done
+	local j
+	log "RESTART full stack: $1"
+	for j in "${SERVICE_JOBS[@]}" "${HW_JOBS[@]}"; do
+		kick "$j"
+		sleep 8
+	done
 }
 
 restart_hwvdf() {
-  local j
-  log "RESTART hw-vdf boards: $1"
-  for j in "${HW_JOBS[@]}"; do kick "$j"; sleep 8; done
+	local j
+	log "RESTART hw-vdf boards: $1"
+	for j in "${HW_JOBS[@]}"; do
+		kick "$j"
+		sleep 8
+	done
 }
 
-fn_fail=0; tl_fail=0; vdf_fail=0; ce_fail=0; hc_fail=0; ne_fail=0
-bad_restarts=0; healthy_run=0
-grace_until=$(( $(date +%s) + GRACE_BASE ))
+fn_fail=0
+tl_fail=0
+vdf_fail=0
+ce_fail=0
+hc_fail=0
+ne_fail=0
+bad_restarts=0
+healthy_run=0
+grace_until=$(($(date +%s) + GRACE_BASE))
 log "watchdog start pid $$ (dry=$DRY) expected_vdfs=$EXPECTED_VDFS jobs=${HW_JOBS[*]}; initial grace ${GRACE_BASE}s"
 
 while :; do
-  now=$(date +%s)
-  if [ "$now" -lt "$grace_until" ]; then
-    [ "$WATCHDOG_ONCE" = 1 ] && { log "in grace, ${grace_until}-${now}"; exit 0; }
-    sleep "$CYCLE"; continue
-  fi
+	now=$(date +%s)
+	if [ "$now" -lt "$grace_until" ]; then
+		[ "$WATCHDOG_ONCE" = 1 ] && {
+			log "in grace, ${grace_until}-${now}"
+			exit 0
+		}
+		sleep "$CYCLE"
+		continue
+	fi
 
-  fn=$(http_code /full_node); tl=$(http_code /timelord); vdf=$(vdf_conns)
-  problems=""; scope=""
+	fn=$(http_code /full_node)
+	tl=$(http_code /timelord)
+	vdf=$(vdf_conns)
+	problems=""
+	scope=""
 
-  if [ "$CHECK_HEALTHCHECK" = 1 ]; then
-    if [ "$fn" = "000" ] && [ "$tl" = "000" ]; then
-      hc_fail=$((hc_fail+1)); fn_fail=0; tl_fail=0
-      log "healthcheck :{{ chia_darwin_chia_healthcheck_port | int }} unreachable ($hc_fail/$FAIL_CYCLES)"
-      if [ $hc_fail -ge $FAIL_CYCLES ]; then kick chia-healthcheck; hc_fail=0; fi
-    else
-      hc_fail=0
-      if [ "$fn" = "200" ]; then fn_fail=0; else fn_fail=$((fn_fail+1)); log "/full_node HTTP $fn ($fn_fail/$FAIL_CYCLES)"; fi
-      if [ "$tl" = "200" ]; then tl_fail=0; else tl_fail=$((tl_fail+1)); log "/timelord HTTP $tl ($tl_fail/$FAIL_CYCLES)"; fi
-      [ $fn_fail -ge $FAIL_CYCLES ] && { problems="$problems full_node-health"; scope=full; }
-      [ $tl_fail -ge $FAIL_CYCLES ] && { problems="$problems timelord-health"; scope=full; }
-    fi
-  fi
+	if [ "$CHECK_HEALTHCHECK" = 1 ]; then
+		if [ "$fn" = "000" ] && [ "$tl" = "000" ]; then
+			hc_fail=$((hc_fail + 1))
+			fn_fail=0
+			tl_fail=0
+			log "healthcheck :{{ chia_darwin_chia_healthcheck_port | int }} unreachable ($hc_fail/$FAIL_CYCLES)"
+			if [ $hc_fail -ge $FAIL_CYCLES ]; then
+				kick chia-healthcheck
+				hc_fail=0
+			fi
+		else
+			hc_fail=0
+			if [ "$fn" = "200" ]; then fn_fail=0; else
+				fn_fail=$((fn_fail + 1))
+				log "/full_node HTTP $fn ($fn_fail/$FAIL_CYCLES)"
+			fi
+			if [ "$tl" = "200" ]; then tl_fail=0; else
+				tl_fail=$((tl_fail + 1))
+				log "/timelord HTTP $tl ($tl_fail/$FAIL_CYCLES)"
+			fi
+			[ $fn_fail -ge $FAIL_CYCLES ] && {
+				problems="$problems full_node-health"
+				scope=full
+			}
+			[ $tl_fail -ge $FAIL_CYCLES ] && {
+				problems="$problems timelord-health"
+				scope=full
+			}
+		fi
+	fi
 
-  if [ "$EXPECTED_VDFS" -eq 0 ]; then
-    vdf_fail=0
-  elif [ "$vdf" = "$EXPECTED_VDFS" ] && hw_jobs_running; then
-    vdf_fail=0
-  else
-    vdf_fail=$((vdf_fail+1))
-    log "hw-vdf: established=$vdf (want $EXPECTED_VDFS) running=$(hw_jobs_running && echo y || echo n) ($vdf_fail/$FAIL_CYCLES)"
-  fi
-  if [ $vdf_fail -ge $FAIL_CYCLES ]; then problems="$problems hw-vdf-asics"; [ -z "$scope" ] && scope=hwvdf; fi
+	if [ "$EXPECTED_VDFS" -eq 0 ]; then
+		vdf_fail=0
+	elif [ "$vdf" = "$EXPECTED_VDFS" ] && hw_jobs_running; then
+		vdf_fail=0
+	else
+		vdf_fail=$((vdf_fail + 1))
+		log "hw-vdf: established=$vdf (want $EXPECTED_VDFS) running=$(hw_jobs_running && echo y || echo n) ($vdf_fail/$FAIL_CYCLES)"
+	fi
+	if [ $vdf_fail -ge $FAIL_CYCLES ]; then
+		problems="$problems hw-vdf-asics"
+		[ -z "$scope" ] && scope=hwvdf
+	fi
 
-  if [ "$CHECK_EXPORTER" = 1 ]; then
-    if listening {{ chia_darwin_chia_exporter_port | int }}; then ce_fail=0; else ce_fail=$((ce_fail+1)); fi
-    if [ $ce_fail -ge $FAIL_CYCLES ]; then log "chia-exporter :{{ chia_darwin_chia_exporter_port | int }} not listening"; kick chia-exporter; ce_fail=0; fi
-  fi
-  if [ "$CHECK_NODE" = 1 ]; then
-    if listening {{ chia_darwin_node_exporter_port | int }}; then ne_fail=0; else ne_fail=$((ne_fail+1)); fi
-    if [ $ne_fail -ge $FAIL_CYCLES ]; then log "node-exporter :{{ chia_darwin_node_exporter_port | int }} not listening"; kick node-exporter; ne_fail=0; fi
-  fi
+	if [ "$CHECK_EXPORTER" = 1 ]; then
+		if listening {{ chia_darwin_chia_exporter_port | int }}; then ce_fail=0; else ce_fail=$((ce_fail + 1)); fi
+		if [ $ce_fail -ge $FAIL_CYCLES ]; then
+			log "chia-exporter :{{ chia_darwin_chia_exporter_port | int }} not listening"
+			kick chia-exporter
+			ce_fail=0
+		fi
+	fi
+	if [ "$CHECK_NODE" = 1 ]; then
+		if listening {{ chia_darwin_node_exporter_port | int }}; then ne_fail=0; else ne_fail=$((ne_fail + 1)); fi
+		if [ $ne_fail -ge $FAIL_CYCLES ]; then
+			log "node-exporter :{{ chia_darwin_node_exporter_port | int }} not listening"
+			kick node-exporter
+			ne_fail=0
+		fi
+	fi
 
-  if [ -n "$problems" ]; then
-    bad_restarts=$((bad_restarts+1)); healthy_run=0
-    if [ "$scope" = full ]; then restart_full "$problems"; else restart_hwvdf "$problems"; fi
-    alert "Watchdog restarted the Chia timelord services ($scope:$problems) on host $(hostname -s)"
-    fn_fail=0; tl_fail=0; vdf_fail=0
-    extra=$(( (bad_restarts-1) * 300 )); [ $extra -gt 900 ] && extra=900
-    grace_until=$(( $(date +%s) + GRACE_BASE + extra ))
-    log "grace until +$((GRACE_BASE+extra))s (consecutive restarts: $bad_restarts)"
-  else
-    healthy_run=$((healthy_run+1))
-    if [ $healthy_run -ge 5 ] && [ $bad_restarts -ne 0 ]; then bad_restarts=0; log "healthy for 5 cycles; restart backoff reset"; fi
-    [ $((healthy_run % 30)) -eq 1 ] && log "ok fn=$fn tl=$tl vdf=$vdf"
-  fi
-  [ "$WATCHDOG_ONCE" = 1 ] && { log "once: fn=$fn tl=$tl vdf=$vdf problems='$problems'"; exit 0; }
-  sleep "$CYCLE"
+	if [ -n "$problems" ]; then
+		bad_restarts=$((bad_restarts + 1))
+		healthy_run=0
+		if [ "$scope" = full ]; then restart_full "$problems"; else restart_hwvdf "$problems"; fi
+		alert "Watchdog restarted the Chia timelord services ($scope:$problems) on host $(hostname -s)"
+		fn_fail=0
+		tl_fail=0
+		vdf_fail=0
+		extra=$(((bad_restarts - 1) * 300))
+		[ $extra -gt 900 ] && extra=900
+		grace_until=$(($(date +%s) + GRACE_BASE + extra))
+		log "grace until +$((GRACE_BASE + extra))s (consecutive restarts: $bad_restarts)"
+	else
+		healthy_run=$((healthy_run + 1))
+		if [ $healthy_run -ge 5 ] && [ $bad_restarts -ne 0 ]; then
+			bad_restarts=0
+			log "healthy for 5 cycles; restart backoff reset"
+		fi
+		[ $((healthy_run % 30)) -eq 1 ] && log "ok fn=$fn tl=$tl vdf=$vdf"
+	fi
+	[ "$WATCHDOG_ONCE" = 1 ] && {
+		log "once: fn=$fn tl=$tl vdf=$vdf problems='$problems'"
+		exit 0
+	}
+	sleep "$CYCLE"
 done

@@ -231,12 +231,12 @@ The role also owns the LaunchDaemons that the Linux timelord hosts run next to
 chia. They use the same `net.chia.timelord.*` prefix, the same service account,
 and the same restart path as the core jobs:
 
-| Job               | Label suffix      | Default port | Notes                                  |
-| ----------------- | ----------------- | ------------ | -------------------------------------- |
-| `chia-exporter`   | `.chia-exporter`  | 9914         | `CHIA_ROOT` may be a read-only copy.   |
-| `chia-healthcheck`| `.chia-healthcheck`| 9950        | Serves `/full_node` and `/timelord`.   |
-| `node-exporter`   | `.node-exporter`  | 9100         | Host metrics.                          |
-| `watchdog`        | `.watchdog`       | none         | Runs as root; see below.               |
+| Job                | Label suffix        | Default port | Notes                                |
+| ------------------ | ------------------- | ------------ | ------------------------------------ |
+| `chia-exporter`    | `.chia-exporter`    | 9914         | `CHIA_ROOT` may be a read-only copy. |
+| `chia-healthcheck` | `.chia-healthcheck` | 9950         | Serves `/full_node` and `/timelord`. |
+| `node-exporter`    | `.node-exporter`    | 9100         | Host metrics.                        |
+| `watchdog`         | `.watchdog`         | none         | Runs as root; see below.             |
 
 Set `chia_darwin_enable_chia_exporter`, `chia_darwin_enable_chia_healthcheck`,
 `chia_darwin_enable_node_exporter`, or `chia_darwin_enable_watchdog` to false to
