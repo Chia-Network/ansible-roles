@@ -357,10 +357,13 @@ chia_wallet_connect_to_unknown_peers: true
 # overridden here. Run a second network under a different
 # chia_darwin_launchd_prefix so the LaunchDaemon labels do not collide.
 #
-# Connection: SSH as an admin who can sudo and who owns the Homebrew prefix.
-# `user` is the dedicated non-admin service account the LaunchDaemons run as
-# (the reference uses timelord). Leaving `user` at the Linux default `ubuntu`
-# is refused. Homebrew itself is not installed by this role.
+# Connection: SSH as an account with passwordless sudo. The SSH user may own
+# the Homebrew prefix, or, when SSHing as the service user, set
+# chia_darwin_brew_user to the account that owns it. `user` is the dedicated
+# non-admin service account the LaunchDaemons run as (the reference uses
+# timelord). Leaving `user` at the Linux default `ubuntu` is refused. The
+# service account may be the SSH login, as long as it has sudo; Homebrew itself
+# is not installed by this role.
 #
 # Ansible runs modules with whatever interpreter discovery selects. On a fresh
 # Mac that is often Homebrew python@3.13, which does not ship packaging or
@@ -379,6 +382,10 @@ chia_darwin_home: "/Users/{{ user }}"
 chia_darwin_root: "{{ chia_darwin_home }}/.chia/{{ network }}"
 chia_darwin_homebrew_prefix: /opt/homebrew
 chia_darwin_brew: "{{ chia_darwin_homebrew_prefix }}/bin/brew"
+# When the SSH/automation login is the service user, set this to the account
+# that owns chia_darwin_homebrew_prefix. Homebrew tasks then run as that user
+# through sudo. Empty means the connecting user owns the prefix (Linux-style).
+chia_darwin_brew_user: ""
 chia_darwin_python_formula: python@3.13
 chia_darwin_python: "{{ chia_darwin_homebrew_prefix }}/opt/python@3.13/bin/python3.13"
 chia_darwin_venv: "{{ chia_darwin_home }}/chia-venv"

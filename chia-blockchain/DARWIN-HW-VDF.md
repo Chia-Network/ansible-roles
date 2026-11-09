@@ -295,8 +295,10 @@ Existing files are left alone when the variables are empty.
 
 One inventory entry per Mac is enough. The role is generic; do not copy role
 code or add per-host templates for the second and third M6. The controller
-connects over SSH as an admin who can sudo and who owns the Homebrew prefix.
-The timelord service account (`user`) is not the SSH login.
+connects over SSH as an account with passwordless sudo. That account can be an
+admin, or the service account itself when it has sudo. If the SSH account is
+the service account and a different account owns the Homebrew prefix, set
+`chia_darwin_brew_user` to the prefix owner.
 
 ```yaml
 all:
@@ -310,9 +312,10 @@ all:
         m6-mini-3:
           ansible_host: "<lan-or-tailscale-address>"
       vars:
-        ansible_user: hoffmang
+        ansible_user: timelord
         ansible_become_method: sudo
         user: timelord
+        chia_darwin_brew_user: hoffmang
         network: mainnet
         chia_darwin_topology: local-external
         chia_darwin_db_volume: /Volumes/Chia-DB
@@ -321,6 +324,10 @@ all:
         chia_darwin_hw_vdf_boards: []
         chia_darwin_hw_vdf_expected_serial: ""
 ```
+
+For the Linux-style split, use `ansible_user: hoffmang` and leave
+`chia_darwin_brew_user` empty. In both cases `user` is the non-admin account
+the LaunchDaemons run as.
 
 The playbook targets `m6_timelords`, not `localhost` with
 `connection: local`. A controller with a checkout of this repository can run:

@@ -296,8 +296,9 @@
     mode: "0755"
   when: chia_darwin_topology != "local-external"
 
-- name: Install Homebrew packages as the connecting user
-  become: false
+- name: Install Homebrew packages as the Homebrew prefix owner
+  become: "{{ chia_darwin_brew_user | length > 0 }}"
+  become_user: "{{ chia_darwin_brew_user if chia_darwin_brew_user | length > 0 else omit }}"
   block:
     - name: Require Homebrew
       ansible.builtin.stat:
@@ -383,7 +384,8 @@
       when: chia_darwin_enable_hw_vdf | bool
 
 - name: Install chiavdf from the Chia Homebrew tap
-  become: false
+  become: "{{ chia_darwin_brew_user | length > 0 }}"
+  become_user: "{{ chia_darwin_brew_user if chia_darwin_brew_user | length > 0 else omit }}"
   ansible.builtin.command:
     argv:
       - "{{ chia_darwin_brew }}"

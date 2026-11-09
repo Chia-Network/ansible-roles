@@ -12,8 +12,10 @@ services, and run as the same non-admin service account as the daemons. Set
 leave a job to another owner.
 
 The role also documents the SSH-managed controller pattern used by the Linux
-timelords. Run the playbook against an inventory of Macs over SSH as an admin
-with sudo; do not install a self-hosted runner on the timelord. The same
+timelords. Run the playbook against an inventory of Macs over SSH as an account
+with passwordless sudo; do not install a self-hosted runner on the timelord.
+The service account may be the SSH login when it has sudo, or set
+`chia_darwin_brew_user` so Homebrew runs as the prefix owner. The same
 inventory entry shape covers the second and third M6. See
 [DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#companion-services) for the service table,
 watchdog behavior, binary pins, and the approved-sudoers note.
