@@ -113,6 +113,10 @@
           - chia_darwin_node_exporter_sha256 | length == 64
           - "'checksum:' in companions_text"
           - "'sha256:' in companions_text"
+          - "'format: zip' in companions_text"
+          - "'format: tar' in companions_text"
+          - "'/usr/bin/tar' in companions_text"
+          - "'Unpack the tar companion archives' in companions_text"
           - "'restart-chia-darwin-companions' in companions_text"
           - "'alert-token' in companions_text"
           - "'webhook-url' in companions_text"

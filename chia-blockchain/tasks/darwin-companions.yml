@@ -55,6 +55,7 @@
         archive: "chia-exporter-darwin-arm64.zip"
         unpack: chia-exporter-darwin-arm64
         binary: chia-exporter
+        format: zip
         checksum: "{{ chia_darwin_chia_exporter_sha256 }}"
       - name: chia-healthcheck
         enabled: "{{ chia_darwin_enable_chia_healthcheck | bool }}"
@@ -63,6 +64,7 @@
         archive: "chia-healthcheck-darwin-arm64.zip"
         unpack: chia-healthcheck-darwin-arm64
         binary: chia-healthcheck
+        format: zip
         checksum: "{{ chia_darwin_chia_healthcheck_sha256 }}"
       - name: node_exporter
         enabled: "{{ chia_darwin_enable_node_exporter | bool }}"
@@ -71,6 +73,7 @@
         archive: "node_exporter-{{ chia_darwin_node_exporter_version }}.darwin-arm64.tar.gz"
         unpack: "node_exporter-{{ chia_darwin_node_exporter_version }}.darwin-arm64"
         binary: node_exporter
+        format: tar
         checksum: "{{ chia_darwin_node_exporter_sha256 }}"
   changed_when: false
 
@@ -104,7 +107,7 @@
     - chia_darwin_install_companion_binaries | bool
     - item.enabled | bool
 
-- name: Unpack the companion archives
+- name: Unpack the zip companion archives
   become: true
   become_user: "{{ user }}"
   ansible.builtin.unarchive:
@@ -118,6 +121,28 @@
   when:
     - chia_darwin_install_companion_binaries | bool
     - item.enabled | bool
+    - item.format == 'zip'
+
+# macOS ships BSD tar. ansible.builtin.unarchive insists on GNU tar, so use
+# the native tar for the node_exporter tarball and keep the creates guard.
+- name: Unpack the tar companion archives
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/tar
+      - -xzf
+      - "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.version }}/{{ item.archive }}"
+      - -C
+      - "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.version }}"
+    creates: "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.version }}/{{ item.unpack }}/{{ item.binary }}"
+  loop: "{{ chia_darwin_companion_binaries }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - chia_darwin_install_companion_binaries | bool
+    - item.enabled | bool
+    - item.format == 'tar'
 
 - name: Install the companion binaries
   become: true
