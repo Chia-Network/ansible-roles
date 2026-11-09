@@ -38,7 +38,7 @@
   block:
     - name: Resolve with the bad persisted wrapper
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: Discovery accepted the bad persisted wrapper
       ansible.builtin.fail:

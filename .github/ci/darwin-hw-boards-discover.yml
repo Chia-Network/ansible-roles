@@ -24,7 +24,7 @@
         hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-1.txt"
     - name: Resolve one discovered board
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: One Chia board is mask 7 and the non-Chia row is ignored
       ansible.builtin.assert:
@@ -48,7 +48,7 @@
         hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-2.txt"
     - name: Resolve two discovered boards
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: Two discovered boards are sorted by serial and use masks 3 then 1
       vars:
@@ -75,7 +75,7 @@
         hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-3.txt"
     - name: Resolve three discovered boards
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: Three discovered boards are numbered by serial and use one engine each
       ansible.builtin.assert:
@@ -96,7 +96,7 @@
         hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-recable.txt"
     - name: Resolve the three re-cabled boards
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: IDs follow the serials and the locations are refreshed
       vars:
@@ -166,7 +166,7 @@
       block:
         - name: Resolve when no board is attached
           ansible.builtin.include_role:
-            name: chia-blockchain
+            name: chia-blockchain-test
             tasks_from: darwin-hw-vdf-boards.yml
         - name: Discovery accepted an empty board list
           ansible.builtin.fail:
@@ -190,7 +190,7 @@
       block:
         - name: Resolve when too many boards are attached
           ansible.builtin.include_role:
-            name: chia-blockchain
+            name: chia-blockchain-test
             tasks_from: darwin-hw-vdf-boards.yml
         - name: Discovery accepted more than three boards
           ansible.builtin.fail:
@@ -268,7 +268,7 @@
       block:
         - name: Resolve while every slot is claimed
           ansible.builtin.include_role:
-            name: chia-blockchain
+            name: chia-blockchain-test
             tasks_from: darwin-hw-vdf-boards.yml
         - name: Discovery accepted a hidden stale claim
           ansible.builtin.fail:
@@ -318,7 +318,7 @@
       block:
         - name: Resolve a new board in a hidden claim's port
           ansible.builtin.include_role:
-            name: chia-blockchain
+            name: chia-blockchain-test
             tasks_from: darwin-hw-vdf-boards.yml
         - name: Discovery accepted a reused port
           ansible.builtin.fail:
@@ -348,7 +348,7 @@
       block:
         - name: Resolve when the client cannot be executed
           ansible.builtin.include_role:
-            name: chia-blockchain
+            name: chia-blockchain-test
             tasks_from: darwin-hw-vdf-boards.yml
         - name: Discovery accepted an unrunnable client
           ansible.builtin.fail:
@@ -371,7 +371,7 @@
         chia_darwin_hw_vdf_boards: "{{ fixture_boards }}"
     - name: Resolve explicit boards without calling --list
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: Explicit boards are used even when --list is unavailable
       ansible.builtin.assert:
@@ -389,7 +389,7 @@
         chia_darwin_hw_vdf_expected_serial: FIX-BOARD-0001
     - name: Resolve the legacy board without calling --list
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: The legacy board keeps its mask and omits --device-loc
       vars:
@@ -452,7 +452,7 @@
       block:
         - name: Resolve discovery with play-level become enabled
           ansible.builtin.include_role:
-            name: chia-blockchain
+            name: chia-blockchain-test
             tasks_from: darwin-hw-vdf-boards.yml
         - name: Discovery completed without invoking become
           ansible.builtin.assert:

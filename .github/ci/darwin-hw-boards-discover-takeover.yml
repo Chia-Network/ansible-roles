@@ -29,7 +29,7 @@
 
 - name: Resolve the explicit boards after a takeover discovery
   ansible.builtin.include_role:
-    name: chia-blockchain
+    name: chia-blockchain-test
     tasks_from: darwin-hw-vdf-boards.yml
 
 - name: Changing the mode clears the earlier takeover ownership

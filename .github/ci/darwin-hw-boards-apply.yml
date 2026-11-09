@@ -20,22 +20,22 @@
 
 - name: Resolve the inventory
   ansible.builtin.include_role:
-    name: chia-blockchain
+    name: chia-blockchain-test
     tasks_from: darwin-hw-vdf-boards.yml
 
 - name: Decide which hw-vdf LaunchDaemons this role will change
   ansible.builtin.include_role:
-    name: chia-blockchain
+    name: chia-blockchain-test
     tasks_from: darwin-hw-vdf-launchd.yml
 
 - name: Install enabled wrappers
   ansible.builtin.include_role:
-    name: chia-blockchain
+    name: chia-blockchain-test
     tasks_from: darwin-hw-vdf-install.yml
 
 - name: Apply LaunchDaemons
   ansible.builtin.include_role:
-    name: chia-blockchain
+    name: chia-blockchain-test
     tasks_from: darwin-launchd-job.yml
   vars:
     chia_job: "{{ hw_job }}"
@@ -46,7 +46,7 @@
 
 - name: Remove retired wrappers
   ansible.builtin.include_role:
-    name: chia-blockchain
+    name: chia-blockchain-test
     tasks_from: darwin-hw-vdf-retire.yml
 
 - name: Run pending LaunchDaemon restarts

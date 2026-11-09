@@ -1,0 +1,6 @@
+---
+# Test-only role shell. The ASIC CI plays select Darwin task files with
+# include_role; using the production role would also load its Linux meta
+# dependencies on the Ubuntu runner. This role has no dependencies and links
+# the production task, handler, template, default, and vars trees.
+dependencies: []

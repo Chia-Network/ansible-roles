@@ -132,7 +132,7 @@
         chia_darwin_hw_vdf_mask: 5
     - name: Resolve legacy mask 5
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: Legacy mask 5 keeps two engines and does not pass a device location
       vars:
@@ -160,7 +160,7 @@
         chia_darwin_hw_vdf_mask: 1
     - name: Resolve legacy mask 1
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: Mask 1 publishes one engine
       ansible.builtin.assert:
@@ -173,7 +173,7 @@
         chia_darwin_hw_vdf_mask: 7
     - name: Resolve legacy mask 7
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: Mask 7 publishes three engines
       ansible.builtin.assert:
@@ -191,7 +191,7 @@
             expected_serial: FIX-BOARD-0001
     - name: Resolve one inventoried board
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: One inventoried board uses mask 7 and passes device_loc
       ansible.builtin.assert:
@@ -216,7 +216,7 @@
             expected_serial: FIX-BOARD-0001
     - name: Resolve two boards
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: Lowest ID gets mask 3 and the later slot waits one stagger
       vars:
@@ -248,7 +248,7 @@
         chia_darwin_hw_vdf_checkpoint_threshold: 8000
     - name: Resolve three boards
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: Three boards are one engine each and the stagger steps by slot
       vars:
@@ -275,7 +275,7 @@
         chia_darwin_hw_vdf_boards: "{{ fixture_boards }}"
     - name: Resolve with the client disabled
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: No board is enabled
       ansible.builtin.assert:
@@ -305,7 +305,7 @@
         chia_darwin_hw_vdf_boards: "{{ fixture_boards }}"
     - name: Resolve three boards in check mode
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: Check mode does not write a wrapper
       ansible.builtin.assert:
