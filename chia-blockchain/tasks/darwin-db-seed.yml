@@ -110,7 +110,8 @@
 
     - name: Ensure the AWS CLI is available for the database seed
       when: not ansible_check_mode
-      become: false
+      become: "{{ chia_darwin_brew_user | length > 0 }}"
+      become_user: "{{ chia_darwin_brew_user if chia_darwin_brew_user | length > 0 else omit }}"
       block:
         - name: Check whether the AWS CLI formula is installed
           ansible.builtin.command:

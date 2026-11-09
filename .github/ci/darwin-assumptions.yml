@@ -102,6 +102,18 @@
           to become chia_darwin_brew_user. The default keeps the connecting
           user as the Homebrew owner.
 
+    - name: The database seed Homebrew install can use the prefix owner
+      vars:
+        seed_text: "{{ lookup('file', playbook_dir ~ '/../../chia-blockchain/tasks/darwin-db-seed.yml') }}"
+        seed_aws: "{{ seed_text.split('Ensure the AWS CLI is available for the database seed')[1].split('Download and publish the Darwin database seed')[0] }}"
+      ansible.builtin.assert:
+        that:
+          - "'chia_darwin_brew_user' in seed_aws"
+          - "'become: false' not in seed_aws"
+        fail_msg: >-
+          The database seed's AWS CLI install must honor chia_darwin_brew_user
+          when the SSH login is the service user.
+
     - name: Darwin still refuses to seed when the external volume is absent
       ansible.builtin.assert:
         that:
