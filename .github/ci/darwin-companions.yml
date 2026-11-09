@@ -43,6 +43,18 @@
           watchdog should check the local full node, and include
           darwin-companions.yml before the LaunchDaemons are installed.
 
+    - name: The daemon keeps the daemon restart timeouts
+      ansible.builtin.assert:
+        that:
+          - "'chia_darwin_daemon_throttle_interval' in darwin_text.split('name: daemon')[1].split('name: full-node')[0]"
+          - "'chia_darwin_daemon_exit_timeout' in darwin_text.split('name: daemon')[1].split('name: full-node')[0]"
+          - "'chia_darwin_companion_throttle_interval' not in darwin_text.split('name: daemon')[1].split('name: full-node')[0]"
+          - "'chia_darwin_companion_exit_timeout' not in darwin_text.split('name: daemon')[1].split('name: full-node')[0]"
+        fail_msg: >-
+          The daemon job must keep chia_darwin_daemon_throttle_interval and
+          chia_darwin_daemon_exit_timeout; the companion timeouts are only for
+          the companion jobs.
+
     - name: The LaunchDaemon list includes companions and the restart path covers them
       ansible.builtin.assert:
         that:
