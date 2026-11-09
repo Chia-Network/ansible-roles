@@ -312,8 +312,9 @@
           - chia_darwin_brew_stat.stat.executable | default(false)
         fail_msg: >-
           Homebrew was not found at {{ chia_darwin_brew }}. Install it for the
-          connecting admin (https://brew.sh) before running this role. The role
-          does not run the Homebrew installer.
+          Homebrew prefix owner before running this role. The role does not run
+          the Homebrew installer. When the SSH login is the service user, set
+          chia_darwin_brew_user to the prefix owner.
 
     - name: Check whether Homebrew Python is installed
       ansible.builtin.command:
