@@ -330,7 +330,7 @@
           - "text.count('include_tasks: darwin-hw-vdf-validate.yml') == 1"
           - "text.index('include_tasks: darwin-hw-vdf-validate.yml') < text.index('Ensure the timelord service user exists')"
           - "text.index('include_tasks: darwin-hw-vdf-validate.yml') < text.index('Apply pmset so the host stays awake')"
-          - "text.index('include_tasks: darwin-hw-vdf-validate.yml') < text.index('Install Homebrew packages as the connecting user')"
+          - "text.index('include_tasks: darwin-hw-vdf-validate.yml') < text.index('Install Homebrew packages as the Homebrew prefix owner')"
           - "text.index('include_tasks: darwin-hw-vdf-validate.yml') < text.index('Install chiavdf from the Chia Homebrew tap')"
 
     - name: Boards resolution, launchd ownership, and wrapper install keep that order
