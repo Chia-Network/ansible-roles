@@ -1,0 +1,50 @@
+# This job keeps the default-off monit output identical to main and exercises the restart gate.
+name: Monit restart tests
+
+on:
+  pull_request:
+    paths:
+      - "chia-blockchain/**"
+      - ".github/workflows/monit-restart-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  monit:
+    name: Monit restart tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Create virtualenv and install Ansible
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install ansible-core
+
+      - name: Install bats
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+
+      - name: Fetch main if needed
+        shell: bash
+        run: |
+          if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
+            git fetch origin main
+          fi
+
+      - name: Add virtualenv to PATH
+        run: echo "$PWD/.venv/bin" >>"$GITHUB_PATH"
+
+      - name: Check monit rendering matches main
+        shell: bash
+        run: chia-blockchain/tests/check-monit-render.sh origin/main
+
+      - name: Run restart gate tests
+        shell: bash
+        run: bats chia-blockchain/tests/
