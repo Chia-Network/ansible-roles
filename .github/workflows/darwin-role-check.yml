@@ -45,6 +45,9 @@ jobs:
       - name: Check Darwin restart and pip assumptions
         run: ansible-playbook .github/ci/darwin-assumptions.yml
 
+      - name: Check Darwin companion services and watchdog
+        run: ansible-playbook .github/ci/darwin-companions.yml
+
       - name: Run Darwin database seed tests
         env:
           ANSIBLE_ROLES_PATH: ${{ github.workspace }}

@@ -90,6 +90,7 @@
     chia_darwin_launchd_jobs: >-
       {{
         (chia_darwin_service_jobs | default([]))
+        + (chia_darwin_companion_jobs | default([]))
         + (chia_darwin_hw_vdf_jobs | selectattr('enabled', 'equalto', true) | list)
         + (
           chia_darwin_hw_vdf_jobs

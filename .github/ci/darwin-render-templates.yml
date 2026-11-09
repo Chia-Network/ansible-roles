@@ -15,10 +15,16 @@
     templates:
       - chia-daemon-run.sh
       - chia-env.sh
+      - chia-exporter-run.sh
+      - chia-exporter.yml
       - chia-full-node-run.sh
+      - chia-healthcheck-run.sh
       - chia-hw-vdf-run.sh
       - chia-timelord-run.sh
+      - chia-watchdog.sh
+      - chia-watchdog.plist
       - launchdaemon.plist
+      - node-exporter-run.sh
       - pppc.mobileconfig
       - rotpipe.py
       - FULL-DISK-ACCESS.txt
@@ -29,6 +35,20 @@
         chia_root: /Users/timelord/.chia
         chia_darwin_hw_vdf_expected_serial: "FT'TEST 01"
         chia_timelord_full_node_peer_host: 10.0.0.5
+        chia_darwin_hw_vdf_jobs:
+          - name: hw-vdf
+            enabled: true
+          - name: hw-vdf-2
+            enabled: true
+          - name: hw-vdf-3
+            enabled: true
+        chia_darwin_service_jobs:
+          - name: daemon
+            enabled: true
+          - name: full-node
+            enabled: true
+          - name: timelord
+            enabled: true
         chia_job:
           name: timelord
           label: net.chia.timelord

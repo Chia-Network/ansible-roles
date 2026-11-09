@@ -498,6 +498,55 @@ chia_darwin_hw_vdf_port: "{{ chia_timelord_launcher_port }}"
 chia_darwin_hw_vdf_settle_seconds: 3
 chia_darwin_rotpipe_max_bytes: 52428800
 chia_darwin_rotpipe_backups: 5
+# Companion services. These are the Darwin equivalents of the separate
+# chia-exporter, chia-healthcheck, and prometheus-node-exporter roles plus the
+# Linux monit checks, all owned here so one play applies the whole timelord
+# stack. Set a flag to false to leave that job to another owner; the role then
+# removes its plist but leaves installed binaries and wrappers in place.
+chia_darwin_enable_chia_exporter: true
+chia_darwin_enable_chia_healthcheck: true
+chia_darwin_enable_node_exporter: true
+chia_darwin_enable_watchdog: true
+# Pinned release artifacts. The role downloads the same binaries the reference
+# M6 host runs. Checksums are for the published darwin-arm64 archives; update
+# both when changing a version. Empty checksums are allowed but not recommended.
+chia_darwin_install_companion_binaries: true
+chia_darwin_companion_bin_dir: "{{ chia_darwin_home }}/opt/bin"
+chia_darwin_companion_download_dir: "{{ chia_darwin_home }}/opt/downloads"
+chia_darwin_chia_exporter_version: "1.0.3"
+chia_darwin_chia_exporter_sha256: "52ef18ae6ec0d0a2312f9a8e9ac3eda95e7ee387e286bc0a36d5824696be9a12"
+chia_darwin_chia_exporter_port: "{{ chia_exporter_port | default(9914) }}"
+chia_darwin_chia_healthcheck_version: "1.0.3"
+chia_darwin_chia_healthcheck_sha256: "3931d301e0eff12f038d82721c2e499b2c47163c4318d328dc41ff0cf547b76e"
+chia_darwin_chia_healthcheck_port: "{{ chia_healthcheck_port | default(9950) }}"
+chia_darwin_chia_healthcheck_dns_hostname: "{{ chia_healthcheck_dns_hostname | default('') }}"
+chia_darwin_node_exporter_version: "1.12.1"
+chia_darwin_node_exporter_sha256: "35b246a34af55a8f0c3f11067f17aecf9836cfd4689bde364776b3a4ad3a84d6"
+chia_darwin_node_exporter_port: 9100
+# CHIA_ROOT used by chia-exporter and chia-healthcheck. The Linux units use
+# the real chia root. A host may point this at a read-only config copy, as the
+# reference M6 does with ~/.chia-monitor, without changing CHIA_ROOT for the
+# daemons. Wrappers still wait for chia_darwin_db_marker (the real root).
+chia_darwin_companion_chia_root: "{{ chia_root }}"
+chia_darwin_companion_rotpipe_max_bytes: 20971520
+chia_darwin_companion_rotpipe_backups: 3
+chia_darwin_companion_throttle_interval: 15
+chia_darwin_companion_exit_timeout: 30
+# Watchdog: the macOS equivalent of the Linux monit checks. It runs as root so
+# it can kickstart LaunchDaemons. The alert files stay root-only and are only
+# written when the corresponding variable is nonempty.
+chia_darwin_watchdog_cycle: 60
+chia_darwin_watchdog_grace: 600
+chia_darwin_watchdog_fail_cycles: 3
+chia_darwin_watchdog_expected_vdfs: 3
+chia_darwin_watchdog_throttle_interval: 30
+chia_darwin_watchdog_exit_timeout: 30
+chia_darwin_watchdog_conf_dir: /usr/local/etc/chia-watchdog
+chia_darwin_watchdog_script: /usr/local/libexec/chia-watchdog/chia-watchdog.sh
+chia_darwin_watchdog_log: /var/log/chia-watchdog.log
+chia_darwin_watchdog_log_dir: /var/log
+chia_darwin_watchdog_alert_token: ""
+chia_darwin_watchdog_webhook_url: ""
 chia_darwin_pmset_apply: true
 chia_darwin_pmset:
   sleep: 0

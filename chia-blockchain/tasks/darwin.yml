@@ -3,6 +3,7 @@
   ansible.builtin.set_fact:
     chia_darwin_hw_vdf_changed_labels: []
     chia_darwin_restart_services: false
+    chia_darwin_restart_companions: false
   changed_when: false
 
 - name: Require an Apple Silicon Mac
@@ -67,8 +68,8 @@
       - name: daemon
         label: "{{ chia_darwin_launchd_prefix }}.daemon"
         wrapper: "{{ chia_darwin_bin_dir }}/chia-daemon-run.sh"
-        throttle: "{{ chia_darwin_daemon_throttle_interval }}"
-        exit_timeout: "{{ chia_darwin_daemon_exit_timeout }}"
+        throttle: "{{ chia_darwin_companion_throttle_interval }}"
+        exit_timeout: "{{ chia_darwin_companion_exit_timeout }}"
         enabled: true
       - name: full-node
         label: "{{ chia_darwin_launchd_prefix }}.full-node"
@@ -82,6 +83,54 @@
         throttle: "{{ chia_darwin_timelord_throttle_interval }}"
         exit_timeout: "{{ chia_darwin_timelord_exit_timeout }}"
         enabled: true
+
+# Companion jobs mirror the Linux timelord host. They are separate from
+# chia_darwin_service_jobs so a companion-only change does not bounce the
+# daemon, full node, timelord, or ASIC boards.
+- name: Build the Darwin companion LaunchDaemon job list
+  ansible.builtin.set_fact:
+    chia_darwin_companion_jobs:
+      - name: chia-exporter
+        label: "{{ chia_darwin_launchd_prefix }}.chia-exporter"
+        wrapper: "{{ chia_darwin_bin_dir }}/chia-exporter-run.sh"
+        throttle: "{{ chia_darwin_companion_throttle_interval }}"
+        exit_timeout: "{{ chia_darwin_companion_exit_timeout }}"
+        nofile: 8192
+        run_at_load: true
+        process_type: ""
+        companion: true
+        enabled: "{{ chia_darwin_enable_chia_exporter | bool }}"
+      - name: chia-healthcheck
+        label: "{{ chia_darwin_launchd_prefix }}.chia-healthcheck"
+        wrapper: "{{ chia_darwin_bin_dir }}/chia-healthcheck-run.sh"
+        throttle: "{{ chia_darwin_companion_throttle_interval }}"
+        exit_timeout: "{{ chia_darwin_companion_exit_timeout }}"
+        nofile: 8192
+        run_at_load: true
+        process_type: ""
+        companion: true
+        enabled: "{{ chia_darwin_enable_chia_healthcheck | bool }}"
+      - name: node-exporter
+        label: "{{ chia_darwin_launchd_prefix }}.node-exporter"
+        wrapper: "{{ chia_darwin_bin_dir }}/node-exporter-run.sh"
+        throttle: "{{ chia_darwin_companion_throttle_interval }}"
+        exit_timeout: "{{ chia_darwin_companion_exit_timeout }}"
+        nofile: 8192
+        run_at_load: true
+        process_type: ""
+        companion: true
+        enabled: "{{ chia_darwin_enable_node_exporter | bool }}"
+      - name: watchdog
+        label: "{{ chia_darwin_launchd_prefix }}.watchdog"
+        wrapper: "{{ chia_darwin_watchdog_script }}"
+        plist_template: darwin/chia-watchdog.plist.j2
+        throttle: "{{ chia_darwin_watchdog_throttle_interval }}"
+        exit_timeout: "{{ chia_darwin_watchdog_exit_timeout }}"
+        run_at_load: true
+        process_type: ""
+        companion: true
+        enabled: "{{ chia_darwin_enable_watchdog | bool }}"
+  changed_when: false
 
 - name: Validate shared ASIC options before changing the host
   ansible.builtin.include_tasks: darwin-hw-vdf-validate.yml
@@ -665,6 +714,9 @@
 
 - name: Install enabled hw_vdf wrappers
   ansible.builtin.include_tasks: darwin-hw-vdf-install.yml
+
+- name: Install the Darwin companion services and watchdog
+  ansible.builtin.include_tasks: darwin-companions.yml
 
 - name: Install and load LaunchDaemons
   ansible.builtin.include_tasks: darwin-launchd-job.yml

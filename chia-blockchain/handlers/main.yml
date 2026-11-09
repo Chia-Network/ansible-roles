@@ -28,8 +28,14 @@
     chia_darwin_restart_services: true
   listen: restart-chia-darwin
 
+- name: Note that the Darwin companion jobs must restart
+  ansible.builtin.set_fact:
+    chia_darwin_restart_companions: true
+  listen: restart-chia-darwin-companions
+
 - name: restart-chia-darwin-ordered
   ansible.builtin.include_tasks: "{{ role_path }}/tasks/darwin-restart-ordered.yml"
   listen:
     - restart-chia-darwin
     - restart-chia-darwin-boards
+    - restart-chia-darwin-companions

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>{{ chia_job.label | e }}</string>
+  <key>ProgramArguments</key>
+  <array><string>{{ chia_job.wrapper | e }}</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>{{ chia_job.throttle | int }}</integer>
+  <key>ExitTimeOut</key><integer>{{ chia_job.exit_timeout | int }}</integer>
+  <key>StandardOutPath</key><string>{{ chia_darwin_watchdog_log_dir | e }}/chia-watchdog.out.log</string>
+  <key>StandardErrorPath</key><string>{{ chia_darwin_watchdog_log_dir | e }}/chia-watchdog.err.log</string>
+</dict>
+</plist>

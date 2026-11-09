@@ -14,11 +14,20 @@
     <key>CHIA_ROOT</key><string>{{ chia_root | e }}</string>
   </dict>
   <key>KeepAlive</key><true/>
+{% if chia_job.run_at_load | default(false) %}
+  <key>RunAtLoad</key><true/>
+{% endif %}
   <key>ThrottleInterval</key><integer>{{ chia_job.throttle | int }}</integer>
   <key>ExitTimeOut</key><integer>{{ chia_job.exit_timeout | int }}</integer>
+{% if chia_job.process_type is defined %}
+{% if chia_job.process_type | length > 0 %}
+  <key>ProcessType</key><string>{{ chia_job.process_type | e }}</string>
+{% endif %}
+{% else %}
   <key>ProcessType</key><string>{{ chia_darwin_process_type | e }}</string>
-  <key>SoftResourceLimits</key><dict><key>NumberOfFiles</key><integer>{{ chia_darwin_nofile | int }}</integer></dict>
-  <key>HardResourceLimits</key><dict><key>NumberOfFiles</key><integer>{{ chia_darwin_nofile | int }}</integer></dict>
+{% endif %}
+  <key>SoftResourceLimits</key><dict><key>NumberOfFiles</key><integer>{{ chia_job.nofile | default(chia_darwin_nofile) | int }}</integer></dict>
+  <key>HardResourceLimits</key><dict><key>NumberOfFiles</key><integer>{{ chia_job.nofile | default(chia_darwin_nofile) | int }}</integer></dict>
   <key>StandardOutPath</key><string>{{ chia_darwin_log_dir | e }}/{{ chia_job.name | e }}.out.log</string>
   <key>StandardErrorPath</key><string>{{ chia_darwin_log_dir | e }}/{{ chia_job.name | e }}.err.log</string>
 </dict>

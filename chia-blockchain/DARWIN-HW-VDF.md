@@ -225,7 +225,121 @@ rollback: the other wrappers still claim their boards, so the set stays
 larger. `remote-node` still has no local full node, and every ASIC client
 still connects to the local timelord.
 
-This role does not install or change an external watchdog. A watchdog that
-expects three VDF connections and only restarts the ID 1 job keeps doing only
-that. Boards 2 and 3 come back through launchd `KeepAlive`. Keep the board that
-watchdog restarts as ID 1.
+## Companion services
+
+The role also owns the LaunchDaemons that the Linux timelord hosts run next to
+chia. They use the same `net.chia.timelord.*` prefix, the same service account,
+and the same restart path as the core jobs:
+
+| Job               | Label suffix      | Default port | Notes                                  |
+| ----------------- | ----------------- | ------------ | -------------------------------------- |
+| `chia-exporter`   | `.chia-exporter`  | 9914         | `CHIA_ROOT` may be a read-only copy.   |
+| `chia-healthcheck`| `.chia-healthcheck`| 9950        | Serves `/full_node` and `/timelord`.   |
+| `node-exporter`   | `.node-exporter`  | 9100         | Host metrics.                          |
+| `watchdog`        | `.watchdog`       | none         | Runs as root; see below.               |
+
+Set `chia_darwin_enable_chia_exporter`, `chia_darwin_enable_chia_healthcheck`,
+`chia_darwin_enable_node_exporter`, or `chia_darwin_enable_watchdog` to false to
+leave a job to another owner. The role removes that plist; installed binaries
+and wrappers are left in place. On Darwin this role replaces the Linux
+`chia-exporter`, `chia-healthcheck`, and `prometheus-node-exporter` roles; do
+not include those roles in the same play or they will try to manage the same
+ports with systemd or Homebrew services.
+
+Binary versions are pinned by `chia_darwin_chia_exporter_version`,
+`chia_darwin_chia_healthcheck_version`, and
+`chia_darwin_node_exporter_version`. Each has a matching `*_sha256` for the
+published darwin-arm64 archive. `chia_darwin_install_companion_binaries: false`
+skips downloading and keeps whatever is already in
+`chia_darwin_companion_bin_dir`. The wrappers pipe output through `rotpipe.py`
+with `chia_darwin_companion_rotpipe_max_bytes` and
+`chia_darwin_companion_rotpipe_backups`.
+
+`chia_darwin_companion_chia_root` is the `CHIA_ROOT` the exporter and
+healthcheck use. It defaults to `chia_root`. A host can point it at a read-only
+config copy instead; the reference M6 host keeps one under `~/.chia-monitor`.
+The wrappers still wait for the real database volume before starting.
+
+## Watchdog
+
+`chia-watchdog` is the macOS equivalent of the Linux monit configuration. It
+runs as root from `<prefix>.watchdog`, checks every 60 seconds, and mirrors the
+Linux triggers:
+
+- `/full_node` or `/timelord` not returning 200 for three cycles restarts the
+  daemon, full node, timelord, and every enabled `hw-vdf` board.
+- The VDF port having the expected number of established connections and every
+  enabled `hw-vdf` job running is the board-health check. A failure restarts
+  all enabled boards in ID order.
+- The exporter ports not listening for three cycles kickstart that exporter
+  job.
+- If the healthcheck itself is unreachable, only the healthcheck is restarted.
+
+Checks for a disabled companion service are skipped, and the full-stack
+restart only kicks the core service jobs that are enabled.
+
+After a restart the watchdog waits `chia_darwin_watchdog_grace` seconds before
+counting failures again, and lengthens that grace after repeated restarts. It
+never stops checking. The driver and thresholds are
+`chia_darwin_watchdog_cycle`, `chia_darwin_watchdog_fail_cycles`, and
+`chia_darwin_watchdog_expected_vdfs`; the last one is computed from the enabled
+board masks.
+
+Alerting uses `/usr/local/etc/chia-watchdog/alert-token` and `webhook-url`.
+The role creates the root-only directory and writes either file only when
+`chia_darwin_watchdog_alert_token` or `chia_darwin_watchdog_webhook_url` is
+nonempty. Keep those values in private inventory; both writes use `no_log`.
+Existing files are left alone when the variables are empty.
+
+## Managing several Macs
+
+One inventory entry per Mac is enough. The role is generic; do not copy role
+code or add per-host templates for the second and third M6. The controller
+connects over SSH as an admin who can sudo and who owns the Homebrew prefix.
+The timelord service account (`user`) is not the SSH login.
+
+```yaml
+all:
+  children:
+    m6_timelords:
+      hosts:
+        m6-mini-1:
+          ansible_host: "<lan-or-tailscale-address>"
+        m6-mini-2:
+          ansible_host: "<lan-or-tailscale-address>"
+        m6-mini-3:
+          ansible_host: "<lan-or-tailscale-address>"
+      vars:
+        ansible_user: hoffmang
+        ansible_become_method: sudo
+        user: timelord
+        network: mainnet
+        chia_darwin_topology: local-external
+        chia_darwin_db_volume: /Volumes/Chia-DB
+        chia_darwin_pip_version: "2.7.5"
+        chia_darwin_enable_hw_vdf: true
+        chia_darwin_hw_vdf_boards: []
+        chia_darwin_hw_vdf_expected_serial: ""
+```
+
+The playbook targets `m6_timelords`, not `localhost` with
+`connection: local`. A controller with a checkout of this repository can run:
+
+```bash
+ansible-playbook -i inventory.yml playbooks/m6-timelords.yml
+```
+
+That controller may be a Mac or a Linux host. GitHub holds the reviewed role
+code and CI; an always-on controller pulls `main` and applies it over SSH. No
+self-hosted runner is installed on the timelord. The Mac equivalent of the
+Linux SSH-managed host is the same privilege model: the admin account gets
+passwordless sudo and Ansible runs commands through it. A one-time fragment
+like this matches the Linux reference hosts:
+
+```sudoers
+# /etc/sudoers.d/hoffmang
+hoffmang ALL=(ALL) NOPASSWD: ALL
+```
+
+The role does not edit `/etc/sudoers.d`. Apply that fragment only after the
+owner approves the exact policy for the host. SSH should stay public-key only.

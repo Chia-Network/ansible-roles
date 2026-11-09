@@ -22,6 +22,14 @@
     loop_var: chia_job
     label: "{{ chia_job.label }}"
 
+- name: Restart companion jobs
+  when: chia_darwin_restart_companions | default(false) | bool
+  ansible.builtin.include_tasks: darwin-restart-job.yml
+  loop: "{{ chia_darwin_companion_jobs | default([]) }}"
+  loop_control:
+    loop_var: chia_job
+    label: "{{ chia_job.label }}"
+
 - name: See which ASIC boards are loaded after the stops
   when:
     - chia_darwin_start_now | bool
@@ -54,3 +62,4 @@
 - name: Clear the service restart request
   ansible.builtin.set_fact:
     chia_darwin_restart_services: false
+    chia_darwin_restart_companions: false

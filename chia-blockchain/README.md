@@ -1,5 +1,23 @@
 # chia-blockchain
 
+## Darwin companion services
+
+The Darwin tasks own the timelord stack's companion LaunchDaemons as well as
+the chia services: `chia-exporter` (9914), `chia-healthcheck` (9950),
+`node-exporter` (9100), and the root-run `chia-watchdog` that mirrors the Linux
+monit checks. Binaries are pinned GitHub release artifacts, not Homebrew
+services, and run as the same non-admin service account as the daemons. Set
+`chia_darwin_enable_chia_exporter`, `chia_darwin_enable_chia_healthcheck`,
+`chia_darwin_enable_node_exporter`, or `chia_darwin_enable_watchdog` to false to
+leave a job to another owner.
+
+The role also documents the SSH-managed controller pattern used by the Linux
+timelords. Run the playbook against an inventory of Macs over SSH as an admin
+with sudo; do not install a self-hosted runner on the timelord. The same
+inventory entry shape covers the second and third M6. See
+[DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#companion-services) for the service table,
+watchdog behavior, binary pins, and the approved-sudoers note.
+
 ## Darwin full-node database seeding
 
 Darwin `local-internal` and `local-external` full nodes can optionally seed from

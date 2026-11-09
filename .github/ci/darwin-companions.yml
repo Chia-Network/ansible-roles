@@ -1,0 +1,124 @@
+---
+# Static checks for the Darwin companion services and watchdog. These do not
+# install anything; they keep the role's job list, templates, and pins wired
+# together so a future edit cannot silently drop a service.
+- name: Check Darwin companion service assumptions
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+  vars:
+    role_dir: "{{ playbook_dir }}/../../chia-blockchain"
+  tasks:
+    - name: Read the companion-related role sources
+      ansible.builtin.set_fact:
+        darwin_text: "{{ lookup('file', role_dir ~ '/tasks/darwin.yml') }}"
+        companions_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-companions.yml') }}"
+        launchd_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-hw-vdf-launchd.yml') }}"
+        launchd_job_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-launchd-job.yml') }}"
+        restart_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-restart-ordered.yml') }}"
+        watchdog_text: "{{ lookup('file', role_dir ~ '/templates/darwin/chia-watchdog.sh.j2') }}"
+        watchdog_plist_text: "{{ lookup('file', role_dir ~ '/templates/darwin/chia-watchdog.plist.j2') }}"
+        launchd_plist_text: "{{ lookup('file', role_dir ~ '/templates/darwin/launchdaemon.plist.j2') }}"
+
+    - name: Parse the Darwin task files
+      ansible.builtin.set_fact:
+        darwin_tasks: "{{ darwin_text | from_yaml }}"
+
+    - name: The role defines every companion job and includes the install tasks
+      ansible.builtin.assert:
+        that:
+          - "'Build the Darwin companion LaunchDaemon job list' in (darwin_tasks | map(attribute='name') | list)"
+          - "'Install the Darwin companion services and watchdog' in (darwin_tasks | map(attribute='name') | list)"
+          - "'chia_darwin_companion_jobs:' in darwin_text"
+          - "'chia_darwin_enable_chia_exporter' in darwin_text"
+          - "'chia_darwin_enable_chia_healthcheck' in darwin_text"
+          - "'chia_darwin_enable_node_exporter' in darwin_text"
+          - "'chia_darwin_enable_watchdog' in darwin_text"
+          - "'darwin-companions.yml' in darwin_text"
+        fail_msg: >-
+          darwin.yml must define the four companion jobs and include
+          darwin-companions.yml before the LaunchDaemons are installed.
+
+    - name: The LaunchDaemon list includes companions and the restart path covers them
+      ansible.builtin.assert:
+        that:
+          - "'chia_darwin_companion_jobs | default([])' in launchd_text"
+          - "'Restart companion jobs' in restart_text"
+          - "'chia_darwin_restart_companions' in restart_text"
+          - "'chia_darwin_plist_template' not in launchd_job_text"
+          - "'chia_job.plist_template | default' in launchd_job_text"
+          - "'restart-chia-darwin-companions' in launchd_job_text"
+        fail_msg: >-
+          Companion plists must join chia_darwin_launchd_jobs, and a
+          companion-only change must restart only companion jobs.
+
+    - name: The base plist supports RunAtLoad and per-job resource limits
+      ansible.builtin.assert:
+        that:
+          - "'chia_job.run_at_load' in launchd_plist_text"
+          - "'chia_job.nofile' in launchd_plist_text"
+          - "'chia_job.process_type' in launchd_plist_text"
+        fail_msg: >-
+          The core LaunchDaemon template must keep the companion RunAtLoad,
+          nofile, and ProcessType overrides.
+
+    - name: The watchdog runs as root and restarts every enabled ASIC board
+      ansible.builtin.assert:
+        that:
+          - "'<key>UserName</key>' not in watchdog_plist_text"
+          - "'<key>RunAtLoad</key><true/>' in watchdog_plist_text"
+          - "'<key>KeepAlive</key><true/>' in watchdog_plist_text"
+          - "'HW_JOBS=' in watchdog_text"
+          - "'SERVICE_JOBS=' in watchdog_text"
+          - "'EXPECTED_VDFS' in watchdog_text"
+          - "'hw_jobs_running' in watchdog_text"
+          - "'restart_hwvdf' in watchdog_text"
+          - "'for j in \"${SERVICE_JOBS[@]}\" \"${HW_JOBS[@]}\"' in watchdog_text"
+          - "'for j in \"${HW_JOBS[@]}\"' in watchdog_text"
+          - "'CHECK_HEALTHCHECK' in watchdog_text"
+          - "'CHECK_EXPORTER' in watchdog_text"
+          - "'CHECK_NODE' in watchdog_text"
+        fail_msg: >-
+          The watchdog must run as root, check every enabled hw-vdf job, and
+          restart all exposed boards rather than only hw-vdf.
+
+    - name: The companion binaries and watchdog files are pinned and installed
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_chia_exporter_version | length > 0
+          - chia_darwin_chia_healthcheck_version | length > 0
+          - chia_darwin_node_exporter_version | length > 0
+          - chia_darwin_chia_exporter_sha256 | length == 64
+          - chia_darwin_chia_healthcheck_sha256 | length == 64
+          - chia_darwin_node_exporter_sha256 | length == 64
+          - "'checksum:' in companions_text"
+          - "'sha256:' in companions_text"
+          - "'restart-chia-darwin-companions' in companions_text"
+          - "'alert-token' in companions_text"
+          - "'webhook-url' in companions_text"
+          - "'no_log: true' in companions_text"
+        fail_msg: >-
+          Companion downloads need pinned versions and checksums. The watchdog
+          alert files must stay optional and no_log.
+
+    - name: The expected companion templates exist
+      ansible.builtin.stat:
+        path: "{{ role_dir }}/templates/darwin/{{ item }}"
+      loop:
+        - chia-exporter.yml.j2
+        - chia-exporter-run.sh.j2
+        - chia-healthcheck-run.sh.j2
+        - node-exporter-run.sh.j2
+        - chia-watchdog.sh.j2
+        - chia-watchdog.plist.j2
+      register: companion_templates
+
+    - name: Fail when a companion template is missing
+      ansible.builtin.assert:
+        that:
+          - companion_templates.results | rejectattr('stat.exists') | list | length == 0
+        fail_msg: >-
+          Missing companion template:
+          {{ companion_templates.results | rejectattr('stat.exists') | map(attribute='item') | list | join(', ') }}
