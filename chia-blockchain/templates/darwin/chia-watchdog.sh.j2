@@ -33,6 +33,7 @@ SERVICE_JOB_LIST="{{ chia_darwin_service_jobs | default([]) | selectattr('enable
 read -r -a HW_JOBS <<<"$HW_JOB_LIST"
 read -r -a SERVICE_JOBS <<<"$SERVICE_JOB_LIST"
 CHECK_HEALTHCHECK={{ 1 if chia_darwin_enable_chia_healthcheck | bool else 0 }}
+CHECK_FULL_NODE={{ 1 if chia_darwin_watchdog_full_node_enabled | bool else 0 }}
 CHECK_EXPORTER={{ 1 if chia_darwin_enable_chia_exporter | bool else 0 }}
 CHECK_NODE={{ 1 if chia_darwin_enable_node_exporter | bool else 0 }}
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
@@ -139,7 +140,13 @@ while :; do
 	scope=""
 
 	if [ "$CHECK_HEALTHCHECK" = 1 ]; then
-		if [ "$fn" = "000" ] && [ "$tl" = "000" ]; then
+		hc_down=0
+		if [ "$tl" = "000" ]; then
+			if [ "$CHECK_FULL_NODE" = 0 ] || [ "$fn" = "000" ]; then
+				hc_down=1
+			fi
+		fi
+		if [ "$hc_down" = 1 ]; then
 			hc_fail=$((hc_fail + 1))
 			fn_fail=0
 			tl_fail=0
@@ -150,22 +157,28 @@ while :; do
 			fi
 		else
 			hc_fail=0
-			if [ "$fn" = "200" ]; then fn_fail=0; else
-				fn_fail=$((fn_fail + 1))
-				log "/full_node HTTP $fn ($fn_fail/$FAIL_CYCLES)"
+			if [ "$CHECK_FULL_NODE" = 1 ]; then
+				if [ "$fn" = "200" ]; then
+					fn_fail=0
+				else
+					fn_fail=$((fn_fail + 1))
+					log "/full_node HTTP $fn ($fn_fail/$FAIL_CYCLES)"
+				fi
 			fi
-			if [ "$tl" = "200" ]; then tl_fail=0; else
+			if [ "$tl" = "200" ]; then
+				tl_fail=0
+			else
 				tl_fail=$((tl_fail + 1))
 				log "/timelord HTTP $tl ($tl_fail/$FAIL_CYCLES)"
 			fi
-			[ $fn_fail -ge $FAIL_CYCLES ] && {
+			if [ "$CHECK_FULL_NODE" = 1 ] && [ $fn_fail -ge $FAIL_CYCLES ]; then
 				problems="$problems full_node-health"
 				scope=full
-			}
-			[ $tl_fail -ge $FAIL_CYCLES ] && {
+			fi
+			if [ $tl_fail -ge $FAIL_CYCLES ]; then
 				problems="$problems timelord-health"
 				scope=full
-			}
+			fi
 		fi
 	fi
 

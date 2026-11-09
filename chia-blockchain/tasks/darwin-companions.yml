@@ -127,7 +127,7 @@
     dest: "{{ chia_darwin_companion_bin_dir }}/{{ item.binary }}"
     remote_src: true
     owner: "{{ user }}"
-    group: "{{ group }}"
+    group: "{{ chia_darwin_group }}"
     mode: "0755"
   loop: "{{ chia_darwin_companion_binaries }}"
   loop_control:

@@ -68,8 +68,8 @@
       - name: daemon
         label: "{{ chia_darwin_launchd_prefix }}.daemon"
         wrapper: "{{ chia_darwin_bin_dir }}/chia-daemon-run.sh"
-        throttle: "{{ chia_darwin_companion_throttle_interval }}"
-        exit_timeout: "{{ chia_darwin_companion_exit_timeout }}"
+        throttle: "{{ chia_darwin_daemon_throttle_interval }}"
+        exit_timeout: "{{ chia_darwin_daemon_exit_timeout }}"
         enabled: true
       - name: full-node
         label: "{{ chia_darwin_launchd_prefix }}.full-node"
@@ -83,6 +83,15 @@
         throttle: "{{ chia_darwin_timelord_throttle_interval }}"
         exit_timeout: "{{ chia_darwin_timelord_exit_timeout }}"
         enabled: true
+
+# remote-node has no local full node, so the watchdog must not treat
+# /full_node as a required healthcheck there.
+- name: Record whether the watchdog should check the local full node
+  ansible.builtin.set_fact:
+    chia_darwin_watchdog_full_node_enabled: >-
+      {{ (chia_darwin_service_jobs | selectattr('name', 'equalto', 'full-node')
+          | selectattr('enabled', 'equalto', true) | list | length) > 0 }}
+  changed_when: false
 
 # Companion jobs mirror the Linux timelord host. They are separate from
 # chia_darwin_service_jobs so a companion-only change does not bounce the

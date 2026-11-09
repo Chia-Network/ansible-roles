@@ -31,6 +31,7 @@
         that:
           - "'Build the Darwin companion LaunchDaemon job list' in (darwin_tasks | map(attribute='name') | list)"
           - "'Install the Darwin companion services and watchdog' in (darwin_tasks | map(attribute='name') | list)"
+          - "'Record whether the watchdog should check the local full node' in (darwin_tasks | map(attribute='name') | list)"
           - "'chia_darwin_companion_jobs:' in darwin_text"
           - "'chia_darwin_enable_chia_exporter' in darwin_text"
           - "'chia_darwin_enable_chia_healthcheck' in darwin_text"
@@ -38,7 +39,8 @@
           - "'chia_darwin_enable_watchdog' in darwin_text"
           - "'darwin-companions.yml' in darwin_text"
         fail_msg: >-
-          darwin.yml must define the four companion jobs and include
+          darwin.yml must define the four companion jobs, record whether the
+          watchdog should check the local full node, and include
           darwin-companions.yml before the LaunchDaemons are installed.
 
     - name: The LaunchDaemon list includes companions and the restart path covers them
@@ -80,6 +82,8 @@
           - '''for j in "${SERVICE_JOBS[@]}" "${HW_JOBS[@]}"'' in watchdog_text'
           - '''for j in "${HW_JOBS[@]}"'' in watchdog_text'
           - "'CHECK_HEALTHCHECK' in watchdog_text"
+          - "'CHECK_FULL_NODE' in watchdog_text"
+          - "'chia_darwin_watchdog_full_node_enabled' in watchdog_text"
           - "'CHECK_EXPORTER' in watchdog_text"
           - "'CHECK_NODE' in watchdog_text"
         fail_msg: >-
