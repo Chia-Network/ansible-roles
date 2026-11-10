@@ -1,0 +1,256 @@
+---
+# Static checks for the Darwin companion services and watchdog. These do not
+# install anything; they keep the role's job list, templates, and pins wired
+# together so a future edit cannot silently drop a service.
+- name: Check Darwin companion service assumptions
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+  vars:
+    role_dir: "{{ playbook_dir }}/../../chia-blockchain"
+  tasks:
+    - name: Read the companion-related role sources
+      ansible.builtin.set_fact:
+        darwin_text: "{{ lookup('file', role_dir ~ '/tasks/darwin.yml') }}"
+        companions_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-companions.yml') }}"
+        sudo_policy_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-sudo-policy.yml') }}"
+        apply_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-launchd-apply.yml') }}"
+        launchd_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-hw-vdf-launchd.yml') }}"
+        launchd_job_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-launchd-job.yml') }}"
+        restart_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-restart-ordered.yml') }}"
+        restart_job_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-restart-job.yml') }}"
+        watchdog_text: "{{ lookup('file', role_dir ~ '/templates/darwin/chia-watchdog.sh.j2') }}"
+        watchdog_plist_text: "{{ lookup('file', role_dir ~ '/templates/darwin/chia-watchdog.plist.j2') }}"
+        launchd_plist_text: "{{ lookup('file', role_dir ~ '/templates/darwin/launchdaemon.plist.j2') }}"
+
+    - name: Parse the Darwin task files
+      ansible.builtin.set_fact:
+        darwin_tasks: "{{ darwin_text | from_yaml }}"
+
+    - name: The role defines every companion job and includes the install tasks
+      ansible.builtin.assert:
+        that:
+          - "'Build the Darwin companion LaunchDaemon job list' in (darwin_tasks | map(attribute='name') | list)"
+          - "'Install the Darwin companion services and watchdog' in (darwin_tasks | map(attribute='name') | list)"
+          - "'chia_darwin_companion_jobs:' in darwin_text"
+          - "'chia_darwin_watchdog_job:' in darwin_text"
+          - "'release:' in darwin_text"
+          - "'wrapper_template:' in darwin_text"
+          - "'chia_darwin_enable_chia_exporter' in darwin_text"
+          - "'chia_darwin_enable_chia_healthcheck' in darwin_text"
+          - "'chia_darwin_enable_node_exporter' in darwin_text"
+          - "'chia_darwin_enable_watchdog' in darwin_text"
+          - "'darwin-companions.yml' in darwin_text"
+        fail_msg: >-
+          darwin.yml must define the four companion jobs, their release and
+          wrapper metadata, select the watchdog job, and include
+          darwin-companions.yml before the LaunchDaemons are installed.
+
+    - name: The daemon keeps the daemon restart timeouts
+      ansible.builtin.assert:
+        that:
+          - "'chia_darwin_daemon_throttle_interval' in darwin_text.split('name: daemon')[1].split('name: full-node')[0]"
+          - "'chia_darwin_daemon_exit_timeout' in darwin_text.split('name: daemon')[1].split('name: full-node')[0]"
+          - "'chia_darwin_companion_throttle_interval' not in darwin_text.split('name: daemon')[1].split('name: full-node')[0]"
+          - "'chia_darwin_companion_exit_timeout' not in darwin_text.split('name: daemon')[1].split('name: full-node')[0]"
+        fail_msg: >-
+          The daemon job must keep chia_darwin_daemon_throttle_interval and
+          chia_darwin_daemon_exit_timeout; the companion timeouts are only for
+          the companion jobs.
+
+    - name: Companion plists keep their own template indirection
+      ansible.builtin.assert:
+        that:
+          - "'chia_darwin_plist_template' not in launchd_job_text"
+          - "'chia_job.plist_template | default' in launchd_job_text"
+        fail_msg: >-
+          Companion plists must go through chia_job.plist_template so the
+          watchdog can keep its own plist.
+
+    - name: The watchdog parent check covers both configured paths
+      ansible.builtin.assert:
+        that:
+          - "'chia_darwin_watchdog_parent_paths' in companions_text"
+          - "'chia_darwin_watchdog_script | dirname' in companions_text"
+          - "'chia_darwin_watchdog_conf_dir | dirname' in companions_text"
+          - "'Restrict the watchdog config directory' in companions_text"
+          - >-
+            "item.stat.pw_name | default('') == 'root'" in companions_text
+          - "'not (item.stat.wgrp | default(true))' in companions_text"
+          - "'not (item.stat.woth | default(true))' in companions_text"
+        fail_msg: >-
+          The watchdog parent check must cover the configured script and conf
+          directory chains and refuse an existing directory unless it is
+          root-owned and not group- or world-writable.
+
+    - name: The role includes the shared LaunchDaemon apply path
+      ansible.builtin.assert:
+        that:
+          - "'Install and apply the Darwin LaunchDaemons' in darwin_text"
+          - "'darwin-launchd-apply.yml' in darwin_text"
+          - "'Flush pending Darwin restart notifications' in apply_text"
+          - "'Apply the ordered Darwin restart' in apply_text"
+          - "'darwin-restart-ordered.yml' in apply_text"
+        fail_msg: >-
+          darwin.yml must include darwin-launchd-apply.yml, and that file must
+          flush the handlers before the ordered restart. The CI harness includes
+          the same file, so a missing production include would otherwise pass.
+
+    - name: The sudo probe reads the service user's policy by output
+      ansible.builtin.assert:
+        that:
+          - "'/usr/bin/sudo, -l, -U' in darwin_text"
+          - "'darwin-sudo-policy.yml' in darwin_text"
+          - "'may run the following commands' in sudo_policy_text"
+          - "'/usr/bin/sudo, -n, true' not in darwin_text"
+        fail_msg: >-
+          Read the service user's sudo policy with sudo -l -U and judge it by
+          the output. A capability probe with sudo -n true misses password sudo
+          and command-restricted grants.
+
+    - name: The base plist supports per-job resource limits and process type
+      ansible.builtin.assert:
+        that:
+          - "'chia_job.run_at_load' not in launchd_plist_text"
+          - "'chia_job.nofile' in launchd_plist_text"
+          - "'chia_job.process_type | default' in launchd_plist_text"
+        fail_msg: >-
+          The core LaunchDaemon template must keep the per-job nofile and
+          ProcessType defaults without a RunAtLoad special case.
+
+    - name: The watchdog runs as root and restarts every enabled ASIC board
+      ansible.builtin.assert:
+        that:
+          - "'<key>UserName</key>' not in watchdog_plist_text"
+          - "'<key>RunAtLoad</key><true/>' in watchdog_plist_text"
+          - "'<key>KeepAlive</key><true/>' in watchdog_plist_text"
+          - "'HW_JOB_LIST=' in watchdog_text"
+          - "'SERVICE_JOB_LIST=' in watchdog_text"
+          - "'read -r -a HW_JOBS' in watchdog_text"
+          - "'read -r -a SERVICE_JOBS' in watchdog_text"
+          - "'PLIST_DIR=' in watchdog_text"
+          - "'ENABLE_ON_BOOT=' in watchdog_text"
+          - "'BOARD_STOP_TIMEOUT=' in watchdog_text"
+          - "'stop_board' in watchdog_text"
+          - "'start_board' in watchdog_text"
+          - "'launchctl bootout' in watchdog_text"
+          - "'launchctl enable' in watchdog_text"
+          - "'launchctl disable' in watchdog_text"
+          - "'launchctl bootstrap system' in watchdog_text"
+          - "'still loaded after' in watchdog_text"
+          - "'bootstrap $1 skipped: still loaded' in watchdog_text"
+          - '''stop_board "$j"'' in watchdog_text'
+          - '''start_board "$j"'' in watchdog_text'
+          - "'EXPECTED_VDFS' in watchdog_text"
+          - "'hw_jobs_running' in watchdog_text"
+          - "'restart_hwvdf' in watchdog_text"
+          - '''for j in "${SERVICE_JOBS[@]}"; do'' in watchdog_text'
+          - '''for j in "${HW_JOBS[@]}"; do'' in watchdog_text'
+          - '''for j in "${HW_JOBS[@]}"'' in watchdog_text'
+          - "'CHECK_HEALTHCHECK' in watchdog_text"
+          - "'CHECK_FULL_NODE' in watchdog_text"
+          - "'CHECK_EXPORTER' in watchdog_text"
+          - "'CHECK_NODE' in watchdog_text"
+        fail_msg: >-
+          The watchdog must run as root, check every enabled hw-vdf job, and
+          restart all exposed boards rather than only hw-vdf.
+
+    - name: The companion binaries and watchdog files are pinned and installed
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_chia_exporter_version | length > 0
+          - chia_darwin_chia_healthcheck_version | length > 0
+          - chia_darwin_node_exporter_version | length > 0
+          - chia_darwin_chia_exporter_sha256 | length == 64
+          - chia_darwin_chia_healthcheck_sha256 | length == 64
+          - chia_darwin_node_exporter_sha256 | length == 64
+          - "'item.release.checksum' in companions_text"
+          - "'/usr/bin/tar' in companions_text"
+          - "'Unpack the companion archives' in companions_text"
+          - "'restart-chia-darwin-companions' in companions_text"
+          - "'alert-token' in companions_text"
+          - "'webhook-url' in companions_text"
+          - "'no_log: true' in companions_text"
+        fail_msg: >-
+          Companion downloads need pinned versions and checksums. The watchdog
+          alert files must stay optional and no_log.
+
+    - name: The expected companion templates exist
+      ansible.builtin.stat:
+        path: "{{ role_dir }}/templates/darwin/{{ item }}"
+      loop:
+        - chia-exporter-run.sh.j2
+        - chia-healthcheck-run.sh.j2
+        - node-exporter-run.sh.j2
+        - chia-watchdog.sh.j2
+        - chia-watchdog.plist.j2
+      register: companion_templates
+
+    - name: Fail when a companion template is missing
+      ansible.builtin.assert:
+        that:
+          - companion_templates.results | rejectattr('stat.exists') | list | length == 0
+        fail_msg: >-
+          Missing companion template:
+          {{ companion_templates.results | rejectattr('stat.exists') | map(attribute='item') | list | join(', ') }}
+
+- name: Check the Darwin sudo policy guard
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    user: timelord
+    chia_darwin_allow_root_capable_service_user: false
+  tasks:
+    - name: No sudo rights passes without an opt-in
+      vars:
+        chia_darwin_service_user_sudo:
+          rc: 0
+          stdout: "User timelord is not allowed to run sudo on this host.\n"
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-sudo-policy.yml
+
+    - name: A sudo grant is refused without an opt-in
+      block:
+        - name: Run the policy check with a grant
+          vars:
+            chia_darwin_service_user_sudo:
+              rc: 0
+              stdout: "User timelord may run the following commands on this host:\n    (ALL) NOPASSWD: ALL\n"
+          ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-sudo-policy.yml
+        - name: The grant was not refused
+          ansible.builtin.fail:
+            msg: the sudo grant was not refused
+      rescue:
+        - name: The refusal names the root-capable posture
+          ansible.builtin.assert:
+            that:
+              - (ansible_failed_result.msg | default('')) is search('has sudo rights')
+              - "'was not refused' not in (ansible_failed_result.msg | default(''))"
+
+    - name: A sudo grant passes with an opt-in
+      vars:
+        chia_darwin_allow_root_capable_service_user: true
+        chia_darwin_service_user_sudo:
+          rc: 0
+          stdout: "User timelord may run the following commands on this host:\n    (ALL) NOPASSWD: ALL\n"
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-sudo-policy.yml
+
+    - name: An unreadable sudo policy fails closed
+      block:
+        - name: Run the policy check with a failed probe
+          vars:
+            chia_darwin_service_user_sudo:
+              rc: 1
+              stdout: ""
+          ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-sudo-policy.yml
+        - name: The failed probe was not refused
+          ansible.builtin.fail:
+            msg: the failed sudo probe was not refused
+      rescue:
+        - name: The refusal says the policy could not be read
+          ansible.builtin.assert:
+            that:
+              - (ansible_failed_result.msg | default('')) is search('cannot tell whether')
+              - "'was not refused' not in (ansible_failed_result.msg | default(''))"

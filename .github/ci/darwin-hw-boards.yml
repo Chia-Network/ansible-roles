@@ -1,20 +1,27 @@
 ---
 # Role behavior for one, two, or three Darwin ASIC boards.
 # launchctl and the boards are fakes. This does not touch USB or a Mac.
+# The CI matrix selects one group with --tags.
 - name: Validate inventory
   ansible.builtin.import_playbook: darwin-hw-boards-validate.yml
+  tags: inventory
 
 - name: Discover boards
   ansible.builtin.import_playbook: darwin-hw-boards-discover.yml
+  tags: inventory
 
 - name: Render wrappers
   ansible.builtin.import_playbook: darwin-hw-boards-render.yml
+  tags: inventory
 
 - name: Apply LaunchDaemons
   ansible.builtin.import_playbook: darwin-hw-boards-launchd.yml
+  tags: launchd
 
 - name: Takeover behavior
   ansible.builtin.import_playbook: darwin-hw-boards-takeover.yml
+  tags: takeover
 
 - name: Restart handler
   ansible.builtin.import_playbook: darwin-hw-boards-restart.yml
+  tags: takeover

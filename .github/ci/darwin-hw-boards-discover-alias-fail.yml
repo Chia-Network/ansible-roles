@@ -39,7 +39,7 @@
   block:
     - name: Resolve two alias spellings of the same board
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: Discovery accepted two alias spellings of one board
       ansible.builtin.fail:

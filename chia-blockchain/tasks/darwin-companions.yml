@@ -1,0 +1,241 @@
+---
+# Companion services that the Linux timelord host runs alongside chia:
+# chia-exporter, chia-healthcheck, node_exporter, and a monit-equivalent
+# watchdog. Binaries are pinned release artifacts, not Homebrew services, so
+# they run as the service user under the same LaunchDaemon prefix as the core
+# jobs. A companion-only change restarts only these jobs.
+- name: Confirm the companion CHIA_ROOT is readable by the service user
+  when: chia_darwin_enable_chia_exporter | bool or chia_darwin_enable_chia_healthcheck | bool
+  block:
+    - name: Stat the companion CHIA_ROOT config
+      become: true
+      become_user: "{{ user }}"
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_companion_chia_root }}/config/config.yaml"
+      register: chia_darwin_companion_root_stat
+
+    - name: Fail when the companion CHIA_ROOT is not readable
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_companion_root_stat.stat.exists | default(false)
+          - chia_darwin_companion_root_stat.stat.readable | default(false)
+        fail_msg: >-
+          {{ user }} cannot read
+          {{ chia_darwin_companion_chia_root }}/config/config.yaml.
+          Set chia_darwin_companion_chia_root to the CHIA_ROOT the exporter
+          and healthcheck should use. A host may point it at a read-only
+          config copy; otherwise leave it at chia_root.
+
+- name: Ensure companion directories exist
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ chia_darwin_companion_bin_dir }}"
+    - "{{ chia_darwin_companion_download_dir }}"
+  when: chia_darwin_install_companion_binaries | bool
+
+- name: Create the companion download directories
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.file:
+    path: "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.release.tag }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ chia_darwin_companion_jobs | selectattr('release', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - chia_darwin_install_companion_binaries | bool
+    - item.enabled | bool
+
+- name: Download the companion archives
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/{{ item.release.repository }}/releases/download/{{ item.release.tag_prefix }}{{ item.release.tag }}/{{ item.release.archive }}
+    dest: "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.release.tag }}/{{ item.release.archive }}"
+    checksum: "{{ ('sha256:' ~ item.release.checksum) if item.release.checksum | default('') | length > 0 else omit }}"
+    mode: "0644"
+  loop: "{{ chia_darwin_companion_jobs | selectattr('release', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - chia_darwin_install_companion_binaries | bool
+    - item.enabled | bool
+
+# macOS /usr/bin/tar is bsdtar. It extracts both zip and tar.gz, so one task
+# replaces unarchive (which insists on GNU tar) and the previous format split.
+- name: Unpack the companion archives
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/tar
+      - -xf
+      - "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.release.tag }}/{{ item.release.archive }}"
+      - -C
+      - "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.release.tag }}"
+    creates: "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.release.tag }}/{{ item.release.unpack }}/{{ item.release.binary }}"
+  loop: "{{ chia_darwin_companion_jobs | selectattr('release', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - chia_darwin_install_companion_binaries | bool
+    - item.enabled | bool
+
+- name: Install the companion binaries
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.copy:
+    src: "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.release.tag }}/{{ item.release.unpack }}/{{ item.release.binary }}"
+    dest: "{{ chia_darwin_companion_bin_dir }}/{{ item.release.binary }}"
+    remote_src: true
+    owner: "{{ user }}"
+    group: "{{ chia_darwin_group }}"
+    mode: "0755"
+  loop: "{{ chia_darwin_companion_jobs | selectattr('release', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - chia_darwin_install_companion_binaries | bool
+    - item.enabled | bool
+  notify: restart-chia-darwin-companions
+
+- name: Confirm the enabled companion binaries are present
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.stat:
+    path: "{{ chia_darwin_companion_bin_dir }}/{{ item.release.binary }}"
+  loop: "{{ chia_darwin_companion_jobs | selectattr('release', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: chia_darwin_companion_binary_stat
+  when: item.enabled | bool
+
+- name: Fail when an enabled companion binary is missing
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists | default(false)
+      - item.stat.executable | default(false)
+    fail_msg: >-
+      {{ item.item.name }} is enabled but
+      {{ chia_darwin_companion_bin_dir }}/{{ item.item.release.binary }} is
+      missing or not executable. Set
+      chia_darwin_install_companion_binaries to true or install the pinned
+      binary yourself.
+  loop: "{{ chia_darwin_companion_binary_stat.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name | default('skipped') }}"
+  when: item.item.enabled | default(false) | bool
+
+- name: Install companion wrapper scripts
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.template:
+    src: "{{ item.wrapper_template }}"
+    dest: "{{ item.wrapper }}"
+    mode: "0755"
+  loop: "{{ chia_darwin_companion_jobs | selectattr('wrapper_template', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.wrapper }}"
+  notify: restart-chia-darwin-companions
+
+- name: Install the watchdog
+  when: chia_darwin_enable_watchdog | bool
+  block:
+    - name: List the watchdog parent directories
+      ansible.builtin.set_fact:
+        chia_darwin_watchdog_parent_paths: >-
+          {{
+            [
+              chia_darwin_watchdog_script | dirname,
+              chia_darwin_watchdog_script | dirname | dirname,
+              chia_darwin_watchdog_script | dirname | dirname | dirname,
+              chia_darwin_watchdog_script | dirname | dirname | dirname | dirname,
+              chia_darwin_watchdog_conf_dir,
+              chia_darwin_watchdog_conf_dir | dirname,
+              chia_darwin_watchdog_conf_dir | dirname | dirname,
+              chia_darwin_watchdog_conf_dir | dirname | dirname | dirname
+            ] | reject('equalto', '/') | unique | list
+          }}
+      changed_when: false
+
+    - name: Stat the watchdog parent directories
+      become: true
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: "{{ chia_darwin_watchdog_parent_paths }}"
+      register: chia_darwin_watchdog_parent_stats
+
+    - name: Refuse unsafe existing watchdog parent directories
+      ansible.builtin.assert:
+        that:
+          - not (item.stat.exists | default(false)) or
+            (item.stat.pw_name | default('') == 'root' and
+            not (item.stat.wgrp | default(true)) and
+            not (item.stat.woth | default(true)))
+        fail_msg: >-
+          {{ item.item }} must be root-owned and not group- or world-writable
+          when it already exists.
+      loop: "{{ chia_darwin_watchdog_parent_stats.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Create missing watchdog parent directories
+      become: true
+      ansible.builtin.file:
+        path: "{{ item.item }}"
+        state: directory
+        owner: root
+        group: wheel
+        mode: "{{ '0700' if item.item == chia_darwin_watchdog_conf_dir else '0755' }}"
+      loop: "{{ chia_darwin_watchdog_parent_stats.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when: not (item.stat.exists | default(false))
+
+    - name: Restrict the watchdog config directory
+      become: true
+      ansible.builtin.file:
+        path: "{{ chia_darwin_watchdog_conf_dir }}"
+        state: directory
+        owner: root
+        group: wheel
+        mode: "0700"
+
+    - name: Install the watchdog script
+      become: true
+      ansible.builtin.template:
+        src: darwin/chia-watchdog.sh.j2
+        dest: "{{ chia_darwin_watchdog_script }}"
+        owner: root
+        group: wheel
+        mode: "0755"
+      notify: restart-chia-darwin-companions
+
+    - name: Write the watchdog alert token
+      become: true
+      no_log: true
+      ansible.builtin.copy:
+        content: "{{ chia_darwin_watchdog_alert_token }}\n"
+        dest: "{{ chia_darwin_watchdog_conf_dir }}/alert-token"
+        owner: root
+        group: wheel
+        mode: "0600"
+      when: chia_darwin_watchdog_alert_token | length > 0
+
+    - name: Write the watchdog webhook URL
+      become: true
+      no_log: true
+      ansible.builtin.copy:
+        content: "{{ chia_darwin_watchdog_webhook_url }}\n"
+        dest: "{{ chia_darwin_watchdog_conf_dir }}/webhook-url"
+        owner: root
+        group: wheel
+        mode: "0600"
+      when: chia_darwin_watchdog_webhook_url | length > 0

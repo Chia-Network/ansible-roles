@@ -47,7 +47,7 @@
         chia_darwin_hw_vdf_expected_serial: FIX-BOARD-0001
     - name: Resolve the legacy inventory
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: Render the legacy wrapper from the board row
       ansible.builtin.template:
@@ -107,7 +107,7 @@
         chia_darwin_hw_vdf_boards: "{{ fixture_boards }}"
     - name: Resolve three boards
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: Render one wrapper per board
       ansible.builtin.template:

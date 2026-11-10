@@ -21,7 +21,7 @@
     hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-3.txt"
 - name: Resolve with the full interface-A wrapper present
   ansible.builtin.include_role:
-    name: chia-blockchain
+    name: chia-blockchain-test
     tasks_from: darwin-hw-vdf-boards.yml
 - name: A full interface-A wrapper and the same visible serial are one board
   vars:
@@ -58,7 +58,7 @@
     hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-recable-one.txt"
 - name: Resolve the loosened-pattern board
   ansible.builtin.include_role:
-    name: chia-blockchain
+    name: chia-blockchain-test
     tasks_from: darwin-hw-vdf-boards.yml
 - name: A base-serial claim matches one visible board even when the pattern is loose
   ansible.builtin.assert:
@@ -88,7 +88,7 @@
     hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-recable-shorter.txt"
 - name: Resolve the stored full serial and shorter visible serial
   ansible.builtin.include_role:
-    name: chia-blockchain
+    name: chia-blockchain-test
     tasks_from: darwin-hw-vdf-boards.yml
 - name: A stored full serial does not match a shorter visible serial
   vars:
@@ -118,7 +118,7 @@
     hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-non-a.txt"
 - name: Resolve the new non-A serial board
   ansible.builtin.include_role:
-    name: chia-blockchain
+    name: chia-blockchain-test
     tasks_from: darwin-hw-vdf-boards.yml
 - name: A new board keeps its full printed non-A serial
   ansible.builtin.assert:
@@ -154,7 +154,7 @@
     hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-non-a.txt"
 - name: Resolve the non-A non-truncation case
   ansible.builtin.include_role:
-    name: chia-blockchain
+    name: chia-blockchain-test
     tasks_from: darwin-hw-vdf-boards.yml
 - name: A non-A serial is not aliased with a different longer serial
   ansible.builtin.assert:
@@ -197,7 +197,7 @@
     hw_vdf_list_fixture: "{{ hw_vdf_list_dir }}/hw-vdf-list-header.txt"
 - name: Resolve the hand-edited claims
   ansible.builtin.include_role:
-    name: chia-blockchain
+    name: chia-blockchain-test
     tasks_from: darwin-hw-vdf-boards.yml
 - name: Hand-edited spacing and comments still claim their boards
   ansible.builtin.assert:

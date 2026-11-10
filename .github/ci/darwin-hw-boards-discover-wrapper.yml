@@ -16,7 +16,7 @@
 
 - name: Resolve with the {{ hw_wrapper_name }} wrapper present
   ansible.builtin.include_role:
-    name: chia-blockchain
+    name: chia-blockchain-test
     tasks_from: darwin-hw-vdf-boards.yml
 
 - name: The {{ hw_wrapper_name }} wrapper is taken over but stays until install or retire

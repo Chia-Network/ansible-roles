@@ -551,7 +551,7 @@
       block:
         - name: Discover the boards before the injected failure
           ansible.builtin.include_role:
-            name: chia-blockchain
+            name: chia-blockchain-test
             tasks_from: darwin-hw-vdf-boards.yml
         - name: Inject a failure between discovery and install
           ansible.builtin.fail:

@@ -14,11 +14,11 @@
   block:
     - name: Validate shared ASIC options before the inventory
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-validate.yml
     - name: Resolve the rejected inventory
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: The rejected inventory was accepted
       ansible.builtin.fail:

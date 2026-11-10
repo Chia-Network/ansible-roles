@@ -16,9 +16,9 @@
   <key>KeepAlive</key><true/>
   <key>ThrottleInterval</key><integer>{{ chia_job.throttle | int }}</integer>
   <key>ExitTimeOut</key><integer>{{ chia_job.exit_timeout | int }}</integer>
-  <key>ProcessType</key><string>{{ chia_darwin_process_type | e }}</string>
-  <key>SoftResourceLimits</key><dict><key>NumberOfFiles</key><integer>{{ chia_darwin_nofile | int }}</integer></dict>
-  <key>HardResourceLimits</key><dict><key>NumberOfFiles</key><integer>{{ chia_darwin_nofile | int }}</integer></dict>
+  <key>ProcessType</key><string>{{ chia_job.process_type | default(chia_darwin_process_type) | e }}</string>
+  <key>SoftResourceLimits</key><dict><key>NumberOfFiles</key><integer>{{ chia_job.nofile | default(chia_darwin_nofile) | int }}</integer></dict>
+  <key>HardResourceLimits</key><dict><key>NumberOfFiles</key><integer>{{ chia_job.nofile | default(chia_darwin_nofile) | int }}</integer></dict>
   <key>StandardOutPath</key><string>{{ chia_darwin_log_dir | e }}/{{ chia_job.name | e }}.out.log</string>
   <key>StandardErrorPath</key><string>{{ chia_darwin_log_dir | e }}/{{ chia_job.name | e }}.err.log</string>
 </dict>

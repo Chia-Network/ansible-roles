@@ -14,7 +14,7 @@
   block:
     - name: Resolve the failing --list fixture
       ansible.builtin.include_role:
-        name: chia-blockchain
+        name: chia-blockchain-test
         tasks_from: darwin-hw-vdf-boards.yml
     - name: Discovery accepted the failing fixture
       ansible.builtin.fail:

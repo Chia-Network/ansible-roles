@@ -5,14 +5,16 @@
 - name: Install LaunchDaemon plist {{ chia_job.label }}
   become: "{{ chia_darwin_launchd_become | bool }}"
   ansible.builtin.template:
-    src: darwin/launchdaemon.plist.j2
+    src: "{{ chia_job.plist_template | default('darwin/launchdaemon.plist.j2') }}"
     dest: "{{ chia_darwin_launchd_dir }}/{{ chia_job.label }}.plist"
     owner: "{{ 'root' if (chia_darwin_launchd_become | bool) else omit }}"
     group: "{{ 'wheel' if (chia_darwin_launchd_become | bool) else omit }}"
     mode: "0644"
   when: chia_job.enabled | bool
   register: chia_darwin_plist_written
-  notify: "{{ 'restart-chia-darwin-boards' if chia_job.board is defined else 'restart-chia-darwin' }}"
+  notify: >-
+    {{ [] if chia_job.board is defined else
+    (['restart-chia-darwin-companions'] if chia_job.companion | default(false) else ['restart-chia-darwin']) }}
 
 - name: A board plist change restarts that board
   ansible.builtin.set_fact:
@@ -83,16 +85,15 @@
     # Boards start from the ordered restart handler, after any service restart.
     - chia_job.board is not defined
 
-- name: Start ASIC board {{ chia_job.label }} from the ordered restart
-  ansible.builtin.debug:
-    msg: "{{ chia_job.label }} is not loaded."
+- name: Remember that an ASIC board must start from the ordered restart
+  ansible.builtin.set_fact:
+    chia_darwin_start_down_boards: true
   when:
     - chia_job.board is defined
     - chia_job.enabled | bool
     - chia_darwin_start_now | bool
     - chia_darwin_launchd_loaded.rc != 0
-  changed_when: true
-  notify: restart-chia-darwin-boards
+  changed_when: false
 
 - name: Record freshly bootstrapped LaunchDaemons
   ansible.builtin.set_fact:
