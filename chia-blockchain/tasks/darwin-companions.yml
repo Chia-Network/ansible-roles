@@ -199,6 +199,15 @@
         label: "{{ item.item }}"
       when: not (item.stat.exists | default(false))
 
+    - name: Restrict the watchdog config directory
+      become: true
+      ansible.builtin.file:
+        path: "{{ chia_darwin_watchdog_conf_dir }}"
+        state: directory
+        owner: root
+        group: wheel
+        mode: "0700"
+
     - name: Install the watchdog script
       become: true
       ansible.builtin.template:

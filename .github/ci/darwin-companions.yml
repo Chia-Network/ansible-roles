@@ -73,6 +73,7 @@
           - "'chia_darwin_watchdog_parent_paths' in companions_text"
           - "'chia_darwin_watchdog_script | dirname' in companions_text"
           - "'chia_darwin_watchdog_conf_dir | dirname' in companions_text"
+          - "'Restrict the watchdog config directory' in companions_text"
           - >-
             "item.stat.pw_name | default('') == 'root'" in companions_text
           - "'not (item.stat.wgrp | default(true))' in companions_text"
