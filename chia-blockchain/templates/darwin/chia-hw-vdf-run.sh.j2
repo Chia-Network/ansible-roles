@@ -29,7 +29,7 @@ N_VDFS={{ chia_hw_board.n_vdfs | quote }}
 SERIAL={{ chia_hw_board.expected_serial | quote }}
 {% endif %}
 
-{% if chia_darwin_local_timelord | bool == false %}
+{% if chia_darwin_local_timelord | default(true) | bool == false %}
 # vdf-only has no local timelord: connect to the remote VDF server and do not
 # block on a local listener that will never appear.
 {% else %}
