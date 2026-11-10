@@ -8,7 +8,7 @@
   ansible.builtin.set_fact:
     chia_darwin_watchdog_quiesced: >-
       {{ (chia_darwin_restart_services | bool) or
-         (chia_darwin_hw_vdf_changed_labels | length > 0) }}
+      (chia_darwin_hw_vdf_changed_labels | length > 0) }}
   when:
     - chia_darwin_start_now | bool
     - chia_darwin_enable_watchdog | default(false) | bool
