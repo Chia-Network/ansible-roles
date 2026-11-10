@@ -2,8 +2,8 @@
 # One restart path. A shared-runtime change (restart-chia-darwin) stops the
 # watchdog, stops the ASIC boards, restarts the daemon, full node, and timelord,
 # then starts the boards in ID order and finally restarts the watchdog with a
-# fresh grace. restart-chia-darwin-boards alone only touches boards whose own
-# files changed and starts boards that are down.
+# fresh grace. A board-only change only touches boards whose own files changed
+# and starts boards that are down.
 - name: Restart Darwin services and boards in order
   when: chia_darwin_start_now | bool
   block:
@@ -84,35 +84,20 @@
       loop_control:
         label: "{{ item.item.label }}"
   always:
-    # The watchdog is restored even when a service or board restart fails, and
-    # the restart flags are cleared whether the watchdog restart succeeds or
-    # not. A failed apply must not leave monitoring down.
-    - name: Restore the watchdog and reset the restart flags
-      block:
-        - name: Restart the watchdog after the service and board restart
-          when:
-            - chia_darwin_enable_watchdog | default(false) | bool
-            - chia_darwin_watchdog_job is defined
-            - (chia_darwin_watchdog_quiesced | default(false) | bool) or
-              (chia_darwin_restart_companions | default(false) | bool)
-          vars:
-            chia_job: "{{ chia_darwin_watchdog_job }}"
-            chia_darwin_restart_forced: "{{ chia_darwin_watchdog_quiesced | default(false) | bool }}"
-          ansible.builtin.include_tasks: darwin-restart-job.yml
-      always:
-        - name: Clear the service restart request
-          ansible.builtin.set_fact:
-            chia_darwin_restart_services: false
-            chia_darwin_restart_companions: false
-            chia_darwin_restart_boards: false
-            chia_darwin_start_down_boards: false
-            chia_darwin_watchdog_quiesced: false
+    - name: Restart the watchdog after the service and board restart
+      when:
+        - chia_darwin_enable_watchdog | default(false) | bool
+        - chia_darwin_watchdog_job is defined
+        - (chia_darwin_watchdog_quiesced | default(false) | bool) or
+          (chia_darwin_restart_companions | default(false) | bool)
+      vars:
+        chia_job: "{{ chia_darwin_watchdog_job }}"
+        chia_darwin_restart_forced: "{{ chia_darwin_watchdog_quiesced | default(false) | bool }}"
+      ansible.builtin.include_tasks: darwin-restart-job.yml
 
-- name: Clear the service restart request when not starting now
-  when: not (chia_darwin_start_now | bool)
+- name: Clear the service restart request
   ansible.builtin.set_fact:
     chia_darwin_restart_services: false
     chia_darwin_restart_companions: false
-    chia_darwin_restart_boards: false
     chia_darwin_start_down_boards: false
     chia_darwin_watchdog_quiesced: false

@@ -18,6 +18,6 @@
     chia_darwin_fresh_bootstraps: []
     chia_darwin_restart_services: false
     chia_darwin_restart_companions: false
-    chia_darwin_restart_boards: false
     chia_darwin_start_down_boards: false
+    chia_darwin_watchdog_quiesced: false
     chia_darwin_hw_vdf_changed_labels: []

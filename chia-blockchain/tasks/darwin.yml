@@ -5,6 +5,7 @@
     chia_darwin_restart_services: false
     chia_darwin_restart_companions: false
     chia_darwin_start_down_boards: false
+    chia_darwin_watchdog_quiesced: false
   changed_when: false
 
 - name: Require an Apple Silicon Mac
@@ -211,32 +212,8 @@
   failed_when: false
   check_mode: false
 
-- name: Fail when the service user's sudo policy cannot be read
-  ansible.builtin.assert:
-    that:
-      - (chia_darwin_service_user_sudo.rc | default(1) | int) == 0
-    fail_msg: >-
-      sudo -l -U {{ user }} failed, so the role cannot tell whether the
-      service account is root-capable. Check the sudoers policy.
-
-- name: Require explicit opt-in for a root-capable service user
-  ansible.builtin.assert:
-    that:
-      - "'may run the following commands' not in (chia_darwin_service_user_sudo.stdout | default('')) or (chia_darwin_allow_root_capable_service_user | bool)"
-    fail_msg: >-
-      {{ user }} has sudo rights. A root-capable service account is a weaker
-      posture than the Linux split. Keep the SSH/sudo account separate, or set
-      chia_darwin_allow_root_capable_service_user to true to accept it.
-
-- name: Warn about the weaker service-account posture
-  ansible.builtin.debug:
-    msg: >-
-      {{ user }} is the SSH/automation login and has sudo rights. This is a
-      weaker posture than the Linux split; the network-facing service account
-      is root-capable.
-  when:
-    - "'may run the following commands' in (chia_darwin_service_user_sudo.stdout | default(''))"
-    - chia_darwin_allow_root_capable_service_user | bool
+- name: Apply the service user's sudo policy
+  ansible.builtin.include_tasks: darwin-sudo-policy.yml
 
 - name: Apply pmset so the host stays awake
   when: chia_darwin_pmset_apply | bool
@@ -791,24 +768,8 @@
 - name: Install the Darwin companion services and watchdog
   ansible.builtin.include_tasks: darwin-companions.yml
 
-- name: Install and load LaunchDaemons
-  ansible.builtin.include_tasks: darwin-launchd-job.yml
-  loop: "{{ chia_darwin_launchd_jobs }}"
-  loop_control:
-    loop_var: chia_job
-    label: "{{ chia_job.label }}"
-
-- name: Remove retired hw_vdf wrappers
-  ansible.builtin.include_tasks: darwin-hw-vdf-retire.yml
-
-# Handlers only record which restart is needed. Run the ordered restart as a
-# normal task so its block/always can restore the watchdog after a failure;
-# handlers cannot contain blocks.
-- name: Flush pending Darwin restart notifications
-  ansible.builtin.meta: flush_handlers
-
-- name: Apply the ordered Darwin restart
-  ansible.builtin.include_tasks: darwin-restart-ordered.yml
+- name: Install and apply the Darwin LaunchDaemons
+  ansible.builtin.include_tasks: darwin-launchd-apply.yml
 
 - name: Note the testnet full node port
   ansible.builtin.debug:

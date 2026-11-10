@@ -33,29 +33,10 @@
     name: chia-blockchain-test
     tasks_from: darwin-hw-vdf-install.yml
 
-- name: Apply LaunchDaemons
+- name: Install and apply the LaunchDaemons
   ansible.builtin.include_role:
     name: chia-blockchain-test
-    tasks_from: darwin-launchd-job.yml
-  vars:
-    chia_job: "{{ hw_job }}"
-  loop: "{{ chia_darwin_launchd_jobs }}"
-  loop_control:
-    loop_var: hw_job
-    label: "{{ hw_job.label }}"
-
-- name: Remove retired wrappers
-  ansible.builtin.include_role:
-    name: chia-blockchain-test
-    tasks_from: darwin-hw-vdf-retire.yml
-
-- name: Run pending LaunchDaemon restarts
-  ansible.builtin.meta: flush_handlers
-
-- name: Apply the ordered LaunchDaemon restart
-  ansible.builtin.include_role:
-    name: chia-blockchain-test
-    tasks_from: darwin-restart-ordered.yml
+    tasks_from: darwin-launchd-apply.yml
 
 - name: Read the launchctl log for this apply
   when: launch_log is defined

@@ -15,6 +15,8 @@
       ansible.builtin.set_fact:
         darwin_text: "{{ lookup('file', role_dir ~ '/tasks/darwin.yml') }}"
         companions_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-companions.yml') }}"
+        sudo_policy_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-sudo-policy.yml') }}"
+        apply_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-launchd-apply.yml') }}"
         launchd_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-hw-vdf-launchd.yml') }}"
         launchd_job_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-launchd-job.yml') }}"
         restart_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-restart-ordered.yml') }}"
@@ -83,11 +85,25 @@
           directory chains and refuse an existing directory unless it is
           root-owned and not group- or world-writable.
 
+    - name: The role includes the shared LaunchDaemon apply path
+      ansible.builtin.assert:
+        that:
+          - "'Install and apply the Darwin LaunchDaemons' in darwin_text"
+          - "'darwin-launchd-apply.yml' in darwin_text"
+          - "'Flush pending Darwin restart notifications' in apply_text"
+          - "'Apply the ordered Darwin restart' in apply_text"
+          - "'darwin-restart-ordered.yml' in apply_text"
+        fail_msg: >-
+          darwin.yml must include darwin-launchd-apply.yml, and that file must
+          flush the handlers before the ordered restart. The CI harness includes
+          the same file, so a missing production include would otherwise pass.
+
     - name: The sudo probe reads the service user's policy by output
       ansible.builtin.assert:
         that:
           - "'/usr/bin/sudo, -l, -U' in darwin_text"
-          - "'may run the following commands' in darwin_text"
+          - "'darwin-sudo-policy.yml' in darwin_text"
+          - "'may run the following commands' in sudo_policy_text"
           - "'/usr/bin/sudo, -n, true' not in darwin_text"
         fail_msg: >-
           Read the service user's sudo policy with sudo -l -U and judge it by
@@ -179,3 +195,62 @@
         fail_msg: >-
           Missing companion template:
           {{ companion_templates.results | rejectattr('stat.exists') | map(attribute='item') | list | join(', ') }}
+
+- name: Check the Darwin sudo policy guard
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    user: timelord
+    chia_darwin_allow_root_capable_service_user: false
+  tasks:
+    - name: No sudo rights passes without an opt-in
+      vars:
+        chia_darwin_service_user_sudo:
+          rc: 0
+          stdout: "User timelord is not allowed to run sudo on this host.\n"
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-sudo-policy.yml
+
+    - name: A sudo grant is refused without an opt-in
+      block:
+        - name: Run the policy check with a grant
+          vars:
+            chia_darwin_service_user_sudo:
+              rc: 0
+              stdout: "User timelord may run the following commands on this host:\n    (ALL) NOPASSWD: ALL\n"
+          ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-sudo-policy.yml
+        - name: The grant was not refused
+          ansible.builtin.fail:
+            msg: the sudo grant was not refused
+      rescue:
+        - name: The refusal names the root-capable posture
+          ansible.builtin.assert:
+            that:
+              - (ansible_failed_result.msg | default('')) is search('has sudo rights')
+              - "'was not refused' not in (ansible_failed_result.msg | default(''))"
+
+    - name: A sudo grant passes with an opt-in
+      vars:
+        chia_darwin_allow_root_capable_service_user: true
+        chia_darwin_service_user_sudo:
+          rc: 0
+          stdout: "User timelord may run the following commands on this host:\n    (ALL) NOPASSWD: ALL\n"
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-sudo-policy.yml
+
+    - name: An unreadable sudo policy fails closed
+      block:
+        - name: Run the policy check with a failed probe
+          vars:
+            chia_darwin_service_user_sudo:
+              rc: 1
+              stdout: ""
+          ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-sudo-policy.yml
+        - name: The failed probe was not refused
+          ansible.builtin.fail:
+            msg: the failed sudo probe was not refused
+      rescue:
+        - name: The refusal says the policy could not be read
+          ansible.builtin.assert:
+            that:
+              - (ansible_failed_result.msg | default('')) is search('cannot tell whether')
+              - "'was not refused' not in (ansible_failed_result.msg | default(''))"

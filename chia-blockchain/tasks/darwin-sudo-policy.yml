@@ -1,0 +1,30 @@
+---
+# chia_darwin_service_user_sudo is the registered sudo -l -U result. Judge the
+# policy by its output, not by rc: sudo -l returns 0 for a user with no rights
+# as well as for a NOPASSWD grant.
+- name: Fail when the service user's sudo policy cannot be read
+  ansible.builtin.assert:
+    that:
+      - (chia_darwin_service_user_sudo.rc | default(1) | int) == 0
+    fail_msg: >-
+      sudo -l -U {{ user }} failed, so the role cannot tell whether the
+      service account is root-capable. Check the sudoers policy.
+
+- name: Require explicit opt-in for a root-capable service user
+  ansible.builtin.assert:
+    that:
+      - "'may run the following commands' not in (chia_darwin_service_user_sudo.stdout | default('')) or (chia_darwin_allow_root_capable_service_user | bool)"
+    fail_msg: >-
+      {{ user }} has sudo rights. A root-capable service account is a weaker
+      posture than the Linux split. Keep the SSH/sudo account separate, or set
+      chia_darwin_allow_root_capable_service_user to true to accept it.
+
+- name: Warn about the weaker service-account posture
+  ansible.builtin.debug:
+    msg: >-
+      {{ user }} is the SSH/automation login and has sudo rights. This is a
+      weaker posture than the Linux split; the network-facing service account
+      is root-capable.
+  when:
+    - "'may run the following commands' in (chia_darwin_service_user_sudo.stdout | default(''))"
+    - chia_darwin_allow_root_capable_service_user | bool

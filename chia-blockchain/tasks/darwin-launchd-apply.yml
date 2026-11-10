@@ -1,0 +1,22 @@
+---
+# One entry point for the Darwin LaunchDaemon apply tail. The role and the CI
+# harness both include this file, so the restart call site cannot disappear
+# from production while the harness still passes.
+- name: Install and load LaunchDaemons
+  ansible.builtin.include_tasks: darwin-launchd-job.yml
+  loop: "{{ chia_darwin_launchd_jobs }}"
+  loop_control:
+    loop_var: chia_job
+    label: "{{ chia_job.label }}"
+
+- name: Remove retired hw_vdf wrappers
+  ansible.builtin.include_tasks: darwin-hw-vdf-retire.yml
+
+# Handlers only record which restart is needed. Run the ordered restart as a
+# normal task so its block/always can restore the watchdog after a failure;
+# handlers cannot contain blocks.
+- name: Flush pending Darwin restart notifications
+  ansible.builtin.meta: flush_handlers
+
+- name: Apply the ordered Darwin restart
+  ansible.builtin.include_tasks: darwin-restart-ordered.yml

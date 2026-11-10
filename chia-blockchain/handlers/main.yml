@@ -32,8 +32,3 @@
   ansible.builtin.set_fact:
     chia_darwin_restart_companions: true
   listen: restart-chia-darwin-companions
-
-- name: Note that the Darwin boards must restart
-  ansible.builtin.set_fact:
-    chia_darwin_restart_boards: true
-  listen: restart-chia-darwin-boards
