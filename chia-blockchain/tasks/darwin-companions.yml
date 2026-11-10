@@ -148,7 +148,13 @@
 - name: Install the watchdog
   when: chia_darwin_enable_watchdog | bool
   block:
-    - name: Ensure /usr/local exists
+    - name: Stat /usr/local
+      become: true
+      ansible.builtin.stat:
+        path: /usr/local
+      register: chia_darwin_watchdog_parent_local
+
+    - name: Create /usr/local when absent
       become: true
       ansible.builtin.file:
         path: /usr/local
@@ -156,12 +162,14 @@
         owner: root
         group: wheel
         mode: "0755"
+      when: not (chia_darwin_watchdog_parent_local.stat.exists | default(false))
 
-    - name: Stat /usr/local
+    - name: Re-stat /usr/local after creating it
       become: true
       ansible.builtin.stat:
         path: /usr/local
       register: chia_darwin_watchdog_parent_local
+      when: not (chia_darwin_watchdog_parent_local.stat.exists | default(false))
 
     - name: Stat /usr/local/libexec
       become: true

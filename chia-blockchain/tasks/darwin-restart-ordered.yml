@@ -98,6 +98,7 @@
       (chia_darwin_restart_companions | default(false) | bool)
   vars:
     chia_job: "{{ chia_darwin_watchdog_job }}"
+    chia_darwin_restart_forced: "{{ chia_darwin_watchdog_quiesced | default(false) | bool }}"
   ansible.builtin.include_tasks: darwin-restart-job.yml
 
 - name: Clear the service restart request

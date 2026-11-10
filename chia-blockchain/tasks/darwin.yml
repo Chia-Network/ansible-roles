@@ -200,10 +200,11 @@
       (output: {{ chia_darwin_admin_check.stdout | default('') | trim }}). The
       ASIC timelord account must be a dedicated non-admin local user.
 
-- name: Check whether the service user has sudo
+- name: Check whether the service user can run sudo
   become: true
+  become_user: "{{ user }}"
   ansible.builtin.command:
-    argv: [sudo, -n, -l, -U, "{{ user }}"]
+    argv: [/usr/bin/sudo, -n, true]
   register: chia_darwin_service_user_sudo
   changed_when: false
   failed_when: false

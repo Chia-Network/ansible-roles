@@ -9,7 +9,9 @@
   when:
     - chia_job.enabled | bool
     - chia_darwin_start_now | bool
-    - chia_job.label not in (chia_darwin_fresh_bootstraps | default([]))
+    - >-
+      chia_job.label not in (chia_darwin_fresh_bootstraps | default([])) or
+      (chia_darwin_restart_forced | default(false) | bool)
   become: "{{ chia_darwin_launchd_become | bool }}"
   block:
     - name: Stop {{ chia_job.label }} before bootstrap

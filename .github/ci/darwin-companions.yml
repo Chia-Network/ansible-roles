@@ -18,6 +18,7 @@
         launchd_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-hw-vdf-launchd.yml') }}"
         launchd_job_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-launchd-job.yml') }}"
         restart_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-restart-ordered.yml') }}"
+        restart_job_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-restart-job.yml') }}"
         watchdog_text: "{{ lookup('file', role_dir ~ '/templates/darwin/chia-watchdog.sh.j2') }}"
         watchdog_plist_text: "{{ lookup('file', role_dir ~ '/templates/darwin/chia-watchdog.plist.j2') }}"
         launchd_plist_text: "{{ lookup('file', role_dir ~ '/templates/darwin/launchdaemon.plist.j2') }}"
@@ -88,6 +89,42 @@
           A companion-only restart must not probe or bootstrap ASIC boards.
           Gate the board-loaded check and the start-down loop on a service
           restart or a changed board label.
+
+    - name: The watchdog restarts even when it was bootstrapped during this apply
+      ansible.builtin.assert:
+        that:
+          - "'chia_darwin_restart_forced' in restart_text"
+          - "'chia_darwin_restart_forced' in restart_job_text"
+          - "'chia_job.label not in (chia_darwin_fresh_bootstraps | default([])) or' in restart_job_text"
+        fail_msg: >-
+          Quiescing a freshly bootstrapped watchdog must override the
+          fresh-bootstrap skip, or a first apply leaves monitoring down.
+
+    - name: The watchdog parent check does not rewrite an existing /usr/local
+      ansible.builtin.assert:
+        that:
+          - "'Ensure /usr/local exists' not in companions_text"
+          - "'Stat /usr/local' in companions_text"
+          - "'Create /usr/local when absent' in companions_text"
+          - "'chia_darwin_watchdog_parent_local.stat.exists | default(false)' in companions_text"
+          - companions_text.index('Stat /usr/local') < companions_text.index('Create /usr/local when absent')
+        fail_msg: >-
+          Stat the watchdog parents before creating them and only set owner,
+          group, and mode when the directory is absent. An existing unsafe
+          /usr/local must fail the root-owned check, not be rewritten.
+
+    - name: The sudo probe runs as the service user
+      ansible.builtin.assert:
+        that:
+          - "'Check whether the service user can run sudo' in darwin_text"
+          - "'/usr/bin/sudo, -n, true' in darwin_text"
+          - "'sudo, -n, -l, -U' not in darwin_text"
+          - >-
+            'become_user:' in darwin_text.split('Check whether the service user can run sudo')[1].split('Require explicit opt-in')[0]
+        fail_msg: >-
+          Test whether the service user can actually run sudo by executing
+          sudo -n true as that user. Listing privileges as root always
+          succeeds, including for users with no sudo rights.
 
     - name: The base plist supports per-job resource limits and process type
       ansible.builtin.assert:

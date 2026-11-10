@@ -736,3 +736,50 @@
           - "'bootout system/net.chia.timelord.chia-exporter' not in log_text"
           - "'bootout system/net.chia.timelord.chia-healthcheck' not in log_text"
           - "'bootout system/net.chia.timelord.node-exporter' not in log_text"
+
+    - name: Mark the restart scope jobs loaded again for the fresh-bootstrap restart
+      ansible.builtin.file:
+        path: "{{ launch_state }}/loaded/{{ item.label }}"
+        state: touch
+        mode: "0644"
+      loop: "{{ scope_jobs }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Clear the launchctl log before the fresh-bootstrap restart
+      ansible.builtin.copy:
+        dest: "{{ launch_log }}"
+        content: ""
+        mode: "0644"
+
+    - name: Request a core restart with a freshly bootstrapped watchdog
+      ansible.builtin.set_fact:
+        chia_darwin_restart_services: true
+        chia_darwin_restart_companions: false
+        chia_darwin_fresh_bootstraps:
+          - net.chia.timelord.watchdog
+
+    - name: Run a core restart with a freshly bootstrapped watchdog
+      ansible.builtin.include_role:
+        name: chia-blockchain-test
+        tasks_from: darwin-restart-ordered.yml
+
+    - name: Read the fresh-bootstrap launchctl log
+      ansible.builtin.slurp:
+        src: "{{ launch_log }}"
+      register: fresh_bootstrap_log
+
+    - name: A freshly bootstrapped watchdog is started again after quiesce
+      vars:
+        log_text: "{{ fresh_bootstrap_log.content | b64decode }}"
+        watchdog_bootout: "bootout system/net.chia.timelord.watchdog"
+        watchdog_bootstrap: "bootstrap system {{ chia_darwin_launchd_dir }}/net.chia.timelord.watchdog.plist"
+      ansible.builtin.assert:
+        that:
+          - "watchdog_bootout in log_text"
+          - "watchdog_bootstrap in log_text"
+          - "log_text.index(watchdog_bootout) < log_text.index(watchdog_bootstrap)"
+        fail_msg: >-
+          The watchdog was freshly bootstrapped during install, quiesced for
+          the restart, and must be started again even though it is in
+          chia_darwin_fresh_bootstraps.
