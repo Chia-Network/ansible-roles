@@ -1,6 +1,6 @@
 ---
 - name: restart smartctl_exporter
-  systemd:
+  ansible.builtin.systemd:
     name: smartctl_exporter
     state: restarted
   become: true

@@ -98,6 +98,7 @@
   when: >-
     (smartctl_exporter_darwin_download.changed | default(false)) or
     not (smartctl_exporter_darwin_extracted.stat.exists | default(false))
+  changed_when: true
 
 - name: Install the smartctl_exporter binary
   become: true
