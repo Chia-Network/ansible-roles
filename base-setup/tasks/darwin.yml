@@ -33,13 +33,18 @@
 - name: Resolve the SSH login home path
   ansible.builtin.set_fact:
     base_setup_darwin_ssh_home_path: >-
-      {{ (base_setup_darwin_ssh_home.stdout | default('') | regex_replace('^NFSHomeDirectory: *', '') | trim)
-         if (base_setup_darwin_ssh_home.rc | default(1) | int == 0 and
-             (base_setup_darwin_ssh_home.stdout | default('') | trim | length) > 0)
-         else '/Users/' ~ (base_setup_ssh_login | default(ansible_user | default(''))) }}
+      {{ base_setup_darwin_ssh_home.stdout | default('') | regex_replace('^NFSHomeDirectory: *', '') | trim }}
   when:
     - base_setup_disable_ssh_password_login | bool
     - (base_setup_ssh_login | default(ansible_user | default(''))) | length > 0
+
+- name: Fall back to /Users/<login> when dscl has no home
+  ansible.builtin.set_fact:
+    base_setup_darwin_ssh_home_path: "/Users/{{ base_setup_ssh_login | default(ansible_user | default('')) }}"
+  when:
+    - base_setup_disable_ssh_password_login | bool
+    - (base_setup_ssh_login | default(ansible_user | default(''))) | length > 0
+    - (base_setup_darwin_ssh_home_path | default('') | length) == 0
 
 - name: Stat the SSH login account's authorized_keys
   become: true
