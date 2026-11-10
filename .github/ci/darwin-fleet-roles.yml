@@ -39,7 +39,7 @@
           - "'restart-ssh-darwin' in base_darwin"
           - "'launchctl, kickstart, -k, system/com.openssh.sshd' in base_handlers"
           - "'PasswordAuthentication no' in base_linux"
-          - "'when: ansible_os_family != \"Darwin\"' in base_meta"
+          - '''when: ansible_os_family != "Darwin"'' in base_meta'
         fail_msg: >-
           base-setup must keep the Linux sshd tasks and add a Darwin path that
           proves key auth before disabling passwords, validates sshd, and

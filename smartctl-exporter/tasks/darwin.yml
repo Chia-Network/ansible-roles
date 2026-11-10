@@ -124,7 +124,12 @@
 - name: Check whether the smartctl_exporter LaunchDaemon is loaded
   become: true
   ansible.builtin.command:
-    argv: [/bin/launchctl, print, "system/{{ smartctl_exporter_darwin_launchd_label }}"]
+    argv:
+      [
+        /bin/launchctl,
+        print,
+        "system/{{ smartctl_exporter_darwin_launchd_label }}",
+      ]
   register: smartctl_exporter_darwin_loaded
   changed_when: false
   failed_when: false

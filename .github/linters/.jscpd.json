@@ -5,6 +5,7 @@
 		"**/__snapshots__/**",
 		"**/node_modules/**",
 		"**/alloy/tasks/main.yml",
+		"**/alloy/tasks/linux.yml",
 		"**/cat-backup/tasks/main.yml",
 		"**/chia-blockchain/templates/monit-hw-vdf-restart-alert.sh.j2",
 		"**/climate-explorer-ui/tasks/main.yml",

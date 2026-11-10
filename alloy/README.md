@@ -33,17 +33,17 @@ it.
 
 ### Darwin
 
-| Variable                           | Default                    | Description                                                             |
-| ---------------------------------- | -------------------------- | ----------------------------------------------------------------------- |
-| `alloy_darwin_homebrew_prefix`     | `/opt/homebrew`            | Homebrew prefix.                                                        |
-| `alloy_darwin_brew_user`           | `""`                       | Homebrew prefix owner when the SSH login differs; empty uses the login. |
-| `alloy_darwin_formula`             | `grafana-alloy`            | Homebrew formula.                                                       |
-| `alloy_darwin_config_dir`          | `/usr/local/etc/alloy`     | Root-owned config directory.                                            |
-| `alloy_darwin_state_dir`           | `/var/lib/alloy`           | Alloy storage path.                                                     |
-| `alloy_darwin_launchd_label`       | `net.chia.alloy`           | LaunchDaemon label.                                                     |
-| `alloy_darwin_extra_log_files`     | watchdog log entry         | Darwin-only files appended to `alloy_extra_log_files`.                  |
-| `alloy_syslog_path`                | `/var/log/system.log` on macOS | Syslog source path.                                                 |
-| `alloy_chia_log_path`              | `{{ chia_root }}/log/debug.log` | Chia log source path.                                             |
+| Variable                       | Default                         | Description                                                             |
+| ------------------------------ | ------------------------------- | ----------------------------------------------------------------------- |
+| `alloy_darwin_homebrew_prefix` | `/opt/homebrew`                 | Homebrew prefix.                                                        |
+| `alloy_darwin_brew_user`       | `""`                            | Homebrew prefix owner when the SSH login differs; empty uses the login. |
+| `alloy_darwin_formula`         | `grafana-alloy`                 | Homebrew formula.                                                       |
+| `alloy_darwin_config_dir`      | `/usr/local/etc/alloy`          | Root-owned config directory.                                            |
+| `alloy_darwin_state_dir`       | `/var/lib/alloy`                | Alloy storage path.                                                     |
+| `alloy_darwin_launchd_label`   | `net.chia.alloy`                | LaunchDaemon label.                                                     |
+| `alloy_darwin_extra_log_files` | watchdog log entry              | Darwin-only files appended to `alloy_extra_log_files`.                  |
+| `alloy_syslog_path`            | `/var/log/system.log` on macOS  | Syslog source path.                                                     |
+| `alloy_chia_log_path`          | `{{ chia_root }}/log/debug.log` | Chia log source path.                                                   |
 
 ### Loki
 

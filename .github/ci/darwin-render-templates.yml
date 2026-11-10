@@ -208,7 +208,7 @@
       ansible.builtin.assert:
         that:
           - "'vdf-only has no local timelord' in text"
-          - "'wait_for_listen \"$PORT\"' not in text"
+          - '''wait_for_listen "$PORT"'' not in text'
 
     - name: Create the vdf-only watchdog fixture directory
       ansible.builtin.file:
@@ -288,8 +288,8 @@
         text: "{{ tuned_hw_vdf.content | b64decode }}"
       ansible.builtin.assert:
         that:
-          - "'--max-freq \"$MAX_FREQ\"' in text"
-          - "'--auto-freq-period \"$AUTO_FREQ_PERIOD\"' in text"
+          - '''--max-freq "$MAX_FREQ"'' in text'
+          - '''--auto-freq-period "$AUTO_FREQ_PERIOD"'' in text'
           - "'MAX_FREQ=1620' in text"
           - "'AUTO_FREQ_PERIOD=60' in text"
 
