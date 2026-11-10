@@ -33,6 +33,10 @@
 - name: See which ASIC boards are loaded after the stops
   when:
     - chia_darwin_start_now | bool
+    - >-
+      (chia_darwin_restart_services | bool) or
+      (chia_darwin_hw_vdf_changed_labels | length > 0) or
+      (chia_darwin_start_down_boards | default(false) | bool)
     - item.enabled | bool
   become: "{{ chia_darwin_launchd_become | bool }}"
   ansible.builtin.command:
@@ -50,6 +54,10 @@
 - name: Start ASIC boards that are down, in ID order
   when:
     - chia_darwin_start_now | bool
+    - >-
+      (chia_darwin_restart_services | bool) or
+      (chia_darwin_hw_vdf_changed_labels | length > 0) or
+      (chia_darwin_start_down_boards | default(false) | bool)
     - item.rc | default(0) | int != 0
     - item.item.enabled | bool
   vars:
@@ -63,3 +71,4 @@
   ansible.builtin.set_fact:
     chia_darwin_restart_services: false
     chia_darwin_restart_companions: false
+    chia_darwin_start_down_boards: false

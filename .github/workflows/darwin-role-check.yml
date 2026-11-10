@@ -1,9 +1,6 @@
 name: Darwin role check
 
 on:
-  push:
-    branches-ignore:
-      - main
   pull_request:
     branches:
       - main
@@ -83,9 +80,6 @@ jobs:
       - name: Render Darwin templates
         run: ansible-playbook -e render_out="$RUNNER_TEMP/darwin" .github/ci/darwin-render-templates.yml
 
-      - name: Check Darwin ASIC board inventory
-        run: ansible-playbook -e render_out="$RUNNER_TEMP/darwin" .github/ci/darwin-hw-boards.yml
-
       - name: Lint rendered output
         working-directory: ${{ runner.temp }}/darwin
         run: |
@@ -95,3 +89,47 @@ jobs:
             python3 -c 'import plistlib, sys; plistlib.load(open(sys.argv[1], "rb"))' "$f"
           done
           python3 -m py_compile ./*/rotpipe.py
+
+  asic:
+    name: Darwin ASIC tests (${{ matrix.ansible }}, ${{ matrix.group }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ansible:
+          - ">=2.18,<2.19"
+          - ">=2.22,<2.23"
+        group:
+          - inventory
+          - launchd
+          - takeover
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh shellcheck python3-venv
+          python3 -m pip install --user 'ansible-core${{ matrix.ansible }}'
+
+      - name: Run ASIC group
+        env:
+          ANSIBLE_ROLES_PATH: ${{ github.workspace }}
+        run: |
+          case "${{ matrix.group }}" in
+            inventory)
+              ansible-playbook -e render_out="$RUNNER_TEMP/darwin-asic-inventory" .github/ci/darwin-hw-boards-validate.yml
+              ansible-playbook -e render_out="$RUNNER_TEMP/darwin-asic-inventory" .github/ci/darwin-hw-boards-discover.yml
+              ansible-playbook -e render_out="$RUNNER_TEMP/darwin-asic-inventory" .github/ci/darwin-hw-boards-render.yml
+              ;;
+            launchd)
+              ansible-playbook -e render_out="$RUNNER_TEMP/darwin-asic-launchd" .github/ci/darwin-hw-boards-launchd.yml
+              ;;
+            takeover)
+              ansible-playbook -e render_out="$RUNNER_TEMP/darwin-asic-takeover" .github/ci/darwin-hw-boards-takeover.yml
+              ansible-playbook -e render_out="$RUNNER_TEMP/darwin-asic-takeover" .github/ci/darwin-hw-boards-restart.yml
+              ;;
+          esac

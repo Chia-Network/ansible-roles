@@ -23,6 +23,7 @@ EXPECTED_VDFS={{ chia_darwin_watchdog_expected_vdfs | int }}
 VDF_PORT={{ chia_timelord_launcher_port | int }}
 HC=http://127.0.0.1:{{ chia_darwin_chia_healthcheck_port | int }}
 PREFIX={{ chia_darwin_launchd_prefix }}
+PLIST_DIR={{ chia_darwin_launchd_dir }}
 CONF_DIR={{ chia_darwin_watchdog_conf_dir }}
 TOKEN_FILE=$CONF_DIR/alert-token
 URL_FILE=$CONF_DIR/webhook-url
@@ -93,11 +94,39 @@ kick() { # label
 	launchctl kickstart -k "system/$PREFIX.$1" >>"$LOG" 2>&1 || log "kickstart $1 failed"
 }
 
+stop_board() { # label
+	if [ "$DRY" = 1 ]; then
+		log "DRY bootout $PREFIX.$1"
+		return 0
+	fi
+	launchctl bootout "system/$PREFIX.$1" >>"$LOG" 2>&1 || true
+}
+
+start_board() { # label
+	if [ "$DRY" = 1 ]; then
+		log "DRY bootstrap $PREFIX.$1"
+		return 0
+	fi
+	if [ -f "$PLIST_DIR/$PREFIX.$1.plist" ]; then
+		launchctl bootstrap system "$PLIST_DIR/$PREFIX.$1.plist" >>"$LOG" 2>&1 || log "bootstrap $1 failed"
+	else
+		log "bootstrap $1 skipped: missing $PLIST_DIR/$PREFIX.$1.plist"
+	fi
+}
+
 restart_full() {
 	local j
 	log "RESTART full stack: $1"
-	for j in "${SERVICE_JOBS[@]}" "${HW_JOBS[@]}"; do
+	for j in "${HW_JOBS[@]}"; do
+		stop_board "$j"
+	done
+	sleep 2
+	for j in "${SERVICE_JOBS[@]}"; do
 		kick "$j"
+		sleep 8
+	done
+	for j in "${HW_JOBS[@]}"; do
+		start_board "$j"
 		sleep 8
 	done
 }
@@ -106,7 +135,11 @@ restart_hwvdf() {
 	local j
 	log "RESTART hw-vdf boards: $1"
 	for j in "${HW_JOBS[@]}"; do
-		kick "$j"
+		stop_board "$j"
+	done
+	sleep 2
+	for j in "${HW_JOBS[@]}"; do
+		start_board "$j"
 		sleep 8
 	done
 }

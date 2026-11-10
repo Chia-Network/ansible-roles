@@ -83,6 +83,16 @@
     # Boards start from the ordered restart handler, after any service restart.
     - chia_job.board is not defined
 
+- name: Remember that an ASIC board must start from the ordered restart
+  ansible.builtin.set_fact:
+    chia_darwin_start_down_boards: true
+  when:
+    - chia_job.board is defined
+    - chia_job.enabled | bool
+    - chia_darwin_start_now | bool
+    - chia_darwin_launchd_loaded.rc != 0
+  changed_when: false
+
 - name: Start ASIC board {{ chia_job.label }} from the ordered restart
   ansible.builtin.debug:
     msg: "{{ chia_job.label }} is not loaded."

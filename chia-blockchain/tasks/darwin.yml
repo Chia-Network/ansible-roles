@@ -4,6 +4,7 @@
     chia_darwin_hw_vdf_changed_labels: []
     chia_darwin_restart_services: false
     chia_darwin_restart_companions: false
+    chia_darwin_start_down_boards: false
   changed_when: false
 
 - name: Require an Apple Silicon Mac

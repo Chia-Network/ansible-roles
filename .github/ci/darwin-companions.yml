@@ -68,6 +68,21 @@
           Companion plists must join chia_darwin_launchd_jobs, and a
           companion-only change must restart only companion jobs.
 
+    - name: Companion-only restarts do not probe or start ASIC boards
+      vars:
+        restart_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-restart-ordered.yml') }}"
+      ansible.builtin.assert:
+        that:
+          - "'See which ASIC boards are loaded after the stops' in restart_text"
+          - "'Start ASIC boards that are down, in ID order' in restart_text"
+          - "'chia_darwin_restart_services | bool' in restart_text"
+          - "'chia_darwin_hw_vdf_changed_labels | length > 0' in restart_text"
+          - "'chia_darwin_start_down_boards | default(false) | bool' in restart_text"
+        fail_msg: >-
+          A companion-only restart must not probe or bootstrap ASIC boards.
+          Gate the board-loaded check and the start-down loop on a service
+          restart or a changed board label.
+
     - name: The base plist supports RunAtLoad and per-job resource limits
       ansible.builtin.assert:
         that:
@@ -88,10 +103,18 @@
           - "'SERVICE_JOB_LIST=' in watchdog_text"
           - "'read -r -a HW_JOBS' in watchdog_text"
           - "'read -r -a SERVICE_JOBS' in watchdog_text"
+          - "'PLIST_DIR=' in watchdog_text"
+          - "'stop_board' in watchdog_text"
+          - "'start_board' in watchdog_text"
+          - "'launchctl bootout' in watchdog_text"
+          - "'launchctl bootstrap system' in watchdog_text"
+          - '''stop_board "$j"'' in watchdog_text'
+          - '''start_board "$j"'' in watchdog_text'
           - "'EXPECTED_VDFS' in watchdog_text"
           - "'hw_jobs_running' in watchdog_text"
           - "'restart_hwvdf' in watchdog_text"
-          - '''for j in "${SERVICE_JOBS[@]}" "${HW_JOBS[@]}"'' in watchdog_text'
+          - '''for j in "${SERVICE_JOBS[@]}"; do'' in watchdog_text'
+          - '''for j in "${HW_JOBS[@]}"; do'' in watchdog_text'
           - '''for j in "${HW_JOBS[@]}"'' in watchdog_text'
           - "'CHECK_HEALTHCHECK' in watchdog_text"
           - "'CHECK_FULL_NODE' in watchdog_text"
