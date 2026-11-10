@@ -1,0 +1,174 @@
+---
+# Static and render checks for the fleet roles that the Darwin timelord adds:
+# base-setup (SSH), alloy (central logs), and smartctl-exporter (SMART metrics).
+# These run on Linux CI; they never install Homebrew packages or call launchd.
+- name: Check the Darwin fleet role sources
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    repo_dir: "{{ playbook_dir }}/../.."
+  tasks:
+    - name: Read the fleet role sources
+      ansible.builtin.set_fact:
+        base_main: "{{ lookup('file', repo_dir ~ '/base-setup/tasks/main.yml') }}"
+        base_darwin: "{{ lookup('file', repo_dir ~ '/base-setup/tasks/darwin.yml') }}"
+        base_linux: "{{ lookup('file', repo_dir ~ '/base-setup/tasks/linux.yml') }}"
+        base_handlers: "{{ lookup('file', repo_dir ~ '/base-setup/handlers/main.yml') }}"
+        base_meta: "{{ lookup('file', repo_dir ~ '/base-setup/meta/main.yml') }}"
+        alloy_main: "{{ lookup('file', repo_dir ~ '/alloy/tasks/main.yml') }}"
+        alloy_darwin: "{{ lookup('file', repo_dir ~ '/alloy/tasks/darwin.yml') }}"
+        alloy_defaults: "{{ lookup('file', repo_dir ~ '/alloy/defaults/main.yml') }}"
+        alloy_handlers: "{{ lookup('file', repo_dir ~ '/alloy/handlers/main.yml') }}"
+        alloy_template: "{{ lookup('file', repo_dir ~ '/alloy/templates/config.alloy.j2') }}"
+        smartctl_main: "{{ lookup('file', repo_dir ~ '/smartctl-exporter/tasks/main.yml') }}"
+        smartctl_darwin: "{{ lookup('file', repo_dir ~ '/smartctl-exporter/tasks/darwin.yml') }}"
+        smartctl_defaults: "{{ lookup('file', repo_dir ~ '/smartctl-exporter/defaults/main.yml') }}"
+        smartctl_handlers: "{{ lookup('file', repo_dir ~ '/smartctl-exporter/handlers/main.yml') }}"
+
+    - name: base-setup routes Darwin and Linux separately
+      ansible.builtin.assert:
+        that:
+          - "'darwin.yml' in base_main"
+          - "'linux.yml' in base_main"
+          - "'PasswordAuthentication no' in base_darwin"
+          - "'PermitRootLogin no' in base_darwin"
+          - "'KbdInteractiveAuthentication no' in base_darwin"
+          - "'authorized_keys' in base_darwin"
+          - "'/usr/sbin/sshd, -t, -f' in base_darwin"
+          - "'restart-ssh-darwin' in base_darwin"
+          - "'launchctl, kickstart, -k, system/com.openssh.sshd' in base_handlers"
+          - "'PasswordAuthentication no' in base_linux"
+          - "'when: ansible_os_family != \"Darwin\"' in base_meta"
+        fail_msg: >-
+          base-setup must keep the Linux sshd tasks and add a Darwin path that
+          proves key auth before disabling passwords, validates sshd, and
+          restarts launchd's com.openssh.sshd.
+
+    - name: alloy routes Darwin and Linux and keeps a Darwin config path
+      ansible.builtin.assert:
+        that:
+          - "'darwin.yml' in alloy_main"
+          - "'linux.yml' in alloy_main"
+          - "'grafana-alloy' in alloy_defaults"
+          - "'alloy_darwin_config_file' in alloy_defaults"
+          - "'alloy_darwin_extra_log_files' in alloy_defaults"
+          - "'alloy_syslog_path' in alloy_template"
+          - "'alloy_chia_log_path' in alloy_template"
+          - "'restart alloy darwin' in alloy_handlers"
+          - "'/bin/launchctl' in alloy_handlers"
+          - "'launchctl' in alloy_darwin"
+          - "'alloy.plist.j2' in alloy_darwin"
+        fail_msg: >-
+          alloy must keep the Linux apt/systemd path and add a Homebrew +
+          launchd path with a Darwin config directory, log paths, and handler.
+
+    - name: smartctl-exporter routes Darwin and installs a launchd job
+      ansible.builtin.assert:
+        that:
+          - "'darwin.yml' in smartctl_main"
+          - "'linux.yml' in smartctl_main"
+          - "'smartctl_exporter_darwin_version' in smartctl_defaults"
+          - "'smartctl_exporter_darwin_sha256' in smartctl_defaults"
+          - "'darwin-arm64' in smartctl_defaults"
+          - "'smartmontools' in smartctl_darwin"
+          - "'--smartctl.path' in smartctl_darwin or 'smartctl_exporter.plist.j2' in smartctl_darwin"
+          - "'restart smartctl_exporter darwin' in smartctl_handlers"
+          - "'/bin/launchctl' in smartctl_handlers"
+        fail_msg: >-
+          smartctl-exporter must keep the Linux systemd path and add a pinned
+          darwin-arm64 release, Homebrew smartmontools, and a launchd job.
+
+- name: Render the Darwin Alloy configuration
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../alloy/defaults/main.yml
+  vars:
+    ansible_os_family: Darwin
+    ansible_hostname: darwin-test
+    chia_root: /Users/timelord/.chia/mainnet
+    alloy_darwin_chia_root: /Users/timelord/.chia/mainnet
+    network: mainnet
+    fleet_out: "{{ render_out | default('/tmp/darwin-fleet') }}"
+  tasks:
+    - name: Set the Darwin Alloy Chia root
+      ansible.builtin.set_fact:
+        alloy_darwin_chia_root: /Users/timelord/.chia/mainnet
+        chia_root: /Users/timelord/.chia/mainnet
+        ansible_os_family: Darwin
+        ansible_hostname: darwin-test
+
+    - name: Create the render directory
+      ansible.builtin.file:
+        path: "{{ fleet_out }}"
+        state: directory
+        mode: "0755"
+
+    - name: Render the Alloy config
+      ansible.builtin.template:
+        src: ../../alloy/templates/config.alloy.j2
+        dest: "{{ fleet_out }}/config.alloy"
+        mode: "0644"
+
+    - name: Render the Alloy LaunchDaemon
+      ansible.builtin.template:
+        src: ../../alloy/templates/alloy.plist.j2
+        dest: "{{ fleet_out }}/alloy.plist"
+        mode: "0644"
+
+    - name: Read the rendered Alloy files
+      ansible.builtin.slurp:
+        src: "{{ fleet_out }}/{{ item }}"
+      loop:
+        - config.alloy
+        - alloy.plist
+      register: alloy_rendered
+
+    - name: The Alloy render uses macOS paths and avoids fail2ban
+      vars:
+        config: "{{ alloy_rendered.results[0].content | b64decode }}"
+        plist: "{{ alloy_rendered.results[1].content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - "'/var/log/system.log' in config"
+          - "'/var/log/fail2ban.log' not in config"
+          - "'/Users/timelord/.chia/mainnet/log/debug.log' in config"
+          - "'chia-watchdog.log' in config"
+          - "'/opt/homebrew/bin/alloy' in plist"
+          - "'--storage.path=/var/lib/alloy' in plist"
+          - "'<key>KeepAlive</key><true/>' in plist"
+
+- name: Render the Darwin smartctl_exporter LaunchDaemon
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../smartctl-exporter/defaults/main.yml
+  vars:
+    ansible_os_family: Darwin
+    ansible_architecture: arm64
+    fleet_out: "{{ render_out | default('/tmp/darwin-fleet') }}"
+  tasks:
+    - name: Render the smartctl_exporter LaunchDaemon
+      ansible.builtin.template:
+        src: ../../smartctl-exporter/templates/smartctl_exporter.plist.j2
+        dest: "{{ fleet_out }}/smartctl_exporter.plist"
+        mode: "0644"
+
+    - name: Read the rendered smartctl_exporter LaunchDaemon
+      ansible.builtin.slurp:
+        src: "{{ fleet_out }}/smartctl_exporter.plist"
+      register: smartctl_rendered
+
+    - name: The smartctl_exporter LaunchDaemon uses Homebrew smartctl
+      vars:
+        text: "{{ smartctl_rendered.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - "'/usr/local/bin/smartctl_exporter' in text"
+          - "'--web.listen-address=:9633' in text"
+          - "'--smartctl.path=/opt/homebrew/bin/smartctl' in text"
+          - "'<key>KeepAlive</key><true/>' in text"
+          - "'net.chia.smartctl_exporter' in text"

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>{{ alloy_darwin_launchd_label | e }}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{{ alloy_darwin_binary | e }}</string>
+    <string>run</string>
+    <string>--storage.path={{ alloy_darwin_state_dir | e }}</string>
+    <string>--server.http.listen-addr={{ alloy_darwin_http_listen_addr | e }}</string>
+    <string>{{ alloy_darwin_config_file | e }}</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>{{ alloy_darwin_homebrew_prefix | e }}/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>15</integer>
+  <key>ProcessType</key><string>Background</string>
+  <key>StandardOutPath</key><string>/var/log/alloy.out.log</string>
+  <key>StandardErrorPath</key><string>/var/log/alloy.err.log</string>
+</dict>
+</plist>

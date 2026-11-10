@@ -19,13 +19,13 @@ loki.write "default" {
   }
 }
 
-{% if alloy_enable_syslog_source %}
+{% if alloy_enable_syslog_source | bool %}
 // ── Syslog ───────────────────────────────────────────────────────────────────
 
 loki.source.file "syslog" {
   targets = [
     {
-      __path__ = "/var/log/syslog",
+      __path__ = "{{ alloy_syslog_path }}",
       job      = "syslog",
       host     = "{{ ansible_hostname | default('localhost') }}",
     },
@@ -33,14 +33,14 @@ loki.source.file "syslog" {
   forward_to = [loki.write.default.receiver]
 }
 {% endif %}
-{% if alloy_enable_fail2ban_source %}
+{% if alloy_enable_fail2ban_source | bool %}
 
 // ── Fail2ban ─────────────────────────────────────────────────────────────────
 
 loki.source.file "fail2ban" {
   targets = [
     {
-      __path__ = "/var/log/fail2ban.log",
+      __path__ = "{{ alloy_fail2ban_log_path }}",
       job      = "fail2ban",
       host     = "{{ ansible_hostname | default('localhost') }}",
     },
@@ -48,14 +48,14 @@ loki.source.file "fail2ban" {
   forward_to = [loki.write.default.receiver]
 }
 {% endif %}
-{% if alloy_enable_chia_source %}
+{% if alloy_enable_chia_source | bool %}
 
 // ── Chia ─────────────────────────────────────────────────────────────────────
 
 loki.source.file "chia" {
   targets = [
     {
-      __path__    = "{{ chia_root }}/log/debug.log",
+      __path__    = "{{ alloy_chia_log_path }}",
       job         = "chia",
       application = "{{ application }}",
       component   = "{{ component }}",
@@ -87,7 +87,7 @@ loki.process "chia" {
 {% endif %}
 
 // ── Extra log files ──────────────────────────────────────────────────────────
-{% for extra in alloy_extra_log_files %}
+{% for extra in (alloy_extra_log_files + (alloy_darwin_extra_log_files | default([]))) %}
 
 loki.source.file "{{ extra.name }}" {
   targets = [

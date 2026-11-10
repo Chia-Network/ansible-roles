@@ -9,3 +9,16 @@
   register: systemd_action
   retries: 10
   until: systemd_action is success
+
+- name: restart alloy darwin
+  become: true
+  ansible.builtin.shell: |
+    /bin/launchctl bootout "system/{{ alloy_darwin_launchd_label }}" 2>/dev/null || true
+    sleep 1
+    /bin/launchctl enable "system/{{ alloy_darwin_launchd_label }}"
+    /bin/launchctl bootstrap system "{{ alloy_darwin_launchd_dir }}/{{ alloy_darwin_launchd_label }}.plist"
+    {% if not (alloy_start_on_boot | bool) %}
+    /bin/launchctl disable "system/{{ alloy_darwin_launchd_label }}"
+    {% endif %}
+  when: alloy_start_now | bool
+  changed_when: true

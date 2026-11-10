@@ -19,10 +19,10 @@
 - name: Require a known Darwin topology
   ansible.builtin.assert:
     that:
-      - chia_darwin_topology in ["local-internal", "local-external", "remote-node"]
+      - chia_darwin_topology in ["local-internal", "local-external", "remote-node", "vdf-only"]
     fail_msg: >-
-      chia_darwin_topology must be local-internal, local-external, or
-      remote-node. Got {{ chia_darwin_topology }}.
+      chia_darwin_topology must be local-internal, local-external, remote-node,
+      or vdf-only. Got {{ chia_darwin_topology }}.
 
 - name: Require a pinned chia-blockchain version
   ansible.builtin.assert:
@@ -41,6 +41,17 @@
       SSH/automation account separate; using the service account as that login
       requires chia_darwin_allow_root_capable_service_user and a weaker
       posture.
+
+- name: Require a remote timelord VDF server for vdf-only
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_hw_vdf_ip | length > 0
+      - chia_darwin_hw_vdf_ip not in ["localhost", "127.0.0.1", "::1"]
+    fail_msg: >-
+      vdf-only has no local timelord. Set chia_darwin_hw_vdf_ip to the remote
+      timelord's VDF server address (the board wrappers connect there instead
+      of waiting for a local listener).
+  when: chia_darwin_topology == "vdf-only"
 
 - name: Require a remote full node when this Mac does not run one
   ansible.builtin.assert:
@@ -65,6 +76,8 @@
   ansible.builtin.set_fact:
     chia_root: "{{ chia_darwin_root }}"
     process_count: "{{ chia_darwin_process_count }}"
+    log_level: "{{ chia_darwin_log_level }}"
+    target_outbound_peer_count: "{{ chia_darwin_target_outbound_peer_count }}"
 
 - name: Build the non-ASIC LaunchDaemon job list
   ansible.builtin.set_fact:
@@ -74,19 +87,19 @@
         wrapper: "{{ chia_darwin_bin_dir }}/chia-daemon-run.sh"
         throttle: "{{ chia_darwin_daemon_throttle_interval }}"
         exit_timeout: "{{ chia_darwin_daemon_exit_timeout }}"
-        enabled: true
+        enabled: "{{ chia_darwin_topology != 'vdf-only' }}"
       - name: full-node
         label: "{{ chia_darwin_launchd_prefix }}.full-node"
         wrapper: "{{ chia_darwin_bin_dir }}/chia-full-node-run.sh"
         throttle: "{{ chia_darwin_full_node_throttle_interval }}"
         exit_timeout: "{{ chia_darwin_full_node_exit_timeout }}"
-        enabled: "{{ chia_darwin_topology != 'remote-node' }}"
+        enabled: "{{ chia_darwin_topology not in ['remote-node', 'vdf-only'] }}"
       - name: timelord
         label: "{{ chia_darwin_launchd_prefix }}.timelord"
         wrapper: "{{ chia_darwin_bin_dir }}/chia-timelord-run.sh"
         throttle: "{{ chia_darwin_timelord_throttle_interval }}"
         exit_timeout: "{{ chia_darwin_timelord_exit_timeout }}"
-        enabled: true
+        enabled: "{{ chia_darwin_topology != 'vdf-only' }}"
 
 # Companion jobs mirror the Linux timelord host. They are separate from
 # chia_darwin_service_jobs so a companion-only change does not bounce the
@@ -112,7 +125,7 @@
         nofile: 8192
         process_type: Standard
         companion: true
-        enabled: "{{ chia_darwin_enable_chia_exporter | bool }}"
+        enabled: "{{ chia_darwin_enable_chia_exporter | bool and chia_darwin_topology != 'vdf-only' }}"
       - name: chia-healthcheck
         label: "{{ chia_darwin_launchd_prefix }}.chia-healthcheck"
         wrapper: "{{ chia_darwin_bin_dir }}/chia-healthcheck-run.sh"
@@ -130,7 +143,7 @@
         nofile: 8192
         process_type: Standard
         companion: true
-        enabled: "{{ chia_darwin_enable_chia_healthcheck | bool }}"
+        enabled: "{{ chia_darwin_enable_chia_healthcheck | bool and chia_darwin_topology != 'vdf-only' }}"
       - name: node-exporter
         label: "{{ chia_darwin_launchd_prefix }}.node-exporter"
         wrapper: "{{ chia_darwin_bin_dir }}/node-exporter-run.sh"
@@ -149,6 +162,17 @@
         process_type: Standard
         companion: true
         enabled: "{{ chia_darwin_enable_node_exporter | bool }}"
+      - name: periodic-connect
+        label: "{{ chia_darwin_launchd_prefix }}.periodic-connect"
+        wrapper: "{{ chia_darwin_bin_dir }}/chia-periodic-connect-run.sh"
+        wrapper_template: darwin/chia-periodic-connect-run.sh.j2
+        plist_template: darwin/chia-periodic-connect.plist.j2
+        throttle: "{{ chia_darwin_companion_throttle_interval }}"
+        exit_timeout: "{{ chia_darwin_companion_exit_timeout }}"
+        start_interval: "{{ chia_darwin_periodic_connect_interval_seconds }}"
+        process_type: Background
+        companion: true
+        enabled: "{{ chia_periodic_connect_peers | length > 0 and chia_darwin_topology in ['local-internal', 'local-external'] }}"
       - name: watchdog
         label: "{{ chia_darwin_launchd_prefix }}.watchdog"
         wrapper: "{{ chia_darwin_watchdog_script }}"
@@ -797,8 +821,9 @@
   ansible.builtin.debug:
     msg: >-
       topology={{ chia_darwin_topology }} network={{ network }}
-      CHIA_ROOT={{ chia_root }}
+      CHIA_ROOT={{ chia_root }} log_level={{ log_level }}
       full_node_peer={{ chia_timelord_full_node_peer_host }}:{{ full_node_port }}
+      outbound_peers={{ target_outbound_peer_count }}
       jobs={{ chia_darwin_launchd_jobs | selectattr('enabled', 'truthy') | map(attribute='label') | list | join(', ') }}
       {% if chia_darwin_topology == 'local-external' %}
       Full Disk Access for {{ chia_darwin_interpreter }} is required before
@@ -807,4 +832,7 @@
       {% elif chia_darwin_topology == 'remote-node' %}
       The remote full node must accept this timelord (exempt_peer_networks on
       chia 2.7.1 and later).
+      {% elif chia_darwin_topology == 'vdf-only' %}
+      Only ASIC board jobs run. Boards connect to the remote VDF server at
+      {{ chia_darwin_hw_vdf_ip }}:{{ chia_darwin_hw_vdf_port }}.
       {% endif %}

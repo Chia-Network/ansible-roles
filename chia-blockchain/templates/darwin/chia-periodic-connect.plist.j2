@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>{{ chia_job.label | e }}</string>
+  <key>UserName</key><string>{{ user | e }}</string>
+  <key>GroupName</key><string>{{ chia_darwin_group | e }}</string>
+  <key>ProgramArguments</key>
+  <array><string>{{ chia_job.wrapper | e }}</string></array>
+  <key>WorkingDirectory</key><string>{{ chia_darwin_home | e }}</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key><string>{{ chia_darwin_home | e }}</string>
+    <key>CHIA_ROOT</key><string>{{ chia_root | e }}</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>StartInterval</key><integer>{{ chia_job.start_interval | int }}</integer>
+  <key>ThrottleInterval</key><integer>{{ chia_job.throttle | int }}</integer>
+  <key>ExitTimeOut</key><integer>{{ chia_job.exit_timeout | int }}</integer>
+  <key>ProcessType</key><string>{{ chia_job.process_type | default(chia_darwin_process_type) | e }}</string>
+  <key>StandardOutPath</key><string>{{ chia_darwin_log_dir | e }}/{{ chia_job.name | e }}.out.log</string>
+  <key>StandardErrorPath</key><string>{{ chia_darwin_log_dir | e }}/{{ chia_job.name | e }}.err.log</string>
+</dict>
+</plist>

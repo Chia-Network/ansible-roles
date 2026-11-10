@@ -23,6 +23,25 @@ same inventory entry shape covers additional Macs. See
 [DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#companion-services) for the service table,
 watchdog behavior, binary pins, and the approved-sudoers note.
 
+The role can also run a `vdf-only` topology: only the ASIC `hw-vdf` board jobs
+are installed. Set `chia_darwin_hw_vdf_ip` to the remote timelord's VDF server.
+There is no local daemon, full node, timelord, chia-exporter, or healthcheck.
+The watchdog still supervises the board LaunchDaemons.
+
+The Darwin watchdog matches the Linux monit defaults more closely than earlier
+releases: `chia_darwin_watchdog_grace` defaults to 3600 seconds, the watchdog
+checks `/full_node/ports` when enabled, and it raises Chia to DEBUG after
+`chia_darwin_watchdog_log_debug_threshold` failed health checks. Set
+`chia_darwin_watchdog_alert_token` and `chia_darwin_watchdog_webhook_url`
+together; a half-configured sink is refused. The role removes stale alert files
+when both are empty, and logs the skipped alert description to the watchdog log.
+Set `chia_periodic_connect_peers` to install the launchd periodic full-node peer
+connect job (every `chia_darwin_periodic_connect_interval_seconds`).
+
+The role also applies the Linux-style VDF tuning flags:
+`chia_darwin_hw_vdf_max_freq` and `chia_darwin_hw_vdf_auto_freq_period` are
+passed to `hw_vdf_client` when greater than zero.
+
 ## Darwin full-node database seeding
 
 Darwin `local-internal` and `local-external` full nodes can optionally seed from

@@ -9,8 +9,15 @@ for full flexibility.
 
 ## Requirements
 
-- Debian / Ubuntu target host
+- Debian / Ubuntu target host, or macOS with Homebrew
 - A reachable Loki push endpoint
+
+On macOS the role installs `grafana-alloy` with Homebrew and runs it from a
+root LaunchDaemon (`net.chia.alloy`) so it can read Chia and system logs. Set
+`alloy_darwin_brew_user` when the SSH login does not own the Homebrew prefix.
+The Darwin defaults ship `/var/log/system.log`, the Chia debug log, and
+`/var/log/chia-watchdog.log`; fail2ban is disabled because macOS does not run
+it.
 
 ## Role Variables
 
@@ -23,6 +30,20 @@ for full flexibility.
 | `alloy_user_groups`   | `[adm, systemd-journal, ubuntu]` | Supplementary groups granted to the `alloy` user so it can read log files. |
 | `alloy_start_on_boot` | `true`                           | Whether the systemd unit is enabled at boot.                               |
 | `alloy_start_now`     | `true`                           | Start the service immediately (`true`) or leave it stopped (`false`).      |
+
+### Darwin
+
+| Variable                           | Default                    | Description                                                             |
+| ---------------------------------- | -------------------------- | ----------------------------------------------------------------------- |
+| `alloy_darwin_homebrew_prefix`     | `/opt/homebrew`            | Homebrew prefix.                                                        |
+| `alloy_darwin_brew_user`           | `""`                       | Homebrew prefix owner when the SSH login differs; empty uses the login. |
+| `alloy_darwin_formula`             | `grafana-alloy`            | Homebrew formula.                                                       |
+| `alloy_darwin_config_dir`          | `/usr/local/etc/alloy`     | Root-owned config directory.                                            |
+| `alloy_darwin_state_dir`           | `/var/lib/alloy`           | Alloy storage path.                                                     |
+| `alloy_darwin_launchd_label`       | `net.chia.alloy`           | LaunchDaemon label.                                                     |
+| `alloy_darwin_extra_log_files`     | watchdog log entry         | Darwin-only files appended to `alloy_extra_log_files`.                  |
+| `alloy_syslog_path`                | `/var/log/system.log` on macOS | Syslog source path.                                                 |
+| `alloy_chia_log_path`              | `{{ chia_root }}/log/debug.log` | Chia log source path.                                             |
 
 ### Loki
 
@@ -222,6 +243,11 @@ If your application writes logs as a specific group, add that group so the
 The role enables the `alloy` systemd unit and (by default) starts it
 immediately. A handler restarts the service whenever the config or snippet
 files change.
+
+On macOS the role installs `/Library/LaunchDaemons/net.chia.alloy.plist`,
+`/usr/local/etc/alloy/config.alloy`, and `/var/lib/alloy`, then enables and
+bootstraps the LaunchDaemon. A handler reloads it with `launchctl` after a
+config change.
 
 ## Built-in Log Sources
 

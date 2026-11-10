@@ -42,11 +42,16 @@
           - "'chia_darwin_enable_chia_healthcheck' in darwin_text"
           - "'chia_darwin_enable_node_exporter' in darwin_text"
           - "'chia_darwin_enable_watchdog' in darwin_text"
+          - "'periodic-connect' in darwin_text"
+          - "'chia_periodic_connect_peers' in darwin_text"
+          - "'chia_darwin_periodic_connect_interval_seconds' in darwin_text"
+          - "'vdf-only' in darwin_text"
           - "'darwin-companions.yml' in darwin_text"
         fail_msg: >-
-          darwin.yml must define the four companion jobs, their release and
-          wrapper metadata, select the watchdog job, and include
-          darwin-companions.yml before the LaunchDaemons are installed.
+          darwin.yml must define the companion jobs (including the periodic
+          peer-connect job), their release and wrapper metadata, select the
+          watchdog job, support vdf-only, and include darwin-companions.yml
+          before the LaunchDaemons are installed.
 
     - name: The daemon keeps the daemon restart timeouts
       ansible.builtin.assert:
@@ -153,6 +158,13 @@
           - "'CHECK_FULL_NODE' in watchdog_text"
           - "'CHECK_EXPORTER' in watchdog_text"
           - "'CHECK_NODE' in watchdog_text"
+          - "'CHECK_FULL_NODE_PORTS' in watchdog_text"
+          - "'CHECK_VDF_CONNS' in watchdog_text"
+          - "'DEBUG_THRESHOLD' in watchdog_text"
+          - "'set_log_level' in watchdog_text"
+          - "'fnp_fail' in watchdog_text"
+          - "'/full_node/ports' in watchdog_text"
+          - "'alert skipped (no $TOKEN_FILE / $URL_FILE): $desc' in watchdog_text"
         fail_msg: >-
           The watchdog must run as root, check every enabled hw-vdf job, and
           restart all exposed boards rather than only hw-vdf.
@@ -173,6 +185,11 @@
           - "'alert-token' in companions_text"
           - "'webhook-url' in companions_text"
           - "'no_log: true' in companions_text"
+          - "'Validate the watchdog alert sink' in companions_text"
+          - "'Remove a stale watchdog alert token' in companions_text"
+          - "'Remove a stale watchdog webhook URL' in companions_text"
+          - "'Warn when companions use a separate CHIA_ROOT' in companions_text"
+          - "'Warn when the companion config is stale' in companions_text"
         fail_msg: >-
           Companion downloads need pinned versions and checksums. The watchdog
           alert files must stay optional and no_log.
@@ -184,6 +201,8 @@
         - chia-exporter-run.sh.j2
         - chia-healthcheck-run.sh.j2
         - node-exporter-run.sh.j2
+        - chia-periodic-connect-run.sh.j2
+        - chia-periodic-connect.plist.j2
         - chia-watchdog.sh.j2
         - chia-watchdog.plist.j2
       register: companion_templates

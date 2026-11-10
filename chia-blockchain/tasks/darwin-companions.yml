@@ -5,7 +5,10 @@
 # they run as the service user under the same LaunchDaemon prefix as the core
 # jobs. A companion-only change restarts only these jobs.
 - name: Confirm the companion CHIA_ROOT is readable by the service user
-  when: chia_darwin_enable_chia_exporter | bool or chia_darwin_enable_chia_healthcheck | bool
+  when: >-
+    (chia_darwin_enable_chia_exporter | bool or
+    chia_darwin_enable_chia_healthcheck | bool) and
+    chia_darwin_topology != 'vdf-only'
   block:
     - name: Stat the companion CHIA_ROOT config
       become: true
@@ -25,6 +28,37 @@
           Set chia_darwin_companion_chia_root to the CHIA_ROOT the exporter
           and healthcheck should use. A host may point it at a read-only
           config copy; otherwise leave it at chia_root.
+
+- name: Warn when companions use a separate CHIA_ROOT
+  when:
+    - chia_darwin_topology != 'vdf-only'
+    - chia_darwin_companion_chia_root != chia_root
+    - chia_darwin_enable_chia_exporter | bool or chia_darwin_enable_chia_healthcheck | bool
+  block:
+    - name: Stat the live and companion config files
+      become: true
+      become_user: "{{ user }}"
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ chia_root }}/config/config.yaml"
+        - "{{ chia_darwin_companion_chia_root }}/config/config.yaml"
+      register: chia_darwin_companion_config_ages
+
+    - name: Warn when the companion config is stale
+      ansible.builtin.debug:
+        msg: >-
+          chia_darwin_companion_chia_root ({{ chia_darwin_companion_chia_root }})
+          is older than the live CHIA_ROOT ({{ chia_root }}). The exporter and
+          healthcheck will read stale network and port settings. Prefer leaving
+          chia_darwin_companion_chia_root at chia_root unless the separate copy
+          is deliberately refreshed.
+      when:
+        - chia_darwin_companion_config_ages.results[0].stat.exists | default(false)
+        - chia_darwin_companion_config_ages.results[1].stat.exists | default(false)
+        - >-
+          (chia_darwin_companion_config_ages.results[1].stat.mtime | int) <
+          (chia_darwin_companion_config_ages.results[0].stat.mtime | int)
 
 - name: Ensure companion directories exist
   become: true
@@ -145,6 +179,28 @@
     label: "{{ item.wrapper }}"
   notify: restart-chia-darwin-companions
 
+- name: Validate the watchdog alert sink
+  ansible.builtin.assert:
+    that:
+      - (chia_darwin_watchdog_alert_token | length > 0) ==
+        (chia_darwin_watchdog_webhook_url | length > 0)
+    fail_msg: >-
+      chia_darwin_watchdog_alert_token and chia_darwin_watchdog_webhook_url
+      must be set together. A half-configured sink is silently skipped at
+      runtime and would hide watchdog restarts.
+  when: chia_darwin_enable_watchdog | bool
+
+- name: Note that watchdog alerts have no sink
+  ansible.builtin.debug:
+    msg: >-
+      No watchdog alert sink is configured. Restarts are still logged to
+      {{ chia_darwin_watchdog_log }} but no webhook is sent. Set both
+      chia_darwin_watchdog_alert_token and chia_darwin_watchdog_webhook_url
+      from the private inventory to match the Linux fleet.
+  when:
+    - chia_darwin_enable_watchdog | bool
+    - chia_darwin_watchdog_alert_token | length == 0
+
 - name: Install the watchdog
   when: chia_darwin_enable_watchdog | bool
   block:
@@ -239,3 +295,17 @@
         group: wheel
         mode: "0600"
       when: chia_darwin_watchdog_webhook_url | length > 0
+
+    - name: Remove a stale watchdog alert token
+      become: true
+      ansible.builtin.file:
+        path: "{{ chia_darwin_watchdog_conf_dir }}/alert-token"
+        state: absent
+      when: chia_darwin_watchdog_alert_token | length == 0
+
+    - name: Remove a stale watchdog webhook URL
+      become: true
+      ansible.builtin.file:
+        path: "{{ chia_darwin_watchdog_conf_dir }}/webhook-url"
+        state: absent
+      when: chia_darwin_watchdog_webhook_url | length == 0

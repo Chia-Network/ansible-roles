@@ -4,8 +4,10 @@
 non-zero mask is used as given. The timelord needs three connections, so masks
 follow the board count, in ID order: one board uses 7, two boards use 3 on the
 lowest ID and 1 on the other, and three boards use 1 each. `N_VDFS` is the
-popcount of that mask. Frequency stays 1540 and voltage stays 1.0. `vdf_threads`
-and `proof_threads` stay 12 and 11 unless that board sets them.
+popcount of that mask. Frequency stays 1540, voltage stays 1.0, and the optional
+`chia_darwin_hw_vdf_max_freq` and `chia_darwin_hw_vdf_auto_freq_period` flags
+are passed only when greater than zero. `vdf_threads` and `proof_threads` stay
+12 and 11 unless that board sets them.
 
 ## Where the board list comes from
 
@@ -223,7 +225,10 @@ and setting only the scalar serial (which omits `--device-loc` and retires the
 other role-owned wrappers). Attaching one board for auto-discovery is not a
 rollback: the other wrappers still claim their boards, so the set stays
 larger. `remote-node` still has no local full node, and every ASIC client
-still connects to the local timelord.
+still connects to the local timelord. `vdf-only` disables the local daemon,
+full node, timelord, chia-exporter, and healthcheck; set
+`chia_darwin_hw_vdf_ip` to the remote timelord's VDF server so the boards
+connect there. The watchdog still supervises the board jobs.
 
 ## Companion services
 
@@ -236,6 +241,7 @@ and the same restart path as the core jobs:
 | `chia-exporter`    | `.chia-exporter`    | 9914         | `CHIA_ROOT` may be a read-only copy. |
 | `chia-healthcheck` | `.chia-healthcheck` | 9950         | Serves `/full_node` and `/timelord`. |
 | `node-exporter`    | `.node-exporter`    | 9100         | Host metrics.                        |
+| `periodic-connect` | `.periodic-connect` | none         | Runs `chia peer full_node` on a timer. |
 | `watchdog`         | `.watchdog`         | none         | Runs as root; see below.             |
 
 Set `chia_darwin_enable_chia_exporter`, `chia_darwin_enable_chia_healthcheck`,
@@ -247,6 +253,15 @@ companion plist with that label.
 On Darwin this role replaces the Linux `chia-exporter`, `chia-healthcheck`, and
 `prometheus-node-exporter` roles; do not include those roles in the same play or
 they will try to manage the same ports with systemd or Homebrew services.
+Central logs and SMART metrics remain separate roles (`alloy` and
+`smartctl-exporter`), which now have Darwin paths.
+
+The `periodic-connect` job is installed only when `chia_periodic_connect_peers`
+is nonempty and the topology has a local full node (`local-internal` or
+`local-external`). It runs as the service user on a launchd `StartInterval` of
+`chia_darwin_periodic_connect_interval_seconds` (default 300) and runs
+`chia peer full_node -a <peer>:<full_node_port>` for each entry, matching the
+Linux cron job.
 
 Binary versions are pinned by `chia_darwin_chia_exporter_version`,
 `chia_darwin_chia_healthcheck_version`, and
@@ -270,12 +285,20 @@ Linux triggers:
 
 - `/full_node` or `/timelord` not returning 200 for three cycles restarts the
   daemon, full node, timelord, and every enabled `hw-vdf` board.
+- `/full_node/ports` not returning 200 for three cycles also restarts the full
+  stack when `chia_darwin_watchdog_check_full_node_ports` is true (the Darwin
+  default).
 - The VDF port having the expected number of established connections and every
   enabled `hw-vdf` job running is the board-health check. A failure restarts
-  all enabled boards in ID order.
+  all enabled boards in ID order. In `vdf-only`, the connection count is skipped
+  and only the board jobs are checked.
 - The exporter ports not listening for three cycles kickstart that exporter
   job.
 - If the healthcheck itself is unreachable, only the healthcheck is restarted.
+- After `chia_darwin_watchdog_log_debug_threshold` failed `/full_node` or
+  `/timelord` checks, the watchdog calls the full-node and timelord RPCs to set
+  DEBUG. When the healthcheck succeeds again it restores
+  `chia_darwin_log_level` (default INFO).
 
 Board restarts enable the job before bootstrap and disable it again when
 `start_on_boot` is false, matching the role's restart helper. The role's own
@@ -285,19 +308,21 @@ board restart fails, so a failed apply does not leave monitoring down.
 Checks for a disabled companion service are skipped, and the full-stack
 restart only kicks the core service jobs that are enabled.
 
-After a restart the watchdog waits `chia_darwin_watchdog_grace` seconds before
-counting failures again, and lengthens that grace after repeated restarts. It
-never stops checking. The driver and thresholds are
-`chia_darwin_watchdog_cycle` and `chia_darwin_watchdog_fail_cycles`. The
-expected VDF count is computed from the enabled board masks, and the
-`/full_node` check is enabled only when the service job list contains
-`full-node`.
+After a restart the watchdog waits `chia_darwin_watchdog_grace` seconds (default
+3600, matching the Linux monit start delay) before counting failures again, and
+lengthens that grace after repeated restarts. It never stops checking. The
+driver and thresholds are `chia_darwin_watchdog_cycle` and
+`chia_darwin_watchdog_fail_cycles`. The expected VDF count is computed from the
+enabled board masks, and the `/full_node` check is enabled only when the service
+job list contains `full-node`.
 
 Alerting uses `/usr/local/etc/chia-watchdog/alert-token` and `webhook-url`.
 The role creates the root-only directory and writes either file only when
 `chia_darwin_watchdog_alert_token` or `chia_darwin_watchdog_webhook_url` is
-nonempty. Keep those values in private inventory; both writes use `no_log`.
-Existing files are left alone when the variables are empty.
+nonempty. The two values must be set together; a half-configured sink is
+refused. Keep those values in private inventory; both writes use `no_log`.
+When both are empty the role removes any stale files, and the watchdog logs the
+skipped alert description to `chia-watchdog.log` instead of discarding it.
 
 ## Managing several Macs
 

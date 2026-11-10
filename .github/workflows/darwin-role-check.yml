@@ -40,12 +40,16 @@ jobs:
           ansible-playbook --syntax-check .github/ci/darwin-assumptions.yml
           ansible-playbook --syntax-check .github/ci/darwin-bare-interpreter.yml
           ansible-playbook --syntax-check .github/ci/darwin-hw-boards.yml
+          ansible-playbook --syntax-check .github/ci/darwin-fleet-roles.yml
 
       - name: Check Darwin restart and pip assumptions
         run: ansible-playbook .github/ci/darwin-assumptions.yml
 
       - name: Check Darwin companion services and watchdog
         run: ansible-playbook .github/ci/darwin-companions.yml
+
+      - name: Check Darwin fleet roles (SSH, Alloy, smartctl)
+        run: ansible-playbook -e render_out="$RUNNER_TEMP/darwin-fleet" .github/ci/darwin-fleet-roles.yml
 
       - name: Run Darwin database seed tests
         env:
@@ -91,6 +95,13 @@ jobs:
             python3 -c 'import plistlib, sys; plistlib.load(open(sys.argv[1], "rb"))' "$f"
           done
           python3 -m py_compile ./*/rotpipe.py
+
+      - name: Validate fleet-rendered plists
+        working-directory: ${{ runner.temp }}/darwin-fleet
+        run: |
+          for f in ./*.plist; do
+            python3 -c 'import plistlib, sys; plistlib.load(open(sys.argv[1], "rb"))' "$f"
+          done
 
   asic:
     name: Darwin ASIC tests (${{ matrix.ansible }}, ${{ matrix.group }})

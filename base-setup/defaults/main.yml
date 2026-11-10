@@ -1,3 +1,6 @@
 ---
 base_setup_disable_ssh_password_login: true
 base_setup_disable_ssh_root_login: true
+# Darwin: account whose authorized_keys prove key-based login still works
+# before password authentication is disabled. Defaults to the Ansible login.
+base_setup_ssh_login: "{{ ansible_user | default('') }}"

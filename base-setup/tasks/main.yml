@@ -1,18 +1,10 @@
 ---
-- name: Disable password login for SSH
-  become: true
-  ansible.builtin.lineinfile:
-    path: "/etc/ssh/sshd_config"
-    regexp: "^PasswordAuthentication"
-    line: "PasswordAuthentication no"
-  notify: restart-ssh
-  when: base_setup_disable_ssh_password_login | bool
+# Linux (sshd service) and Darwin (launchd com.openssh.sshd) are separate task
+# files. Darwin never falls through into the Linux tasks.
+- name: Harden SSH on Darwin
+  ansible.builtin.include_tasks: darwin.yml
+  when: ansible_os_family == "Darwin"
 
-- name: Disable root login for SSH
-  become: true
-  ansible.builtin.lineinfile:
-    path: "/etc/ssh/sshd_config"
-    regexp: "^PermitRootLogin"
-    line: "PermitRootLogin no"
-  notify: restart-ssh
-  when: base_setup_disable_ssh_root_login | bool
+- name: Harden SSH on Linux
+  ansible.builtin.include_tasks: linux.yml
+  when: ansible_os_family != "Darwin"
