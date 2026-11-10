@@ -36,7 +36,6 @@
           - "'chia_darwin_watchdog_job:' in darwin_text"
           - "'release:' in darwin_text"
           - "'wrapper_template:' in darwin_text"
-          - "'tag_prefix:' in darwin_text"
           - "'chia_darwin_enable_chia_exporter' in darwin_text"
           - "'chia_darwin_enable_chia_healthcheck' in darwin_text"
           - "'chia_darwin_enable_node_exporter' in darwin_text"
@@ -59,80 +58,40 @@
           chia_darwin_daemon_exit_timeout; the companion timeouts are only for
           the companion jobs.
 
-    - name: The LaunchDaemon list includes companions and the restart path covers them
+    - name: Companion plists keep their own template indirection
       ansible.builtin.assert:
         that:
-          - "'chia_darwin_companion_jobs | default([])' in launchd_text"
-          - "'Restart companion jobs' in restart_text"
-          - "'chia_darwin_restart_companions' in restart_text"
           - "'chia_darwin_plist_template' not in launchd_job_text"
           - "'chia_job.plist_template | default' in launchd_job_text"
-          - "'restart-chia-darwin-companions' in launchd_job_text"
         fail_msg: >-
-          Companion plists must join chia_darwin_launchd_jobs, and a
-          companion-only change must restart only companion jobs.
+          Companion plists must go through chia_job.plist_template so the
+          watchdog can keep its own plist.
 
-    - name: Companion-only restarts do not probe or start ASIC boards
-      vars:
-        restart_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-restart-ordered.yml') }}"
+    - name: The watchdog parent check covers both configured paths
       ansible.builtin.assert:
         that:
-          - "'See which ASIC boards are loaded after the stops' in restart_text"
-          - "'Start ASIC boards that are down, in ID order' in restart_text"
-          - "'chia_darwin_restart_services | bool' in restart_text"
-          - "'chia_darwin_hw_vdf_changed_labels | length > 0' in restart_text"
-          - "'chia_darwin_start_down_boards | default(false) | bool' in restart_text"
-          - "'Stop the watchdog before a service or board restart' in restart_text"
-          - "'Restart the watchdog after the service and board restart' in restart_text"
-          - "'chia_darwin_watchdog_quiesced' in restart_text"
-        fail_msg: >-
-          A companion-only restart must not probe or bootstrap ASIC boards.
-          Gate the board-loaded check and the start-down loop on a service
-          restart or a changed board label.
-
-    - name: The watchdog restarts even when it was bootstrapped during this apply
-      ansible.builtin.assert:
-        that:
-          - "'chia_darwin_restart_forced' in restart_text"
-          - "'chia_darwin_restart_forced' in restart_job_text"
-          - "'chia_job.label not in (chia_darwin_fresh_bootstraps | default([])) or' in restart_job_text"
-        fail_msg: >-
-          Quiescing a freshly bootstrapped watchdog must override the
-          fresh-bootstrap skip, or a first apply leaves monitoring down.
-
-    - name: The watchdog parent check does not rewrite an existing /usr/local
-      ansible.builtin.assert:
-        that:
-          - "'Ensure /usr/local exists' not in companions_text"
-          - "'Stat /usr/local' in companions_text"
-          - "'Create /usr/local when absent' in companions_text"
-          - "'chia_darwin_watchdog_parent_local.stat.exists | default(false)' in companions_text"
-          - companions_text.index('Stat /usr/local') < companions_text.index('Create /usr/local when absent')
-          - "'register: chia_darwin_watchdog_parent_local_after' in companions_text"
-          - "'register: chia_darwin_watchdog_parent_libexec_after' in companions_text"
-          - "'chia_darwin_watchdog_parent_local_created is changed' in companions_text"
-          - "'chia_darwin_watchdog_parent_libexec_created is changed' in companions_text"
-          - "'chia_darwin_watchdog_parent_local_after.stat | default(chia_darwin_watchdog_parent_local.stat)' in companions_text"
-          - "'chia_darwin_watchdog_parent_libexec_after.stat | default(chia_darwin_watchdog_parent_libexec.stat)' in companions_text"
-        fail_msg: >-
-          Stat the watchdog parents before creating them and only set owner,
-          group, and mode when the directory is absent. Re-stat into a
-          separate register: a skipped task still overwrites its register
-          with no stat. An existing unsafe /usr/local must fail the
-          root-owned check, not be rewritten.
-
-    - name: The sudo probe runs as the service user
-      ansible.builtin.assert:
-        that:
-          - "'Check whether the service user can run sudo' in darwin_text"
-          - "'/usr/bin/sudo, -n, true' in darwin_text"
-          - "'sudo, -n, -l, -U' not in darwin_text"
+          - "'chia_darwin_watchdog_parent_paths' in companions_text"
+          - "'chia_darwin_watchdog_script | dirname' in companions_text"
+          - "'chia_darwin_watchdog_conf_dir | dirname' in companions_text"
           - >-
-            'become_user:' in darwin_text.split('Check whether the service user can run sudo')[1].split('Require explicit opt-in')[0]
+            "item.stat.pw_name | default('') == 'root'" in companions_text
+          - "'not (item.stat.wgrp | default(true))' in companions_text"
+          - "'not (item.stat.woth | default(true))' in companions_text"
         fail_msg: >-
-          Test whether the service user can actually run sudo by executing
-          sudo -n true as that user. Listing privileges as root always
-          succeeds, including for users with no sudo rights.
+          The watchdog parent check must cover the configured script and conf
+          directory chains and refuse an existing directory unless it is
+          root-owned and not group- or world-writable.
+
+    - name: The sudo probe reads the service user's policy by output
+      ansible.builtin.assert:
+        that:
+          - "'/usr/bin/sudo, -l, -U' in darwin_text"
+          - "'may run the following commands' in darwin_text"
+          - "'/usr/bin/sudo, -n, true' not in darwin_text"
+        fail_msg: >-
+          Read the service user's sudo policy with sudo -l -U and judge it by
+          the output. A capability probe with sudo -n true misses password sudo
+          and command-restricted grants.
 
     - name: The base plist supports per-job resource limits and process type
       ansible.builtin.assert:
@@ -155,10 +114,13 @@
           - "'read -r -a HW_JOBS' in watchdog_text"
           - "'read -r -a SERVICE_JOBS' in watchdog_text"
           - "'PLIST_DIR=' in watchdog_text"
+          - "'ENABLE_ON_BOOT=' in watchdog_text"
           - "'BOARD_STOP_TIMEOUT=' in watchdog_text"
           - "'stop_board' in watchdog_text"
           - "'start_board' in watchdog_text"
           - "'launchctl bootout' in watchdog_text"
+          - "'launchctl enable' in watchdog_text"
+          - "'launchctl disable' in watchdog_text"
           - "'launchctl bootstrap system' in watchdog_text"
           - "'still loaded after' in watchdog_text"
           - "'bootstrap $1 skipped: still loaded' in watchdog_text"

@@ -128,3 +128,58 @@
           - '''CHECK_EXPORTER="1"'' in text'
           - '''CHECK_NODE="1"'' in text'
           - '''EXPECTED_VDFS="3"'' in text'
+
+    - name: Read the local watchdog
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/local-external/chia-watchdog.sh"
+      register: local_watchdog
+
+    - name: The local watchdog checks the local full node
+      vars:
+        text: "{{ local_watchdog.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - >-
+            'CHECK_FULL_NODE="1"' in text
+          - >-
+            'SERVICE_JOB_LIST="daemon full-node timelord"' in text
+          - >-
+            'CHECK_HEALTHCHECK="1"' in text
+          - >-
+            'CHECK_EXPORTER="1"' in text
+          - >-
+            'CHECK_NODE="1"' in text
+          - >-
+            'EXPECTED_VDFS="3"' in text
+          - "'ENABLE_ON_BOOT=1' in text"
+
+    - name: Create the no-boot watchdog fixture directory
+      ansible.builtin.file:
+        path: "{{ render_out }}/watchdog-no-boot-start"
+        state: directory
+        mode: "0755"
+
+    - name: Render the watchdog with start_on_boot false
+      ansible.builtin.template:
+        src: "../../chia-blockchain/templates/darwin/chia-watchdog.sh.j2"
+        dest: "{{ render_out }}/watchdog-no-boot-start/chia-watchdog.sh"
+        mode: "0644"
+      vars:
+        chia_darwin_topology: local-external
+        chia_darwin_start_on_boot: false
+
+    - name: Read the no-boot watchdog
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/watchdog-no-boot-start/chia-watchdog.sh"
+      register: no_boot_watchdog
+
+    - name: start_on_boot false enables a board only for the watchdog start
+      vars:
+        text: "{{ no_boot_watchdog.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - "'ENABLE_ON_BOOT=0' in text"
+          - >-
+            'launchctl enable "system/$PREFIX.$1"' in text
+          - >-
+            'launchctl disable "system/$PREFIX.$1"' in text

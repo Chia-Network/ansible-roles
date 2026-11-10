@@ -113,17 +113,7 @@ jobs:
         env:
           ANSIBLE_ROLES_PATH: ${{ github.workspace }}
         run: |
-          case "${{ matrix.group }}" in
-            inventory)
-              ansible-playbook -e render_out="$RUNNER_TEMP/darwin-asic-inventory" .github/ci/darwin-hw-boards-validate.yml
-              ansible-playbook -e render_out="$RUNNER_TEMP/darwin-asic-inventory" .github/ci/darwin-hw-boards-discover.yml
-              ansible-playbook -e render_out="$RUNNER_TEMP/darwin-asic-inventory" .github/ci/darwin-hw-boards-render.yml
-              ;;
-            launchd)
-              ansible-playbook -e render_out="$RUNNER_TEMP/darwin-asic-launchd" .github/ci/darwin-hw-boards-launchd.yml
-              ;;
-            takeover)
-              ansible-playbook -e render_out="$RUNNER_TEMP/darwin-asic-takeover" .github/ci/darwin-hw-boards-takeover.yml
-              ansible-playbook -e render_out="$RUNNER_TEMP/darwin-asic-takeover" .github/ci/darwin-hw-boards-restart.yml
-              ;;
-          esac
+          ansible-playbook \
+            -e render_out="$RUNNER_TEMP/darwin-asic-${{ matrix.group }}" \
+            --tags "${{ matrix.group }}" \
+            .github/ci/darwin-hw-boards.yml

@@ -52,6 +52,11 @@
 - name: Run pending LaunchDaemon restarts
   ansible.builtin.meta: flush_handlers
 
+- name: Apply the ordered LaunchDaemon restart
+  ansible.builtin.include_role:
+    name: chia-blockchain-test
+    tasks_from: darwin-restart-ordered.yml
+
 - name: Read the launchctl log for this apply
   when: launch_log is defined
   ansible.builtin.slurp:

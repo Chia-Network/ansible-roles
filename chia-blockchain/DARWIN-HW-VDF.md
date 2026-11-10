@@ -241,7 +241,9 @@ and the same restart path as the core jobs:
 Set `chia_darwin_enable_chia_exporter`, `chia_darwin_enable_chia_healthcheck`,
 `chia_darwin_enable_node_exporter`, or `chia_darwin_enable_watchdog` to false to
 remove the role's job at that label; installed binaries and wrappers are left
-in place. The role does not adopt a differently-owned plist at the same label.
+in place. Companion jobs replace the plist at the same label; unlike the ASIC
+slots, they have no ownership guard, so enabling one takes over a hand-written
+companion plist with that label.
 On Darwin this role replaces the Linux `chia-exporter`, `chia-healthcheck`, and
 `prometheus-node-exporter` roles; do not include those roles in the same play or
 they will try to manage the same ports with systemd or Homebrew services.
@@ -274,6 +276,11 @@ Linux triggers:
 - The exporter ports not listening for three cycles kickstart that exporter
   job.
 - If the healthcheck itself is unreachable, only the healthcheck is restarted.
+
+Board restarts enable the job before bootstrap and disable it again when
+`start_on_boot` is false, matching the role's restart helper. The role's own
+ordered restart stops the watchdog first and restores it even when a service or
+board restart fails, so a failed apply does not leave monitoring down.
 
 Checks for a disabled companion service are skipped, and the full-stack
 restart only kicks the core service jobs that are enabled.

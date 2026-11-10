@@ -24,6 +24,7 @@ VDF_PORT={{ chia_timelord_launcher_port | int }}
 HC=http://127.0.0.1:{{ chia_darwin_chia_healthcheck_port | int }}
 PREFIX={{ chia_darwin_launchd_prefix }}
 PLIST_DIR={{ chia_darwin_launchd_dir }}
+ENABLE_ON_BOOT={{ 1 if chia_darwin_start_on_boot | bool else 0 }}
 BOARD_STOP_TIMEOUT={{ chia_darwin_watchdog_board_stop_timeout | int }}
 CONF_DIR={{ chia_darwin_watchdog_conf_dir }}
 TOKEN_FILE=$CONF_DIR/alert-token
@@ -123,7 +124,14 @@ start_board() { # label
 		return 1
 	fi
 	if [ -f "$PLIST_DIR/$PREFIX.$1.plist" ]; then
-		launchctl bootstrap system "$PLIST_DIR/$PREFIX.$1.plist" >>"$LOG" 2>&1 || log "bootstrap $1 failed"
+		launchctl enable "system/$PREFIX.$1" >>"$LOG" 2>&1 ||
+			log "enable $1 failed"
+		launchctl bootstrap system "$PLIST_DIR/$PREFIX.$1.plist" >>"$LOG" 2>&1 ||
+			log "bootstrap $1 failed"
+		if [ "$ENABLE_ON_BOOT" = 0 ]; then
+			launchctl disable "system/$PREFIX.$1" >>"$LOG" 2>&1 ||
+				log "disable $1 failed"
+		fi
 	else
 		log "bootstrap $1 skipped: missing $PLIST_DIR/$PREFIX.$1.plist"
 	fi

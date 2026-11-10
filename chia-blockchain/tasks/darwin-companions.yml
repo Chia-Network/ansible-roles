@@ -148,86 +148,56 @@
 - name: Install the watchdog
   when: chia_darwin_enable_watchdog | bool
   block:
-    - name: Stat /usr/local
+    - name: List the watchdog parent directories
+      ansible.builtin.set_fact:
+        chia_darwin_watchdog_parent_paths: >-
+          {{
+            [
+              chia_darwin_watchdog_script | dirname,
+              chia_darwin_watchdog_script | dirname | dirname,
+              chia_darwin_watchdog_script | dirname | dirname | dirname,
+              chia_darwin_watchdog_script | dirname | dirname | dirname | dirname,
+              chia_darwin_watchdog_conf_dir,
+              chia_darwin_watchdog_conf_dir | dirname,
+              chia_darwin_watchdog_conf_dir | dirname | dirname,
+              chia_darwin_watchdog_conf_dir | dirname | dirname | dirname
+            ] | reject('equalto', '/') | unique | list
+          }}
+      changed_when: false
+
+    - name: Stat the watchdog parent directories
       become: true
       ansible.builtin.stat:
-        path: /usr/local
-      register: chia_darwin_watchdog_parent_local
+        path: "{{ item }}"
+      loop: "{{ chia_darwin_watchdog_parent_paths }}"
+      register: chia_darwin_watchdog_parent_stats
 
-    - name: Create /usr/local when absent
-      become: true
-      ansible.builtin.file:
-        path: /usr/local
-        state: directory
-        owner: root
-        group: wheel
-        mode: "0755"
-      register: chia_darwin_watchdog_parent_local_created
-      when: not (chia_darwin_watchdog_parent_local.stat.exists | default(false))
-
-    - name: Re-stat /usr/local after creating it
-      become: true
-      ansible.builtin.stat:
-        path: /usr/local
-      register: chia_darwin_watchdog_parent_local_after
-      when: chia_darwin_watchdog_parent_local_created is changed
-
-    - name: Stat /usr/local/libexec
-      become: true
-      ansible.builtin.stat:
-        path: /usr/local/libexec
-      register: chia_darwin_watchdog_parent_libexec
-
-    - name: Create /usr/local/libexec when absent
-      become: true
-      ansible.builtin.file:
-        path: /usr/local/libexec
-        state: directory
-        owner: root
-        group: wheel
-        mode: "0755"
-      register: chia_darwin_watchdog_parent_libexec_created
-      when: not (chia_darwin_watchdog_parent_libexec.stat.exists | default(false))
-
-    - name: Re-stat /usr/local/libexec after creating it
-      become: true
-      ansible.builtin.stat:
-        path: /usr/local/libexec
-      register: chia_darwin_watchdog_parent_libexec_after
-      when: chia_darwin_watchdog_parent_libexec_created is changed
-
-    - name: Require root-owned, non-writable watchdog parents
+    - name: Refuse unsafe existing watchdog parent directories
       ansible.builtin.assert:
         that:
-          - item.stat.exists | default(false)
-          - item.stat.pw_name | default('') == 'root'
-          - not (item.stat.wgrp | default(true))
-          - not (item.stat.woth | default(true))
+          - not (item.stat.exists | default(false)) or
+            (item.stat.pw_name | default('') == 'root' and
+            not (item.stat.wgrp | default(true)) and
+            not (item.stat.woth | default(true)))
         fail_msg: >-
-          {{ item.path }} must be root-owned and not group- or
-          world-writable before this role installs a root-run watchdog below
-          it.
-      loop:
-        - path: /usr/local
-          stat: "{{ chia_darwin_watchdog_parent_local_after.stat | default(chia_darwin_watchdog_parent_local.stat) }}"
-        - path: /usr/local/libexec
-          stat: "{{ chia_darwin_watchdog_parent_libexec_after.stat | default(chia_darwin_watchdog_parent_libexec.stat) }}"
+          {{ item.item }} must be root-owned and not group- or world-writable
+          when it already exists.
+      loop: "{{ chia_darwin_watchdog_parent_stats.results }}"
       loop_control:
-        label: "{{ item.path }}"
+        label: "{{ item.item }}"
 
-    - name: Ensure the watchdog directories exist
+    - name: Create missing watchdog parent directories
       become: true
       ansible.builtin.file:
-        path: "{{ item.path }}"
+        path: "{{ item.item }}"
         state: directory
         owner: root
         group: wheel
-        mode: "{{ item.mode }}"
-      loop:
-        - path: "{{ chia_darwin_watchdog_script | dirname }}"
-          mode: "0755"
-        - path: "{{ chia_darwin_watchdog_conf_dir }}"
-          mode: "0700"
+        mode: "{{ '0700' if item.item == chia_darwin_watchdog_conf_dir else '0755' }}"
+      loop: "{{ chia_darwin_watchdog_parent_stats.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when: not (item.stat.exists | default(false))
 
     - name: Install the watchdog script
       become: true

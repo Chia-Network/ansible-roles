@@ -200,19 +200,29 @@
       (output: {{ chia_darwin_admin_check.stdout | default('') | trim }}). The
       ASIC timelord account must be a dedicated non-admin local user.
 
-- name: Check whether the service user can run sudo
+- name: Read the service user's sudo policy
   become: true
-  become_user: "{{ user }}"
   ansible.builtin.command:
-    argv: [/usr/bin/sudo, -n, true]
+    argv: [/usr/bin/sudo, -l, -U, "{{ user }}"]
+  environment:
+    LC_ALL: C
   register: chia_darwin_service_user_sudo
   changed_when: false
   failed_when: false
+  check_mode: false
+
+- name: Fail when the service user's sudo policy cannot be read
+  ansible.builtin.assert:
+    that:
+      - (chia_darwin_service_user_sudo.rc | default(1) | int) == 0
+    fail_msg: >-
+      sudo -l -U {{ user }} failed, so the role cannot tell whether the
+      service account is root-capable. Check the sudoers policy.
 
 - name: Require explicit opt-in for a root-capable service user
   ansible.builtin.assert:
     that:
-      - (chia_darwin_service_user_sudo.rc | default(1) | int) != 0 or (chia_darwin_allow_root_capable_service_user | bool)
+      - "'may run the following commands' not in (chia_darwin_service_user_sudo.stdout | default('')) or (chia_darwin_allow_root_capable_service_user | bool)"
     fail_msg: >-
       {{ user }} has sudo rights. A root-capable service account is a weaker
       posture than the Linux split. Keep the SSH/sudo account separate, or set
@@ -225,7 +235,7 @@
       weaker posture than the Linux split; the network-facing service account
       is root-capable.
   when:
-    - (chia_darwin_service_user_sudo.rc | default(1) | int) == 0
+    - "'may run the following commands' in (chia_darwin_service_user_sudo.stdout | default(''))"
     - chia_darwin_allow_root_capable_service_user | bool
 
 - name: Apply pmset so the host stays awake
@@ -790,6 +800,15 @@
 
 - name: Remove retired hw_vdf wrappers
   ansible.builtin.include_tasks: darwin-hw-vdf-retire.yml
+
+# Handlers only record which restart is needed. Run the ordered restart as a
+# normal task so its block/always can restore the watchdog after a failure;
+# handlers cannot contain blocks.
+- name: Flush pending Darwin restart notifications
+  ansible.builtin.meta: flush_handlers
+
+- name: Apply the ordered Darwin restart
+  ansible.builtin.include_tasks: darwin-restart-ordered.yml
 
 - name: Note the testnet full node port
   ansible.builtin.debug:
