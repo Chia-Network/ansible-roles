@@ -35,9 +35,11 @@
       - user | length > 0
       - user != "ubuntu"
     fail_msg: >-
-      Set user to the dedicated non-admin account the LaunchDaemons run as
-      (the reference host uses timelord). The Linux default user ubuntu is
-      refused on Darwin. SSH as an admin; user is not the SSH login.
+      Set user to the dedicated non-admin service account the LaunchDaemons
+      run as. The Linux default user ubuntu is refused on Darwin. Keep the
+      SSH/automation account separate; using the service account as that login
+      requires chia_darwin_allow_root_capable_service_user and a weaker
+      posture.
 
 - name: Require a remote full node when this Mac does not run one
   ansible.builtin.assert:
@@ -85,49 +87,65 @@
         exit_timeout: "{{ chia_darwin_timelord_exit_timeout }}"
         enabled: true
 
-# remote-node has no local full node, so the watchdog must not treat
-# /full_node as a required healthcheck there.
-- name: Record whether the watchdog should check the local full node
-  ansible.builtin.set_fact:
-    chia_darwin_watchdog_full_node_enabled: >-
-      {{ (chia_darwin_service_jobs | selectattr('name', 'equalto', 'full-node')
-          | selectattr('enabled', 'equalto', true) | list | length) > 0 }}
-  changed_when: false
-
 # Companion jobs mirror the Linux timelord host. They are separate from
 # chia_darwin_service_jobs so a companion-only change does not bounce the
-# daemon, full node, timelord, or ASIC boards.
+# daemon, full node, timelord, or ASIC boards. The release dict drives the
+# download/unpack/install loop; wrapper_template drives the wrapper loop.
 - name: Build the Darwin companion LaunchDaemon job list
   ansible.builtin.set_fact:
     chia_darwin_companion_jobs:
       - name: chia-exporter
         label: "{{ chia_darwin_launchd_prefix }}.chia-exporter"
         wrapper: "{{ chia_darwin_bin_dir }}/chia-exporter-run.sh"
+        wrapper_template: darwin/chia-exporter-run.sh.j2
+        release:
+          repository: Chia-Network/chia-exporter
+          tag_prefix: ""
+          tag: "{{ chia_darwin_chia_exporter_version }}"
+          archive: chia-exporter-darwin-arm64.zip
+          unpack: chia-exporter-darwin-arm64
+          binary: chia-exporter
+          checksum: "{{ chia_darwin_chia_exporter_sha256 }}"
         throttle: "{{ chia_darwin_companion_throttle_interval }}"
         exit_timeout: "{{ chia_darwin_companion_exit_timeout }}"
         nofile: 8192
-        run_at_load: true
-        process_type: ""
+        process_type: Standard
         companion: true
         enabled: "{{ chia_darwin_enable_chia_exporter | bool }}"
       - name: chia-healthcheck
         label: "{{ chia_darwin_launchd_prefix }}.chia-healthcheck"
         wrapper: "{{ chia_darwin_bin_dir }}/chia-healthcheck-run.sh"
+        wrapper_template: darwin/chia-healthcheck-run.sh.j2
+        release:
+          repository: Chia-Network/chia-healthcheck
+          tag_prefix: ""
+          tag: "{{ chia_darwin_chia_healthcheck_version }}"
+          archive: chia-healthcheck-darwin-arm64.zip
+          unpack: chia-healthcheck-darwin-arm64
+          binary: chia-healthcheck
+          checksum: "{{ chia_darwin_chia_healthcheck_sha256 }}"
         throttle: "{{ chia_darwin_companion_throttle_interval }}"
         exit_timeout: "{{ chia_darwin_companion_exit_timeout }}"
         nofile: 8192
-        run_at_load: true
-        process_type: ""
+        process_type: Standard
         companion: true
         enabled: "{{ chia_darwin_enable_chia_healthcheck | bool }}"
       - name: node-exporter
         label: "{{ chia_darwin_launchd_prefix }}.node-exporter"
         wrapper: "{{ chia_darwin_bin_dir }}/node-exporter-run.sh"
+        wrapper_template: darwin/node-exporter-run.sh.j2
+        release:
+          repository: prometheus/node_exporter
+          tag_prefix: v
+          tag: "{{ chia_darwin_node_exporter_version }}"
+          archive: "node_exporter-{{ chia_darwin_node_exporter_version }}.darwin-arm64.tar.gz"
+          unpack: "node_exporter-{{ chia_darwin_node_exporter_version }}.darwin-arm64"
+          binary: node_exporter
+          checksum: "{{ chia_darwin_node_exporter_sha256 }}"
         throttle: "{{ chia_darwin_companion_throttle_interval }}"
         exit_timeout: "{{ chia_darwin_companion_exit_timeout }}"
         nofile: 8192
-        run_at_load: true
-        process_type: ""
+        process_type: Standard
         companion: true
         enabled: "{{ chia_darwin_enable_node_exporter | bool }}"
       - name: watchdog
@@ -136,10 +154,14 @@
         plist_template: darwin/chia-watchdog.plist.j2
         throttle: "{{ chia_darwin_watchdog_throttle_interval }}"
         exit_timeout: "{{ chia_darwin_watchdog_exit_timeout }}"
-        run_at_load: true
-        process_type: ""
+        process_type: Standard
         companion: true
         enabled: "{{ chia_darwin_enable_watchdog | bool }}"
+  changed_when: false
+
+- name: Select the watchdog job
+  ansible.builtin.set_fact:
+    chia_darwin_watchdog_job: "{{ chia_darwin_companion_jobs | selectattr('name', 'equalto', 'watchdog') | first }}"
   changed_when: false
 
 - name: Validate shared ASIC options before changing the host
@@ -177,6 +199,33 @@
       dseditgroup did not confirm that {{ user }} is outside the admin group
       (output: {{ chia_darwin_admin_check.stdout | default('') | trim }}). The
       ASIC timelord account must be a dedicated non-admin local user.
+
+- name: Check whether the service user has sudo
+  become: true
+  ansible.builtin.command:
+    argv: [sudo, -n, -l, -U, "{{ user }}"]
+  register: chia_darwin_service_user_sudo
+  changed_when: false
+  failed_when: false
+
+- name: Require explicit opt-in for a root-capable service user
+  ansible.builtin.assert:
+    that:
+      - (chia_darwin_service_user_sudo.rc | default(1) | int) != 0 or (chia_darwin_allow_root_capable_service_user | bool)
+    fail_msg: >-
+      {{ user }} has sudo rights. A root-capable service account is a weaker
+      posture than the Linux split. Keep the SSH/sudo account separate, or set
+      chia_darwin_allow_root_capable_service_user to true to accept it.
+
+- name: Warn about the weaker service-account posture
+  ansible.builtin.debug:
+    msg: >-
+      {{ user }} is the SSH/automation login and has sudo rights. This is a
+      weaker posture than the Linux split; the network-facing service account
+      is root-capable.
+  when:
+    - (chia_darwin_service_user_sudo.rc | default(1) | int) == 0
+    - chia_darwin_allow_root_capable_service_user | bool
 
 - name: Apply pmset so the host stays awake
   when: chia_darwin_pmset_apply | bool

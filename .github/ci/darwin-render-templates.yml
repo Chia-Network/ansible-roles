@@ -16,7 +16,6 @@
       - chia-daemon-run.sh
       - chia-env.sh
       - chia-exporter-run.sh
-      - chia-exporter.yml
       - chia-full-node-run.sh
       - chia-healthcheck-run.sh
       - chia-hw-vdf-run.sh
@@ -38,16 +37,31 @@
         chia_darwin_hw_vdf_jobs:
           - name: hw-vdf
             enabled: true
+            board:
+              n_vdfs: 1
           - name: hw-vdf-2
             enabled: true
+            board:
+              n_vdfs: 1
           - name: hw-vdf-3
             enabled: true
+            board:
+              n_vdfs: 1
         chia_darwin_service_jobs:
           - name: daemon
             enabled: true
           - name: full-node
             enabled: true
           - name: timelord
+            enabled: true
+        chia_darwin_companion_jobs:
+          - name: chia-exporter
+            enabled: true
+          - name: chia-healthcheck
+            enabled: true
+          - name: node-exporter
+            enabled: true
+          - name: watchdog
             enabled: true
         chia_job:
           name: timelord
@@ -73,3 +87,44 @@
       loop: "{{ topologies | product(templates) | list }}"
       loop_control:
         label: "{{ item.0 }}/{{ item.1 }}"
+
+    - name: Create the remote-node watchdog fixture directory
+      ansible.builtin.file:
+        path: "{{ render_out }}/remote-node-no-full-node"
+        state: directory
+        mode: "0755"
+
+    - name: Set the remote-node service list without a local full node
+      ansible.builtin.set_fact:
+        chia_darwin_service_jobs:
+          - name: daemon
+            enabled: true
+          - name: full-node
+            enabled: false
+          - name: timelord
+            enabled: true
+
+    - name: Render the remote-node watchdog with no local full node
+      ansible.builtin.template:
+        src: "../../chia-blockchain/templates/darwin/chia-watchdog.sh.j2"
+        dest: "{{ render_out }}/remote-node-no-full-node/chia-watchdog.sh"
+        mode: "0644"
+      vars:
+        chia_darwin_topology: remote-node
+
+    - name: Read the remote-node watchdog
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/remote-node-no-full-node/chia-watchdog.sh"
+      register: remote_node_watchdog
+
+    - name: The remote-node watchdog omits the full-node check and restart
+      vars:
+        text: "{{ remote_node_watchdog.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - '''CHECK_FULL_NODE="0"'' in text'
+          - '''SERVICE_JOB_LIST="daemon timelord"'' in text'
+          - '''CHECK_HEALTHCHECK="1"'' in text'
+          - '''CHECK_EXPORTER="1"'' in text'
+          - '''CHECK_NODE="1"'' in text'
+          - '''EXPECTED_VDFS="3"'' in text'

@@ -2,15 +2,8 @@
 # Companion services that the Linux timelord host runs alongside chia:
 # chia-exporter, chia-healthcheck, node_exporter, and a monit-equivalent
 # watchdog. Binaries are pinned release artifacts, not Homebrew services, so
-# they run as the timelord user under the same LaunchDaemon prefix as the core
+# they run as the service user under the same LaunchDaemon prefix as the core
 # jobs. A companion-only change restarts only these jobs.
-- name: Count the VDF connections the watchdog expects
-  ansible.builtin.set_fact:
-    chia_darwin_watchdog_expected_vdfs: >-
-      {{ chia_darwin_hw_vdf_jobs | selectattr('enabled', 'equalto', true)
-        | map(attribute='board') | map(attribute='n_vdfs') | map('int') | sum }}
-  changed_when: false
-
 - name: Confirm the companion CHIA_ROOT is readable by the service user
   when: chia_darwin_enable_chia_exporter | bool or chia_darwin_enable_chia_healthcheck | bool
   block:
@@ -30,8 +23,8 @@
           {{ user }} cannot read
           {{ chia_darwin_companion_chia_root }}/config/config.yaml.
           Set chia_darwin_companion_chia_root to the CHIA_ROOT the exporter
-          and healthcheck should use. The reference M6 host keeps a read-only
-          config copy in ~/.chia-monitor; a new host can use chia_root.
+          and healthcheck should use. A host may point it at a read-only
+          config copy; otherwise leave it at chia_root.
 
 - name: Ensure companion directories exist
   become: true
@@ -45,46 +38,14 @@
     - "{{ chia_darwin_companion_download_dir }}"
   when: chia_darwin_install_companion_binaries | bool
 
-- name: Build the companion binary list
-  ansible.builtin.set_fact:
-    chia_darwin_companion_binaries:
-      - name: chia-exporter
-        enabled: "{{ chia_darwin_enable_chia_exporter | bool }}"
-        version: "{{ chia_darwin_chia_exporter_version }}"
-        repository: Chia-Network/chia-exporter
-        archive: "chia-exporter-darwin-arm64.zip"
-        unpack: chia-exporter-darwin-arm64
-        binary: chia-exporter
-        format: zip
-        checksum: "{{ chia_darwin_chia_exporter_sha256 }}"
-      - name: chia-healthcheck
-        enabled: "{{ chia_darwin_enable_chia_healthcheck | bool }}"
-        version: "{{ chia_darwin_chia_healthcheck_version }}"
-        repository: Chia-Network/chia-healthcheck
-        archive: "chia-healthcheck-darwin-arm64.zip"
-        unpack: chia-healthcheck-darwin-arm64
-        binary: chia-healthcheck
-        format: zip
-        checksum: "{{ chia_darwin_chia_healthcheck_sha256 }}"
-      - name: node_exporter
-        enabled: "{{ chia_darwin_enable_node_exporter | bool }}"
-        version: "{{ chia_darwin_node_exporter_version }}"
-        repository: prometheus/node_exporter
-        archive: "node_exporter-{{ chia_darwin_node_exporter_version }}.darwin-arm64.tar.gz"
-        unpack: "node_exporter-{{ chia_darwin_node_exporter_version }}.darwin-arm64"
-        binary: node_exporter
-        format: tar
-        checksum: "{{ chia_darwin_node_exporter_sha256 }}"
-  changed_when: false
-
 - name: Create the companion download directories
   become: true
   become_user: "{{ user }}"
   ansible.builtin.file:
-    path: "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.version }}"
+    path: "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.release.tag }}"
     state: directory
     mode: "0755"
-  loop: "{{ chia_darwin_companion_binaries }}"
+  loop: "{{ chia_darwin_companion_jobs | selectattr('release', 'defined') | list }}"
   loop_control:
     label: "{{ item.name }}"
   when:
@@ -96,65 +57,48 @@
   become_user: "{{ user }}"
   ansible.builtin.get_url:
     url: >-
-      https://github.com/{{ item.repository }}/releases/download/{{ 'v' if item.repository == 'prometheus/node_exporter' else '' }}{{ item.version }}/{{ item.archive }}
-    dest: "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.version }}/{{ item.archive }}"
-    checksum: "{{ ('sha256:' ~ item.checksum) if item.checksum | default('') | length > 0 else omit }}"
+      https://github.com/{{ item.release.repository }}/releases/download/{{ item.release.tag_prefix }}{{ item.release.tag }}/{{ item.release.archive }}
+    dest: "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.release.tag }}/{{ item.release.archive }}"
+    checksum: "{{ ('sha256:' ~ item.release.checksum) if item.release.checksum | default('') | length > 0 else omit }}"
     mode: "0644"
-  loop: "{{ chia_darwin_companion_binaries }}"
+  loop: "{{ chia_darwin_companion_jobs | selectattr('release', 'defined') | list }}"
   loop_control:
     label: "{{ item.name }}"
   when:
     - chia_darwin_install_companion_binaries | bool
     - item.enabled | bool
 
-- name: Unpack the zip companion archives
-  become: true
-  become_user: "{{ user }}"
-  ansible.builtin.unarchive:
-    src: "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.version }}/{{ item.archive }}"
-    dest: "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.version }}"
-    remote_src: true
-    creates: "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.version }}/{{ item.unpack }}/{{ item.binary }}"
-  loop: "{{ chia_darwin_companion_binaries }}"
-  loop_control:
-    label: "{{ item.name }}"
-  when:
-    - chia_darwin_install_companion_binaries | bool
-    - item.enabled | bool
-    - item.format == 'zip'
-
-# macOS ships BSD tar. ansible.builtin.unarchive insists on GNU tar, so use
-# the native tar for the node_exporter tarball and keep the creates guard.
-- name: Unpack the tar companion archives
+# macOS /usr/bin/tar is bsdtar. It extracts both zip and tar.gz, so one task
+# replaces unarchive (which insists on GNU tar) and the previous format split.
+- name: Unpack the companion archives
   become: true
   become_user: "{{ user }}"
   ansible.builtin.command:
     argv:
       - /usr/bin/tar
-      - -xzf
-      - "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.version }}/{{ item.archive }}"
+      - -xf
+      - "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.release.tag }}/{{ item.release.archive }}"
       - -C
-      - "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.version }}"
-    creates: "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.version }}/{{ item.unpack }}/{{ item.binary }}"
-  loop: "{{ chia_darwin_companion_binaries }}"
+      - "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.release.tag }}"
+    creates: "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.release.tag }}/{{ item.release.unpack }}/{{ item.release.binary }}"
+  loop: "{{ chia_darwin_companion_jobs | selectattr('release', 'defined') | list }}"
   loop_control:
     label: "{{ item.name }}"
   when:
     - chia_darwin_install_companion_binaries | bool
     - item.enabled | bool
-    - item.format == 'tar'
 
 - name: Install the companion binaries
   become: true
   become_user: "{{ user }}"
   ansible.builtin.copy:
-    src: "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.version }}/{{ item.unpack }}/{{ item.binary }}"
-    dest: "{{ chia_darwin_companion_bin_dir }}/{{ item.binary }}"
+    src: "{{ chia_darwin_companion_download_dir }}/{{ item.name }}-{{ item.release.tag }}/{{ item.release.unpack }}/{{ item.release.binary }}"
+    dest: "{{ chia_darwin_companion_bin_dir }}/{{ item.release.binary }}"
     remote_src: true
     owner: "{{ user }}"
     group: "{{ chia_darwin_group }}"
     mode: "0755"
-  loop: "{{ chia_darwin_companion_binaries }}"
+  loop: "{{ chia_darwin_companion_jobs | selectattr('release', 'defined') | list }}"
   loop_control:
     label: "{{ item.name }}"
   when:
@@ -166,8 +110,8 @@
   become: true
   become_user: "{{ user }}"
   ansible.builtin.stat:
-    path: "{{ chia_darwin_companion_bin_dir }}/{{ item.binary }}"
-  loop: "{{ chia_darwin_companion_binaries }}"
+    path: "{{ chia_darwin_companion_bin_dir }}/{{ item.release.binary }}"
+  loop: "{{ chia_darwin_companion_jobs | selectattr('release', 'defined') | list }}"
   loop_control:
     label: "{{ item.name }}"
   register: chia_darwin_companion_binary_stat
@@ -180,45 +124,87 @@
       - item.stat.executable | default(false)
     fail_msg: >-
       {{ item.item.name }} is enabled but
-      {{ chia_darwin_companion_bin_dir }}/{{ item.item.binary }} is missing or
-      not executable. Set chia_darwin_install_companion_binaries to true or
-      install the pinned binary yourself.
+      {{ chia_darwin_companion_bin_dir }}/{{ item.item.release.binary }} is
+      missing or not executable. Set
+      chia_darwin_install_companion_binaries to true or install the pinned
+      binary yourself.
   loop: "{{ chia_darwin_companion_binary_stat.results | default([]) }}"
   loop_control:
     label: "{{ item.item.name | default('skipped') }}"
   when: item.item.enabled | default(false) | bool
 
-- name: Write the chia-exporter config
-  become: true
-  become_user: "{{ user }}"
-  ansible.builtin.template:
-    src: darwin/chia-exporter.yml.j2
-    dest: "{{ chia_darwin_home }}/.chia-exporter.yml"
-    mode: "0644"
-  when: chia_darwin_enable_chia_exporter | bool
-  notify: restart-chia-darwin-companions
-
 - name: Install companion wrapper scripts
   become: true
   become_user: "{{ user }}"
   ansible.builtin.template:
-    src: "{{ item.src }}"
-    dest: "{{ item.dest }}"
+    src: "{{ item.wrapper_template }}"
+    dest: "{{ item.wrapper }}"
     mode: "0755"
-  loop:
-    - src: darwin/chia-exporter-run.sh.j2
-      dest: "{{ chia_darwin_bin_dir }}/chia-exporter-run.sh"
-    - src: darwin/chia-healthcheck-run.sh.j2
-      dest: "{{ chia_darwin_bin_dir }}/chia-healthcheck-run.sh"
-    - src: darwin/node-exporter-run.sh.j2
-      dest: "{{ chia_darwin_bin_dir }}/node-exporter-run.sh"
+  loop: "{{ chia_darwin_companion_jobs | selectattr('wrapper_template', 'defined') | list }}"
   loop_control:
-    label: "{{ item.dest }}"
+    label: "{{ item.wrapper }}"
   notify: restart-chia-darwin-companions
 
 - name: Install the watchdog
   when: chia_darwin_enable_watchdog | bool
   block:
+    - name: Ensure /usr/local exists
+      become: true
+      ansible.builtin.file:
+        path: /usr/local
+        state: directory
+        owner: root
+        group: wheel
+        mode: "0755"
+
+    - name: Stat /usr/local
+      become: true
+      ansible.builtin.stat:
+        path: /usr/local
+      register: chia_darwin_watchdog_parent_local
+
+    - name: Stat /usr/local/libexec
+      become: true
+      ansible.builtin.stat:
+        path: /usr/local/libexec
+      register: chia_darwin_watchdog_parent_libexec
+
+    - name: Create /usr/local/libexec when absent
+      become: true
+      ansible.builtin.file:
+        path: /usr/local/libexec
+        state: directory
+        owner: root
+        group: wheel
+        mode: "0755"
+      when: not (chia_darwin_watchdog_parent_libexec.stat.exists | default(false))
+
+    - name: Re-stat /usr/local/libexec after creating it
+      become: true
+      ansible.builtin.stat:
+        path: /usr/local/libexec
+      register: chia_darwin_watchdog_parent_libexec
+      when: not (chia_darwin_watchdog_parent_libexec.stat.exists | default(false))
+
+    - name: Require root-owned, non-writable watchdog parents
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists | default(false)
+          - item.stat.pw_name | default('') == 'root'
+          - not (item.stat.wgrp | default(true))
+          - not (item.stat.woth | default(true))
+        fail_msg: >-
+          {{ item.path }} must be root-owned and not group- or
+          world-writable before this role installs a root-run watchdog below
+          it.
+      loop:
+        - path: /usr/local
+          stat: "{{ chia_darwin_watchdog_parent_local.stat | default({}) }}"
+        - path: /usr/local/libexec
+          stat: "{{ chia_darwin_watchdog_parent_libexec.stat | default({}) }}"
+      loop_control:
+        label: "{{ item.path }}"
+
     - name: Ensure the watchdog directories exist
       become: true
       ansible.builtin.file:

@@ -31,16 +31,19 @@
         that:
           - "'Build the Darwin companion LaunchDaemon job list' in (darwin_tasks | map(attribute='name') | list)"
           - "'Install the Darwin companion services and watchdog' in (darwin_tasks | map(attribute='name') | list)"
-          - "'Record whether the watchdog should check the local full node' in (darwin_tasks | map(attribute='name') | list)"
           - "'chia_darwin_companion_jobs:' in darwin_text"
+          - "'chia_darwin_watchdog_job:' in darwin_text"
+          - "'release:' in darwin_text"
+          - "'wrapper_template:' in darwin_text"
+          - "'tag_prefix:' in darwin_text"
           - "'chia_darwin_enable_chia_exporter' in darwin_text"
           - "'chia_darwin_enable_chia_healthcheck' in darwin_text"
           - "'chia_darwin_enable_node_exporter' in darwin_text"
           - "'chia_darwin_enable_watchdog' in darwin_text"
           - "'darwin-companions.yml' in darwin_text"
         fail_msg: >-
-          darwin.yml must define the four companion jobs, record whether the
-          watchdog should check the local full node, and include
+          darwin.yml must define the four companion jobs, their release and
+          wrapper metadata, select the watchdog job, and include
           darwin-companions.yml before the LaunchDaemons are installed.
 
     - name: The daemon keeps the daemon restart timeouts
@@ -78,20 +81,23 @@
           - "'chia_darwin_restart_services | bool' in restart_text"
           - "'chia_darwin_hw_vdf_changed_labels | length > 0' in restart_text"
           - "'chia_darwin_start_down_boards | default(false) | bool' in restart_text"
+          - "'Stop the watchdog before a service or board restart' in restart_text"
+          - "'Restart the watchdog after the service and board restart' in restart_text"
+          - "'chia_darwin_watchdog_quiesced' in restart_text"
         fail_msg: >-
           A companion-only restart must not probe or bootstrap ASIC boards.
           Gate the board-loaded check and the start-down loop on a service
           restart or a changed board label.
 
-    - name: The base plist supports RunAtLoad and per-job resource limits
+    - name: The base plist supports per-job resource limits and process type
       ansible.builtin.assert:
         that:
-          - "'chia_job.run_at_load' in launchd_plist_text"
+          - "'chia_job.run_at_load' not in launchd_plist_text"
           - "'chia_job.nofile' in launchd_plist_text"
-          - "'chia_job.process_type' in launchd_plist_text"
+          - "'chia_job.process_type | default' in launchd_plist_text"
         fail_msg: >-
-          The core LaunchDaemon template must keep the companion RunAtLoad,
-          nofile, and ProcessType overrides.
+          The core LaunchDaemon template must keep the per-job nofile and
+          ProcessType defaults without a RunAtLoad special case.
 
     - name: The watchdog runs as root and restarts every enabled ASIC board
       ansible.builtin.assert:
@@ -121,7 +127,6 @@
           - '''for j in "${HW_JOBS[@]}"'' in watchdog_text'
           - "'CHECK_HEALTHCHECK' in watchdog_text"
           - "'CHECK_FULL_NODE' in watchdog_text"
-          - "'chia_darwin_watchdog_full_node_enabled' in watchdog_text"
           - "'CHECK_EXPORTER' in watchdog_text"
           - "'CHECK_NODE' in watchdog_text"
         fail_msg: >-
@@ -137,12 +142,9 @@
           - chia_darwin_chia_exporter_sha256 | length == 64
           - chia_darwin_chia_healthcheck_sha256 | length == 64
           - chia_darwin_node_exporter_sha256 | length == 64
-          - "'checksum:' in companions_text"
-          - "'sha256:' in companions_text"
-          - "'format: zip' in companions_text"
-          - "'format: tar' in companions_text"
+          - "'item.release.checksum' in companions_text"
           - "'/usr/bin/tar' in companions_text"
-          - "'Unpack the tar companion archives' in companions_text"
+          - "'Unpack the companion archives' in companions_text"
           - "'restart-chia-darwin-companions' in companions_text"
           - "'alert-token' in companions_text"
           - "'webhook-url' in companions_text"
@@ -155,7 +157,6 @@
       ansible.builtin.stat:
         path: "{{ role_dir }}/templates/darwin/{{ item }}"
       loop:
-        - chia-exporter.yml.j2
         - chia-exporter-run.sh.j2
         - chia-healthcheck-run.sh.j2
         - node-exporter-run.sh.j2

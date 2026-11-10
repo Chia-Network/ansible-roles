@@ -336,7 +336,7 @@ chia_wallet_connect_to_unknown_peers: true
 #   local-internal   Local full node and timelord. CHIA_ROOT is a real directory
 #                    on the internal disk. Wrappers do not wait for a volume.
 #   local-external   Local full node and timelord. ~/.chia is a symlink to
-#                    <chia_darwin_db_volume>/dot-chia (the reference M6 layout,
+#                    <chia_darwin_db_volume>/dot-chia (for example,
 #                    /Volumes/Chia-DB). Wrappers wait until the volume is
 #                    mounted and the config file is readable. The wrapper
 #                    interpreter needs Full Disk Access; see the note this role
@@ -357,13 +357,13 @@ chia_wallet_connect_to_unknown_peers: true
 # overridden here. Run a second network under a different
 # chia_darwin_launchd_prefix so the LaunchDaemon labels do not collide.
 #
-# Connection: SSH as an account with passwordless sudo. The SSH user may own
-# the Homebrew prefix, or, when SSHing as the service user, set
-# chia_darwin_brew_user to the account that owns it. `user` is the dedicated
-# non-admin service account the LaunchDaemons run as (the reference uses
-# timelord). Leaving `user` at the Linux default `ubuntu` is refused. The
-# service account may be the SSH login, as long as it has sudo; Homebrew itself
-# is not installed by this role.
+# Connection: SSH as an account with passwordless sudo. Keep that account
+# separate from `user`, the dedicated non-admin service account the
+# LaunchDaemons run as (the Linux default `ubuntu` is refused). If the only
+# practical SSH login is the service account, the operator must set
+# chia_darwin_allow_root_capable_service_user: true and accept a weaker
+# posture than the Linux split. Use chia_darwin_brew_user when a different
+# account owns the Homebrew prefix. Homebrew itself is not installed here.
 #
 # Ansible runs modules with whatever interpreter discovery selects. On a fresh
 # Mac that is often Homebrew python@3.13, which does not ship packaging or
@@ -377,6 +377,10 @@ chia_wallet_connect_to_unknown_peers: true
 # ---------------------------------------------------------------------------
 chia_darwin_topology: local-external
 chia_darwin_enable_hw_vdf: true
+# The service account normally has no sudo. A deployment that uses the
+# service account as the SSH/automation login must explicitly accept the
+# weaker posture of a root-capable network-facing account.
+chia_darwin_allow_root_capable_service_user: false
 chia_darwin_group: staff
 chia_darwin_home: "/Users/{{ user }}"
 chia_darwin_root: "{{ chia_darwin_home }}/.chia/{{ network }}"
@@ -400,7 +404,7 @@ chia_darwin_pip_extra_index: https://pypi.chia.net/simple
 # brew tap name for github.com/Chia-Network/homebrew-chia
 chia_darwin_chiavdf_tap: Chia-Network/chia
 chia_darwin_chiavdf_formula: chiavdf
-# Empty skips the version assert. 1.2.2 is the formula the reference host runs.
+# Empty skips the version assert. 1.2.2 is the formula this role was validated with.
 chia_darwin_chiavdf_version: "1.2.2"
 chia_darwin_hw_vdf_client: "{{ chia_darwin_homebrew_prefix }}/bin/hw_vdf_client"
 # Initial full-node database seeding from the same S3 snapshot Linux uses.
@@ -514,9 +518,9 @@ chia_darwin_enable_chia_exporter: true
 chia_darwin_enable_chia_healthcheck: true
 chia_darwin_enable_node_exporter: true
 chia_darwin_enable_watchdog: true
-# Pinned release artifacts. The role downloads the same binaries the reference
-# M6 host runs. Checksums are for the published darwin-arm64 archives; update
-# both when changing a version. Empty checksums are allowed but not recommended.
+# Pinned release artifacts. Checksums are for the published darwin-arm64
+# archives; update both when changing a version. Empty checksums are allowed
+# but not recommended.
 chia_darwin_install_companion_binaries: true
 chia_darwin_companion_bin_dir: "{{ chia_darwin_home }}/opt/bin"
 chia_darwin_companion_download_dir: "{{ chia_darwin_home }}/opt/downloads"
@@ -531,9 +535,9 @@ chia_darwin_node_exporter_version: "1.12.1"
 chia_darwin_node_exporter_sha256: "35b246a34af55a8f0c3f11067f17aecf9836cfd4689bde364776b3a4ad3a84d6"
 chia_darwin_node_exporter_port: 9100
 # CHIA_ROOT used by chia-exporter and chia-healthcheck. The Linux units use
-# the real chia root. A host may point this at a read-only config copy, as the
-# reference M6 does with ~/.chia-monitor, without changing CHIA_ROOT for the
-# daemons. Wrappers still wait for chia_darwin_db_marker (the real root).
+# the real chia root. A host may point this at a read-only config copy without
+# changing CHIA_ROOT for the daemons. Wrappers still wait for
+# chia_darwin_db_marker (the real root).
 chia_darwin_companion_chia_root: "{{ chia_root }}"
 chia_darwin_companion_rotpipe_max_bytes: 20971520
 chia_darwin_companion_rotpipe_backups: 3
@@ -545,8 +549,6 @@ chia_darwin_companion_exit_timeout: 30
 chia_darwin_watchdog_cycle: 60
 chia_darwin_watchdog_grace: 600
 chia_darwin_watchdog_fail_cycles: 3
-chia_darwin_watchdog_expected_vdfs: 3
-chia_darwin_watchdog_full_node_enabled: true
 chia_darwin_watchdog_board_stop_timeout: "{{ chia_darwin_hw_vdf_exit_timeout | int + chia_darwin_restart_unload_margin | int }}"
 chia_darwin_watchdog_throttle_interval: 30
 chia_darwin_watchdog_exit_timeout: 30
