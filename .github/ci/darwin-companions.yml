@@ -108,10 +108,18 @@
           - "'Create /usr/local when absent' in companions_text"
           - "'chia_darwin_watchdog_parent_local.stat.exists | default(false)' in companions_text"
           - companions_text.index('Stat /usr/local') < companions_text.index('Create /usr/local when absent')
+          - "'register: chia_darwin_watchdog_parent_local_after' in companions_text"
+          - "'register: chia_darwin_watchdog_parent_libexec_after' in companions_text"
+          - "'chia_darwin_watchdog_parent_local_created is changed' in companions_text"
+          - "'chia_darwin_watchdog_parent_libexec_created is changed' in companions_text"
+          - "'chia_darwin_watchdog_parent_local_after.stat | default(chia_darwin_watchdog_parent_local.stat)' in companions_text"
+          - "'chia_darwin_watchdog_parent_libexec_after.stat | default(chia_darwin_watchdog_parent_libexec.stat)' in companions_text"
         fail_msg: >-
           Stat the watchdog parents before creating them and only set owner,
-          group, and mode when the directory is absent. An existing unsafe
-          /usr/local must fail the root-owned check, not be rewritten.
+          group, and mode when the directory is absent. Re-stat into a
+          separate register: a skipped task still overwrites its register
+          with no stat. An existing unsafe /usr/local must fail the
+          root-owned check, not be rewritten.
 
     - name: The sudo probe runs as the service user
       ansible.builtin.assert:

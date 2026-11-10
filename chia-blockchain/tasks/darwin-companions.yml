@@ -162,14 +162,15 @@
         owner: root
         group: wheel
         mode: "0755"
+      register: chia_darwin_watchdog_parent_local_created
       when: not (chia_darwin_watchdog_parent_local.stat.exists | default(false))
 
     - name: Re-stat /usr/local after creating it
       become: true
       ansible.builtin.stat:
         path: /usr/local
-      register: chia_darwin_watchdog_parent_local
-      when: not (chia_darwin_watchdog_parent_local.stat.exists | default(false))
+      register: chia_darwin_watchdog_parent_local_after
+      when: chia_darwin_watchdog_parent_local_created is changed
 
     - name: Stat /usr/local/libexec
       become: true
@@ -185,14 +186,15 @@
         owner: root
         group: wheel
         mode: "0755"
+      register: chia_darwin_watchdog_parent_libexec_created
       when: not (chia_darwin_watchdog_parent_libexec.stat.exists | default(false))
 
     - name: Re-stat /usr/local/libexec after creating it
       become: true
       ansible.builtin.stat:
         path: /usr/local/libexec
-      register: chia_darwin_watchdog_parent_libexec
-      when: not (chia_darwin_watchdog_parent_libexec.stat.exists | default(false))
+      register: chia_darwin_watchdog_parent_libexec_after
+      when: chia_darwin_watchdog_parent_libexec_created is changed
 
     - name: Require root-owned, non-writable watchdog parents
       ansible.builtin.assert:
@@ -207,9 +209,9 @@
           it.
       loop:
         - path: /usr/local
-          stat: "{{ chia_darwin_watchdog_parent_local.stat | default({}) }}"
+          stat: "{{ chia_darwin_watchdog_parent_local_after.stat | default(chia_darwin_watchdog_parent_local.stat) }}"
         - path: /usr/local/libexec
-          stat: "{{ chia_darwin_watchdog_parent_libexec.stat | default({}) }}"
+          stat: "{{ chia_darwin_watchdog_parent_libexec_after.stat | default(chia_darwin_watchdog_parent_libexec.stat) }}"
       loop_control:
         label: "{{ item.path }}"
 
