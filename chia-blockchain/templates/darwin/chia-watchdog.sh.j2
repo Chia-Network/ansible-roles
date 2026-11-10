@@ -24,6 +24,7 @@ VDF_PORT={{ chia_timelord_launcher_port | int }}
 HC=http://127.0.0.1:{{ chia_darwin_chia_healthcheck_port | int }}
 PREFIX={{ chia_darwin_launchd_prefix }}
 PLIST_DIR={{ chia_darwin_launchd_dir }}
+BOARD_STOP_TIMEOUT={{ chia_darwin_watchdog_board_stop_timeout | int }}
 CONF_DIR={{ chia_darwin_watchdog_conf_dir }}
 TOKEN_FILE=$CONF_DIR/alert-token
 URL_FILE=$CONF_DIR/webhook-url
@@ -100,12 +101,26 @@ stop_board() { # label
 		return 0
 	fi
 	launchctl bootout "system/$PREFIX.$1" >>"$LOG" 2>&1 || true
+	local n=0
+	while launchctl print "system/$PREFIX.$1" >/dev/null 2>&1; do
+		n=$((n + 1))
+		if [ "$n" -ge "$BOARD_STOP_TIMEOUT" ]; then
+			log "stop $1 still loaded after ${BOARD_STOP_TIMEOUT}s"
+			return 1
+		fi
+		sleep 1
+	done
+	return 0
 }
 
 start_board() { # label
 	if [ "$DRY" = 1 ]; then
 		log "DRY bootstrap $PREFIX.$1"
 		return 0
+	fi
+	if launchctl print "system/$PREFIX.$1" >/dev/null 2>&1; then
+		log "bootstrap $1 skipped: still loaded"
+		return 1
 	fi
 	if [ -f "$PLIST_DIR/$PREFIX.$1.plist" ]; then
 		launchctl bootstrap system "$PLIST_DIR/$PREFIX.$1.plist" >>"$LOG" 2>&1 || log "bootstrap $1 failed"

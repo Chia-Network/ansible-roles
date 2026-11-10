@@ -19,12 +19,14 @@ jobs:
           - ">=2.18,<2.19"
           - ">=2.22,<2.23"
     steps:
-      - name: Checkout Code
+      - &checkout
+        name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
-      - name: Install tools
+      - &install_tools
+        name: Install tools
         run: |
           sudo apt-get update
           sudo apt-get install -y zsh shellcheck python3-venv
@@ -104,16 +106,8 @@ jobs:
           - launchd
           - takeover
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - name: Install tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y zsh shellcheck python3-venv
-          python3 -m pip install --user 'ansible-core${{ matrix.ansible }}'
+      - *checkout
+      - *install_tools
 
       - name: Run ASIC group
         env:

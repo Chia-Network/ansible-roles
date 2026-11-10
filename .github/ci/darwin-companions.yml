@@ -104,10 +104,13 @@
           - "'read -r -a HW_JOBS' in watchdog_text"
           - "'read -r -a SERVICE_JOBS' in watchdog_text"
           - "'PLIST_DIR=' in watchdog_text"
+          - "'BOARD_STOP_TIMEOUT=' in watchdog_text"
           - "'stop_board' in watchdog_text"
           - "'start_board' in watchdog_text"
           - "'launchctl bootout' in watchdog_text"
           - "'launchctl bootstrap system' in watchdog_text"
+          - "'still loaded after' in watchdog_text"
+          - "'bootstrap $1 skipped: still loaded' in watchdog_text"
           - '''stop_board "$j"'' in watchdog_text'
           - '''start_board "$j"'' in watchdog_text'
           - "'EXPECTED_VDFS' in watchdog_text"
