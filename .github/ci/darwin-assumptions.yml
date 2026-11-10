@@ -39,7 +39,7 @@
           - darwin_db_seed_include[0]['ansible.builtin.include_tasks'] == 'darwin-db-seed.yml'
           - darwin_db_seed_include[0].when is sequence
           - darwin_db_seed_include[0].when | length == 3
-          - '''chia_darwin_topology in ["local-internal", "local-external"]'' in darwin_db_seed_include[0].when'
+          - "'chia_darwin_local_full_node | bool' in darwin_db_seed_include[0].when"
           - "'download_blockchain_db | bool' in darwin_db_seed_include[0].when"
           - "'blockchain_backup_bucket | length > 0' in darwin_db_seed_include[0].when"
         fail_msg: >-

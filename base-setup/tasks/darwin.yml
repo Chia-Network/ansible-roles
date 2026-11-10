@@ -5,119 +5,78 @@
 - name: Require the SSH login account for the key preflight
   ansible.builtin.assert:
     that:
-      - base_setup_ssh_login | default(ansible_user | default('')) | length > 0
+      - base_setup_ssh_login | length > 0
     fail_msg: >-
       base_setup_disable_ssh_password_login is true but
-      {{ base_setup_ssh_login | default(ansible_user | default('')) }} is
-      empty. Set it to the account the controller logs in as, or disable the
-      password change.
+      base_setup_ssh_login is empty. Set it to the account the controller logs
+      in as, or disable the password change.
   when: base_setup_disable_ssh_password_login | bool
 
-- name: Look up the SSH login account's home directory
-  become: true
-  ansible.builtin.command:
-    argv:
-      - /usr/bin/dscl
-      - .
-      - -read
-      - "/Users/{{ base_setup_ssh_login | default(ansible_user | default('')) }}"
-      - NFSHomeDirectory
-  register: base_setup_darwin_ssh_home
-  changed_when: false
-  failed_when: false
-  check_mode: false
-  when:
-    - base_setup_disable_ssh_password_login | bool
-    - (base_setup_ssh_login | default(ansible_user | default(''))) | length > 0
-
-- name: Resolve the SSH login home path
-  ansible.builtin.set_fact:
-    base_setup_darwin_ssh_home_path: >-
-      {{ base_setup_darwin_ssh_home.stdout | default('') | regex_replace('^NFSHomeDirectory: *', '') | trim }}
-  when:
-    - base_setup_disable_ssh_password_login | bool
-    - (base_setup_ssh_login | default(ansible_user | default(''))) | length > 0
-
-- name: Fall back to /Users/<login> when dscl has no home
-  ansible.builtin.set_fact:
-    base_setup_darwin_ssh_home_path: "/Users/{{ base_setup_ssh_login | default(ansible_user | default('')) }}"
-  when:
-    - base_setup_disable_ssh_password_login | bool
-    - (base_setup_ssh_login | default(ansible_user | default(''))) | length > 0
-    - (base_setup_darwin_ssh_home_path | default('') | length) == 0
-
 - name: Stat the SSH login account's authorized_keys
-  become: true
+  become: "{{ base_setup_become | bool }}"
   ansible.builtin.stat:
-    path: "{{ base_setup_darwin_ssh_home_path }}/.ssh/authorized_keys"
+    path: "{{ base_setup_authorized_keys_path }}"
   register: base_setup_darwin_authorized_key
-  when:
-    - base_setup_disable_ssh_password_login | bool
-    - (base_setup_darwin_ssh_home_path | default('') | length) > 0
+  when: base_setup_disable_ssh_password_login | bool
 
 - name: Refuse to disable password login without an authorized key
   ansible.builtin.assert:
     that:
-      - (base_setup_darwin_ssh_home_path | default('') | length) > 0
       - base_setup_darwin_authorized_key.stat.exists | default(false)
       - (base_setup_darwin_authorized_key.stat.size | default(0) | int) > 0
     fail_msg: >-
       Refusing to disable SSH password authentication: the login account
-      {{ base_setup_ssh_login | default(ansible_user | default('')) }} has no
-      readable authorized_keys at
-      {{ base_setup_darwin_ssh_home_path | default('/Users/' ~ (base_setup_ssh_login | default(ansible_user | default('')))) }}/.ssh/authorized_keys.
-      Set up key authentication first, or set
-      base_setup_disable_ssh_password_login to false.
-  when:
-    - base_setup_disable_ssh_password_login | bool
-    - (base_setup_ssh_login | default(ansible_user | default(''))) | length > 0
+      {{ base_setup_ssh_login }} has no readable authorized_keys at
+      {{ base_setup_authorized_keys_path }}. Set up key authentication first,
+      or set base_setup_disable_ssh_password_login to false.
+  when: base_setup_disable_ssh_password_login | bool
 
 - name: Disable password login for SSH on macOS
-  become: true
+  become: "{{ base_setup_become | bool }}"
   ansible.builtin.lineinfile:
-    path: /etc/ssh/sshd_config
+    path: "{{ base_setup_sshd_config }}"
     regexp: '^[#\s]*PasswordAuthentication\b'
     line: "PasswordAuthentication no"
     backup: true
-    validate: /usr/sbin/sshd -t -f %s
-  notify: restart-ssh-darwin
+    validate: "{{ base_setup_sshd_validate }}"
+  notify: "{{ ['restart-ssh-darwin'] if base_setup_notify_restart | bool else [] }}"
   when: base_setup_disable_ssh_password_login | bool
 
 - name: Disable keyboard-interactive login for SSH on macOS
-  become: true
+  become: "{{ base_setup_become | bool }}"
   ansible.builtin.lineinfile:
-    path: /etc/ssh/sshd_config
+    path: "{{ base_setup_sshd_config }}"
     regexp: '^[#\s]*KbdInteractiveAuthentication\b'
     line: "KbdInteractiveAuthentication no"
     backup: true
-    validate: /usr/sbin/sshd -t -f %s
-  notify: restart-ssh-darwin
+    validate: "{{ base_setup_sshd_validate }}"
+  notify: "{{ ['restart-ssh-darwin'] if base_setup_notify_restart | bool else [] }}"
   when: base_setup_disable_ssh_password_login | bool
 
 - name: Disable root login for SSH on macOS
-  become: true
+  become: "{{ base_setup_become | bool }}"
   ansible.builtin.lineinfile:
-    path: /etc/ssh/sshd_config
+    path: "{{ base_setup_sshd_config }}"
     regexp: '^[#\s]*PermitRootLogin\b'
     line: "PermitRootLogin no"
     backup: true
-    validate: /usr/sbin/sshd -t -f %s
-  notify: restart-ssh-darwin
+    validate: "{{ base_setup_sshd_validate }}"
+  notify: "{{ ['restart-ssh-darwin'] if base_setup_notify_restart | bool else [] }}"
   when: base_setup_disable_ssh_root_login | bool
 
 - name: Validate the macOS sshd configuration
-  become: true
+  become: "{{ base_setup_become | bool }}"
   ansible.builtin.command:
-    argv: [/usr/sbin/sshd, -t, -f, /etc/ssh/sshd_config]
+    cmd: "{{ base_setup_sshd_validate | replace('%s', base_setup_sshd_config) }}"
   changed_when: false
   when: >-
     (base_setup_disable_ssh_password_login | bool) or
     (base_setup_disable_ssh_root_login | bool)
 
 - name: Read the effective macOS sshd configuration
-  become: true
+  become: "{{ base_setup_become | bool }}"
   ansible.builtin.command:
-    argv: [/usr/sbin/sshd, -T]
+    argv: "{{ base_setup_sshd_effective_argv }}"
   register: base_setup_darwin_sshd_effective
   changed_when: false
   when: >-

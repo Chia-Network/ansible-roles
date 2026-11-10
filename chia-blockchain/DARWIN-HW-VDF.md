@@ -228,7 +228,8 @@ larger. `remote-node` still has no local full node, and every ASIC client
 still connects to the local timelord. `vdf-only` disables the local daemon,
 full node, timelord, chia-exporter, and healthcheck; set
 `chia_darwin_hw_vdf_ip` to the remote timelord's VDF server so the boards
-connect there. The watchdog still supervises the board jobs.
+connect there. The watchdog still supervises the board jobs and the remote VDF
+connection count.
 
 ## Companion services
 
@@ -290,15 +291,16 @@ Linux triggers:
   default).
 - The VDF port having the expected number of established connections and every
   enabled `hw-vdf` job running is the board-health check. A failure restarts
-  all enabled boards in ID order. In `vdf-only`, the connection count is skipped
-  and only the board jobs are checked.
+  all enabled boards in ID order. This works for `vdf-only` too: the port comes
+  from `chia_darwin_hw_vdf_port`, so the remote VDF server connection is
+  counted.
 - The exporter ports not listening for three cycles kickstart that exporter
   job.
 - If the healthcheck itself is unreachable, only the healthcheck is restarted.
 - After `chia_darwin_watchdog_log_debug_threshold` failed `/full_node` or
   `/timelord` checks, the watchdog calls the full-node and timelord RPCs to set
   DEBUG. When the healthcheck succeeds again it restores
-  `chia_darwin_log_level` (default INFO).
+  `log_level` (set `INFO` for the Linux fleet's default).
 
 Board restarts enable the job before bootstrap and disable it again when
 `start_on_boot` is false, matching the role's restart helper. The role's own
@@ -308,13 +310,15 @@ board restart fails, so a failed apply does not leave monitoring down.
 Checks for a disabled companion service are skipped, and the full-stack
 restart only kicks the core service jobs that are enabled.
 
-After a restart the watchdog waits `chia_darwin_watchdog_grace` seconds (default
-3600, matching the Linux monit start delay) before counting failures again, and
-lengthens that grace after repeated restarts. It never stops checking. The
+The watchdog uses two separate graces. `chia_darwin_watchdog_grace` (default
+3600, matching the Linux monit start delay) delays the first check after the
+watchdog starts. `chia_darwin_watchdog_restart_grace` (default 600) delays
+checks after a watchdog-initiated restart and lengthens by 300 seconds after
+repeated restarts, capped at +900. The watchdog never stops checking. The
 driver and thresholds are `chia_darwin_watchdog_cycle` and
 `chia_darwin_watchdog_fail_cycles`. The expected VDF count is computed from the
-enabled board masks, and the `/full_node` check is enabled only when the service
-job list contains `full-node`.
+enabled board masks, and the `/full_node` and `/full_node/ports` checks are
+enabled only when the service job list contains `full-node`.
 
 Alerting uses `/usr/local/etc/chia-watchdog/alert-token` and `webhook-url`.
 The role creates the root-only directory and writes either file only when
@@ -349,6 +353,8 @@ all:
         user: "<service-user>"
         chia_darwin_brew_user: "<homebrew-owner>"
         network: mainnet
+        log_level: INFO
+        target_outbound_peer_count: 30
         chia_darwin_topology: local-external
         chia_darwin_db_volume: /Volumes/<database-volume>
         chia_darwin_pip_version: "2.7.5"

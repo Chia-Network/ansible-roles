@@ -8,9 +8,9 @@
     <string>{{ smartctl_exporter_darwin_bin | e }}</string>
     <string>--web.listen-address=:{{ smartctl_exporter_port | int }}</string>
     <string>--smartctl.path={{ smartctl_exporter_darwin_smartctl | e }}</string>
-{% if smartctl_exporter_args | default('') | length > 0 %}
-    <string>{{ smartctl_exporter_args | e }}</string>
-{% endif %}
+{% for arg in smartctl_exporter_args | default('') | split %}
+    <string>{{ arg | e }}</string>
+{% endfor %}
   </array>
   <key>EnvironmentVariables</key>
   <dict>

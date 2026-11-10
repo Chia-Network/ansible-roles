@@ -390,13 +390,9 @@ chia_darwin_allow_root_capable_service_user: false
 chia_darwin_group: staff
 chia_darwin_home: "/Users/{{ user }}"
 chia_darwin_root: "{{ chia_darwin_home }}/.chia/{{ network }}"
-# Logger level used in the rendered config.yaml. Linux keeps its own log_level
-# (the fleet sets INFO in inventory); Darwin defaults to INFO so a timelord
-# keeps enough context for post-incident review without DEBUG log volume.
-chia_darwin_log_level: "INFO"
-# Match the Linux timelord fleet's outbound peer target. target_peer_count
-# remains the shared role default (80).
-chia_darwin_target_outbound_peer_count: 30
+# Darwin uses the shared log_level and target_outbound_peer_count. Set them in
+# the Darwin host/group vars (log_level: INFO and target_outbound_peer_count: 30
+# match the Linux timelord fleet). This role no longer silently overrides them.
 chia_darwin_homebrew_prefix: /opt/homebrew
 chia_darwin_brew: "{{ chia_darwin_homebrew_prefix }}/bin/brew"
 # When the SSH/automation login is the service user, set this to the account
@@ -460,6 +456,7 @@ chia_darwin_restart_unload_margin: 30
 # spawning CPU clients next to the ASIC.
 chia_darwin_process_count: 0
 chia_darwin_interpreter: /bin/zsh
+chia_darwin_sudo: /usr/bin/sudo
 # hw_vdf_client argv. Linux does not use these.
 # Frequency and voltage apply to every board. They are the role defaults
 # (1540 MHz, 1.0 V), not chiavdf's own 1100 / 0.88 defaults.
@@ -570,12 +567,16 @@ chia_darwin_periodic_connect_interval_seconds: 300
 # written when the corresponding variable is nonempty. The token and URL must
 # be set together; the role refuses a half-configured alert sink.
 chia_darwin_watchdog_cycle: 60
-# Match the Linux monit "start delay 3600": boot-time launchd churn must settle
-# before a restart can be triggered.
+# Delay the first check after the watchdog starts. Match the Linux monit
+# "start delay 3600" so boot-time launchd churn settles. This is not used after
+# a watchdog-initiated restart; chia_darwin_watchdog_restart_grace is.
 chia_darwin_watchdog_grace: 3600
+# Delay after a watchdog-initiated restart. Matches the previous Darwin
+# behavior and the Linux monit cycle behavior, where checks resume promptly.
+chia_darwin_watchdog_restart_grace: 600
 chia_darwin_watchdog_fail_cycles: 3
 # Raise Chia to DEBUG after this many failed /full_node or /timelord checks,
-# then restore chia_darwin_log_level when the healthcheck recovers. Matches the
+# then restore log_level when the healthcheck recovers. Matches the
 # Linux monit chia_monit_log_debug_threshold behavior.
 chia_darwin_watchdog_log_debug_threshold: 2
 # Also monitor /full_node/ports (process liveness) so a full node whose RPC is

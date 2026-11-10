@@ -8,7 +8,7 @@
   when: >-
     (chia_darwin_enable_chia_exporter | bool or
     chia_darwin_enable_chia_healthcheck | bool) and
-    chia_darwin_topology != 'vdf-only'
+    chia_darwin_local_timelord | bool
   block:
     - name: Stat the companion CHIA_ROOT config
       become: true
@@ -31,7 +31,7 @@
 
 - name: Warn when companions use a separate CHIA_ROOT
   when:
-    - chia_darwin_topology != 'vdf-only'
+    - chia_darwin_local_timelord | bool
     - chia_darwin_companion_chia_root != chia_root
     - chia_darwin_enable_chia_exporter | bool or chia_darwin_enable_chia_healthcheck | bool
   block:

@@ -27,3 +27,9 @@ smartctl_exporter_darwin_state_dir: /var/lib/smartctl_exporter
 smartctl_exporter_darwin_download_dir: /var/tmp/smartctl_exporter
 smartctl_exporter_darwin_launchd_dir: /Library/LaunchDaemons
 smartctl_exporter_darwin_launchd_label: net.chia.smartctl_exporter
+smartctl_exporter_darwin_launchctl: /bin/launchctl
+smartctl_exporter_darwin_become: true
+smartctl_exporter_darwin_owner: root
+smartctl_exporter_darwin_group: wheel
+# Tests set this false and provide the binary themselves.
+smartctl_exporter_darwin_install_binary: true

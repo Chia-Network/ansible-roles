@@ -31,14 +31,15 @@
         that:
           - "'darwin.yml' in base_main"
           - "'linux.yml' in base_main"
+          - '''ansible_os_family != "Darwin"'' in base_main'
           - "'PasswordAuthentication no' in base_darwin"
           - "'PermitRootLogin no' in base_darwin"
           - "'KbdInteractiveAuthentication no' in base_darwin"
           - "'authorized_keys' in base_darwin"
-          - "'/usr/bin/dscl' in base_darwin"
-          - "'NFSHomeDirectory' in base_darwin"
+          - "'base_setup_authorized_keys_path' in base_darwin"
+          - "'base_setup_sshd_validate' in base_darwin"
           - "'/etc/passwd' not in base_darwin"
-          - "'/usr/sbin/sshd, -t, -f' in base_darwin"
+          - "'/usr/sbin/sshd, -t, -f' not in base_darwin"
           - "'restart-ssh-darwin' in base_darwin"
           - "'launchctl, kickstart, -k, system/com.openssh.sshd' in base_handlers"
           - "'PasswordAuthentication no' in base_linux"
@@ -53,13 +54,14 @@
         that:
           - "'darwin.yml' in alloy_main"
           - "'linux.yml' in alloy_main"
+          - '''ansible_os_family != "Darwin"'' in alloy_main'
           - "'grafana-alloy' in alloy_defaults"
           - "'alloy_darwin_config_file' in alloy_defaults"
           - "'alloy_darwin_extra_log_files' in alloy_defaults"
           - "'alloy_syslog_path' in alloy_template"
           - "'alloy_chia_log_path' in alloy_template"
           - "'restart alloy darwin' in alloy_handlers"
-          - "'/bin/launchctl' in alloy_handlers"
+          - "'alloy_darwin_launchctl' in alloy_handlers"
           - "'launchctl' in alloy_darwin"
           - "'alloy.plist.j2' in alloy_darwin"
         fail_msg: >-
@@ -71,13 +73,16 @@
         that:
           - "'darwin.yml' in smartctl_main"
           - "'linux.yml' in smartctl_main"
+          - '''ansible_os_family != "Darwin"'' in smartctl_main'
           - "'smartctl_exporter_darwin_version' in smartctl_defaults"
           - "'smartctl_exporter_darwin_sha256' in smartctl_defaults"
           - "'darwin-arm64' in smartctl_defaults"
           - "'smartmontools' in smartctl_darwin"
-          - "'--smartctl.path' in smartctl_darwin or 'smartctl_exporter.plist.j2' in smartctl_darwin"
+          - "'smartctl_exporter_darwin_sha256' in smartctl_darwin"
+          - "'sha256:' in smartctl_darwin"
+          - "'smartctl_exporter.plist.j2' in smartctl_darwin"
           - "'restart smartctl_exporter darwin' in smartctl_handlers"
-          - "'/bin/launchctl' in smartctl_handlers"
+          - "'smartctl_exporter_darwin_launchctl' in smartctl_handlers"
         fail_msg: >-
           smartctl-exporter must keep the Linux systemd path and add a pinned
           darwin-arm64 release, Homebrew smartmontools, and a launchd job.
@@ -154,6 +159,10 @@
     ansible_architecture: arm64
     fleet_out: "{{ render_out | default('/tmp/darwin-fleet') }}"
   tasks:
+    - name: Set the smartctl_exporter test args
+      ansible.builtin.set_fact:
+        smartctl_exporter_args: "--smartctl.interval=120s --log.level=debug"
+
     - name: Render the smartctl_exporter LaunchDaemon
       ansible.builtin.template:
         src: ../../smartctl-exporter/templates/smartctl_exporter.plist.j2
@@ -173,6 +182,9 @@
           - "'/usr/local/bin/smartctl_exporter' in text"
           - "'--web.listen-address=:9633' in text"
           - "'--smartctl.path=/opt/homebrew/bin/smartctl' in text"
+          - "'<string>--smartctl.interval=120s</string>' in text"
+          - "'<string>--log.level=debug</string>' in text"
+          - "'--smartctl.interval=120s --log.level=debug' not in text"
           - "'<key>KeepAlive</key><true/>' in text"
           - "'net.chia.smartctl_exporter' in text"
 

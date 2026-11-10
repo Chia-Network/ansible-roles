@@ -5,6 +5,11 @@ on:
   pull_request:
     paths:
       - "chia-blockchain/**"
+      - "base-setup/**"
+      - "alloy/**"
+      - "smartctl-exporter/**"
+      - ".github/ci/darwin-*"
+      - ".github/workflows/darwin-role-check.yml"
       - ".github/workflows/monit-restart-tests.yml"
 
 permissions:

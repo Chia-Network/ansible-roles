@@ -4,3 +4,13 @@ base_setup_disable_ssh_root_login: true
 # Darwin: account whose authorized_keys prove key-based login still works
 # before password authentication is disabled. Defaults to the Ansible login.
 base_setup_ssh_login: "{{ ansible_user | default('') }}"
+# Darwin: paths and commands are variables so the SSH safety checks can be
+# exercised without modifying the real sshd configuration.
+base_setup_sshd_config: /etc/ssh/sshd_config
+base_setup_authorized_keys_path: "~{{ base_setup_ssh_login }}/.ssh/authorized_keys"
+base_setup_sshd_validate: /usr/sbin/sshd -t -f %s
+base_setup_sshd_effective_argv:
+  - /usr/sbin/sshd
+  - -T
+base_setup_notify_restart: true
+base_setup_become: true

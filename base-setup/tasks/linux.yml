@@ -6,7 +6,6 @@
     path: "/etc/ssh/sshd_config"
     regexp: "^PasswordAuthentication"
     line: "PasswordAuthentication no"
-    backup: true
   notify: restart-ssh
   when: base_setup_disable_ssh_password_login | bool
 
@@ -16,6 +15,5 @@
     path: "/etc/ssh/sshd_config"
     regexp: "^PermitRootLogin"
     line: "PermitRootLogin no"
-    backup: true
   notify: restart-ssh
   when: base_setup_disable_ssh_root_login | bool

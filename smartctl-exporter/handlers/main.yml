@@ -6,11 +6,55 @@
   become: true
   when: ansible_os_family != "Darwin"
 
-- name: restart smartctl_exporter darwin
-  become: true
-  ansible.builtin.shell: |
-    /bin/launchctl bootout "system/{{ smartctl_exporter_darwin_launchd_label }}" 2>/dev/null || true
-    sleep 1
-    /bin/launchctl enable "system/{{ smartctl_exporter_darwin_launchd_label }}"
-    /bin/launchctl bootstrap system "{{ smartctl_exporter_darwin_launchd_dir }}/{{ smartctl_exporter_darwin_launchd_label }}.plist"
+- name: Boot out smartctl_exporter for restart
+  listen: restart smartctl_exporter darwin
+  become: "{{ smartctl_exporter_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      [
+        "{{ smartctl_exporter_darwin_launchctl }}",
+        bootout,
+        "system/{{ smartctl_exporter_darwin_launchd_label }}",
+      ]
+  failed_when: false
+  changed_when: true
+
+- name: Wait for smartctl_exporter to unload before restart
+  listen: restart smartctl_exporter darwin
+  become: "{{ smartctl_exporter_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      [
+        "{{ smartctl_exporter_darwin_launchctl }}",
+        print,
+        "system/{{ smartctl_exporter_darwin_launchd_label }}",
+      ]
+  register: smartctl_exporter_darwin_restart_loaded
+  retries: 30
+  delay: 1
+  until: smartctl_exporter_darwin_restart_loaded.rc != 0
+  failed_when: false
+  changed_when: false
+
+- name: Enable smartctl_exporter before restart
+  listen: restart smartctl_exporter darwin
+  become: "{{ smartctl_exporter_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      [
+        "{{ smartctl_exporter_darwin_launchctl }}",
+        enable,
+        "system/{{ smartctl_exporter_darwin_launchd_label }}",
+      ]
+  changed_when: false
+
+- name: Bootstrap smartctl_exporter after restart
+  listen: restart smartctl_exporter darwin
+  become: "{{ smartctl_exporter_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ smartctl_exporter_darwin_launchctl }}"
+      - bootstrap
+      - system
+      - "{{ smartctl_exporter_darwin_launchd_dir }}/{{ smartctl_exporter_darwin_launchd_label }}.plist"
   changed_when: true

@@ -26,17 +26,25 @@ watchdog behavior, binary pins, and the approved-sudoers note.
 The role can also run a `vdf-only` topology: only the ASIC `hw-vdf` board jobs
 are installed. Set `chia_darwin_hw_vdf_ip` to the remote timelord's VDF server.
 There is no local daemon, full node, timelord, chia-exporter, or healthcheck.
-The watchdog still supervises the board LaunchDaemons.
+The watchdog still supervises the board LaunchDaemons and checks the remote VDF
+connection count through `chia_darwin_hw_vdf_port`.
 
 The Darwin watchdog matches the Linux monit defaults more closely than earlier
-releases: `chia_darwin_watchdog_grace` defaults to 3600 seconds, the watchdog
-checks `/full_node/ports` when enabled, and it raises Chia to DEBUG after
-`chia_darwin_watchdog_log_debug_threshold` failed health checks. Set
-`chia_darwin_watchdog_alert_token` and `chia_darwin_watchdog_webhook_url`
-together; a half-configured sink is refused. The role removes stale alert files
-when both are empty, and logs the skipped alert description to the watchdog log.
-Set `chia_periodic_connect_peers` to install the launchd periodic full-node peer
-connect job (every `chia_darwin_periodic_connect_interval_seconds`).
+releases: `chia_darwin_watchdog_grace` is the 3600-second boot delay, and
+`chia_darwin_watchdog_restart_grace` is the 600-second post-restart delay. The
+watchdog checks `/full_node/ports` only when a local full node exists, and it
+raises Chia to DEBUG after `chia_darwin_watchdog_log_debug_threshold` failed
+health checks. Set `chia_darwin_watchdog_alert_token` and
+`chia_darwin_watchdog_webhook_url` together; a half-configured sink is refused.
+The role removes stale alert files when both are empty, and logs the skipped
+alert description to the watchdog log. Set `chia_periodic_connect_peers` to
+install the launchd periodic full-node peer connect job (every
+`chia_darwin_periodic_connect_interval_seconds`).
+
+Darwin hosts use the shared `log_level` and `target_outbound_peer_count`
+inventory variables. Set them in the Darwin host or group vars (for example,
+`log_level: INFO` and `target_outbound_peer_count: 30` to match the Linux
+timelord fleet); the role does not override them.
 
 The role also applies the Linux-style VDF tuning flags:
 `chia_darwin_hw_vdf_max_freq` and `chia_darwin_hw_vdf_auto_freq_period` are
@@ -47,8 +55,8 @@ passed to `hw_vdf_client` when greater than zero.
 Darwin `local-internal` and `local-external` full nodes can optionally seed from
 the uncompressed S3 snapshot layout used by the Linux tasks. This is initial
 seeding, not integrity repair or an ongoing refresh, and the role does not check
-the health of an existing large database. `remote-node` never seeds because it
-has no local full node. The seed reuses `download_blockchain_db`,
+the health of an existing large database. `remote-node` and `vdf-only` never
+seed because they have no local full node. The seed reuses `download_blockchain_db`,
 `blockchain_backup_bucket`, `network` (S3 prefix and
 `blockchain_<db_version>_<network>.sqlite` filename), and `db_version`, and is
 skipped when seeding is disabled or the bucket is empty.

@@ -13,23 +13,27 @@
 # After DEBUG_THRESHOLD failed health checks, raise Chia to DEBUG via the RPC;
 # restore the configured level when health recovers (like monit-set-log-level).
 # If the healthcheck itself is down (no HTTP reply), only the healthcheck job is kickstarted.
-# After any restart: grace period (default 3600s, matching monit's start delay) with
-# no checks counted. Repeated failed restarts lengthen the grace (+300s each,
-# capped at +900s) but the watchdog never gives up.
+# After the watchdog starts, wait the boot grace (default 3600s, matching
+# monit's start delay) before counting failures. After a restart, wait the
+# restart grace (default 600s) with no checks counted. Repeated failed restarts
+# lengthen the restart grace (+300s each, capped at +900s) but the watchdog
+# never gives up.
 # No VDF-cliff / IPS-based triggers.
 #
 # Env overrides (for testing): WATCHDOG_DRY_RUN=1 (log only, no kickstart/alert), WATCHDOG_ONCE=1.
 
 CYCLE=${WATCHDOG_CYCLE:-{{ chia_darwin_watchdog_cycle | int }}}
-GRACE_BASE=${WATCHDOG_GRACE:-{{ chia_darwin_watchdog_grace | int }}}
+GRACE_BOOT=${WATCHDOG_BOOT_GRACE:-{{ chia_darwin_watchdog_grace | int }}}
+GRACE_RESTART=${WATCHDOG_RESTART_GRACE:-{{ chia_darwin_watchdog_restart_grace | int }}}
 FAIL_CYCLES={{ chia_darwin_watchdog_fail_cycles | int }}
 DEBUG_THRESHOLD={{ chia_darwin_watchdog_log_debug_threshold | int }}
-LOG_LEVEL={{ chia_darwin_log_level }}
+LOG_LEVEL={{ log_level }}
 CHIA_BIN={{ chia_darwin_venv }}/bin/chia
 CHIA_HOME={{ chia_darwin_home }}
 CHIA_ROOT={{ chia_root }}
+SUDO={{ chia_darwin_sudo }}
 EXPECTED_VDFS="{{ chia_darwin_hw_vdf_jobs | selectattr('enabled', 'equalto', true) | map(attribute='board') | map(attribute='n_vdfs') | map('int') | sum }}"
-VDF_PORT={{ chia_timelord_launcher_port | int }}
+VDF_PORT={{ chia_darwin_hw_vdf_port | int }}
 HC=http://127.0.0.1:{{ chia_darwin_chia_healthcheck_port | int }}
 PREFIX={{ chia_darwin_launchd_prefix }}
 PLIST_DIR={{ chia_darwin_launchd_dir }}
@@ -47,11 +51,12 @@ read -r -a SERVICE_JOBS <<<"$SERVICE_JOB_LIST"
 CHECK_HEALTHCHECK="{{ 1 if 'chia-healthcheck' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
 CHECK_FULL_NODE="{{ 1 if 'full-node' in chia_darwin_service_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
 CHECK_TIMELORD="{{ 1 if 'timelord' in chia_darwin_service_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
-CHECK_FULL_NODE_PORTS="{{ 1 if chia_darwin_watchdog_check_full_node_ports | bool and chia_darwin_topology not in ['remote-node', 'vdf-only'] else 0 }}"
-CHECK_VDF_CONNS="{{ 1 if chia_darwin_topology != 'vdf-only' else 0 }}"
+CHECK_FULL_NODE_PORTS="{{ 1 if chia_darwin_watchdog_check_full_node_ports | bool and 'full-node' in chia_darwin_service_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
 CHECK_EXPORTER="{{ 1 if 'chia-exporter' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
 CHECK_NODE="{{ 1 if 'node-exporter' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+# The ports probe is meaningless without a local full node.
+[ "$CHECK_FULL_NODE" = 1 ] || CHECK_FULL_NODE_PORTS=0
 
 log() {
 	local ts
@@ -101,7 +106,7 @@ alert() {
 }
 
 chia_rpc_set_log_level() { # service level
-	/usr/bin/sudo -u "{{ user }}" env HOME="$CHIA_HOME" CHIA_ROOT="$CHIA_ROOT" \
+	"$SUDO" -u "{{ user }}" env HOME="$CHIA_HOME" CHIA_ROOT="$CHIA_ROOT" \
 		"$CHIA_BIN" rpc "$1" set_log_level "{\"level\":\"$2\"}"
 }
 
@@ -211,8 +216,11 @@ log_fail=0
 debug_active=0
 bad_restarts=0
 healthy_run=0
-grace_until=$(($(date +%s) + GRACE_BASE))
-log "watchdog start pid $$ (dry=$DRY) expected_vdfs=$EXPECTED_VDFS jobs=${HW_JOBS[*]}; initial grace ${GRACE_BASE}s"
+grace_until=$(($(date +%s) + GRACE_BOOT))
+log "watchdog start pid $$ (dry=$DRY) expected_vdfs=$EXPECTED_VDFS jobs=${HW_JOBS[*]}; initial grace ${GRACE_BOOT}s"
+# A previous watchdog may have left Chia at DEBUG. Start from the configured
+# level so a watchdog-only restart cannot leave DEBUG running indefinitely.
+set_log_level "$LOG_LEVEL"
 
 while :; do
 	now=$(date +%s)
@@ -227,7 +235,7 @@ while :; do
 
 	fn=$(http_code /full_node)
 	tl=$(http_code /timelord)
-	if [ "$CHECK_FULL_NODE" = 1 ] && [ "$CHECK_FULL_NODE_PORTS" = 1 ]; then
+	if [ "$CHECK_FULL_NODE_PORTS" = 1 ]; then
 		fnp=$(http_code /full_node/ports)
 	else
 		fnp=""
@@ -269,7 +277,7 @@ while :; do
 				tl_fail=$((tl_fail + 1))
 				log "/timelord HTTP $tl ($tl_fail/$FAIL_CYCLES)"
 			fi
-			if [ "$CHECK_FULL_NODE" = 1 ] && [ "$CHECK_FULL_NODE_PORTS" = 1 ]; then
+			if [ "$CHECK_FULL_NODE_PORTS" = 1 ]; then
 				if [ "$fnp" = "200" ]; then
 					fnp_fail=0
 				else
@@ -316,7 +324,7 @@ while :; do
 	if [ -n "$HW_JOB_LIST" ] && ! hw_jobs_running; then
 		vdf_fail=$((vdf_fail + 1))
 		log "hw-vdf: a board job is not running ($vdf_fail/$FAIL_CYCLES)"
-	elif [ "$CHECK_VDF_CONNS" = 1 ] && [ "$EXPECTED_VDFS" -gt 0 ] && [ "$vdf" != "$EXPECTED_VDFS" ]; then
+	elif [ "$EXPECTED_VDFS" -gt 0 ] && [ "$vdf" != "$EXPECTED_VDFS" ]; then
 		vdf_fail=$((vdf_fail + 1))
 		log "hw-vdf: established=$vdf (want $EXPECTED_VDFS) ($vdf_fail/$FAIL_CYCLES)"
 	else
@@ -363,8 +371,8 @@ while :; do
 		vdf_fail=0
 		extra=$(((bad_restarts - 1) * 300))
 		[ $extra -gt 900 ] && extra=900
-		grace_until=$(($(date +%s) + GRACE_BASE + extra))
-		log "grace until +$((GRACE_BASE + extra))s (consecutive restarts: $bad_restarts)"
+		grace_until=$(($(date +%s) + GRACE_RESTART + extra))
+		log "grace until +$((GRACE_RESTART + extra))s (consecutive restarts: $bad_restarts)"
 	else
 		healthy_run=$((healthy_run + 1))
 		if [ $healthy_run -ge 5 ] && [ $bad_restarts -ne 0 ]; then

@@ -27,4 +27,9 @@ Apple Silicon disk stack) and runs a root LaunchDaemon named
 
 The Darwin job runs as root because `smartctl` needs raw disk access. Set
 `smartctl_exporter_darwin_brew_user` when the controller logs in as an account
-that does not own the Homebrew prefix.
+that does not own the Homebrew prefix. The role selects its task file with
+`ansible_os_family`, so gather facts for these hosts.
+
+`smartctl_exporter_args` is split on whitespace into separate launchd
+`ProgramArguments` on Darwin, matching the word splitting systemd applies to
+the Linux `ExecStart` line.

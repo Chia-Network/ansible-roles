@@ -24,6 +24,9 @@
       chia_darwin_topology must be local-internal, local-external, remote-node,
       or vdf-only. Got {{ chia_darwin_topology }}.
 
+- name: Build the Darwin LaunchDaemon job list
+  ansible.builtin.include_tasks: darwin-jobs.yml
+
 - name: Require a pinned chia-blockchain version
   ansible.builtin.assert:
     that:
@@ -51,7 +54,7 @@
       vdf-only has no local timelord. Set chia_darwin_hw_vdf_ip to the remote
       timelord's VDF server address (the board wrappers connect there instead
       of waiting for a local listener).
-  when: chia_darwin_topology == "vdf-only"
+  when: not (chia_darwin_local_timelord | bool)
 
 - name: Require a remote full node when this Mac does not run one
   ansible.builtin.assert:
@@ -62,7 +65,9 @@
       remote-node has no local full node. Set chia_timelord_full_node_peer_host
       to the LAN full node. On chia 2.7.1 and later that node must list this
       Mac in exempt_peer_networks.
-  when: chia_darwin_topology == "remote-node"
+  when:
+    - chia_darwin_local_timelord | bool
+    - not (chia_darwin_local_full_node | bool)
 
 - name: Require the external database volume for local-external
   ansible.builtin.assert:
@@ -76,118 +81,6 @@
   ansible.builtin.set_fact:
     chia_root: "{{ chia_darwin_root }}"
     process_count: "{{ chia_darwin_process_count }}"
-    log_level: "{{ chia_darwin_log_level }}"
-    target_outbound_peer_count: "{{ chia_darwin_target_outbound_peer_count }}"
-
-- name: Build the non-ASIC LaunchDaemon job list
-  ansible.builtin.set_fact:
-    chia_darwin_service_jobs:
-      - name: daemon
-        label: "{{ chia_darwin_launchd_prefix }}.daemon"
-        wrapper: "{{ chia_darwin_bin_dir }}/chia-daemon-run.sh"
-        throttle: "{{ chia_darwin_daemon_throttle_interval }}"
-        exit_timeout: "{{ chia_darwin_daemon_exit_timeout }}"
-        enabled: "{{ chia_darwin_topology != 'vdf-only' }}"
-      - name: full-node
-        label: "{{ chia_darwin_launchd_prefix }}.full-node"
-        wrapper: "{{ chia_darwin_bin_dir }}/chia-full-node-run.sh"
-        throttle: "{{ chia_darwin_full_node_throttle_interval }}"
-        exit_timeout: "{{ chia_darwin_full_node_exit_timeout }}"
-        enabled: "{{ chia_darwin_topology not in ['remote-node', 'vdf-only'] }}"
-      - name: timelord
-        label: "{{ chia_darwin_launchd_prefix }}.timelord"
-        wrapper: "{{ chia_darwin_bin_dir }}/chia-timelord-run.sh"
-        throttle: "{{ chia_darwin_timelord_throttle_interval }}"
-        exit_timeout: "{{ chia_darwin_timelord_exit_timeout }}"
-        enabled: "{{ chia_darwin_topology != 'vdf-only' }}"
-
-# Companion jobs mirror the Linux timelord host. They are separate from
-# chia_darwin_service_jobs so a companion-only change does not bounce the
-# daemon, full node, timelord, or ASIC boards. The release dict drives the
-# download/unpack/install loop; wrapper_template drives the wrapper loop.
-- name: Build the Darwin companion LaunchDaemon job list
-  ansible.builtin.set_fact:
-    chia_darwin_companion_jobs:
-      - name: chia-exporter
-        label: "{{ chia_darwin_launchd_prefix }}.chia-exporter"
-        wrapper: "{{ chia_darwin_bin_dir }}/chia-exporter-run.sh"
-        wrapper_template: darwin/chia-exporter-run.sh.j2
-        release:
-          repository: Chia-Network/chia-exporter
-          tag_prefix: ""
-          tag: "{{ chia_darwin_chia_exporter_version }}"
-          archive: chia-exporter-darwin-arm64.zip
-          unpack: chia-exporter-darwin-arm64
-          binary: chia-exporter
-          checksum: "{{ chia_darwin_chia_exporter_sha256 }}"
-        throttle: "{{ chia_darwin_companion_throttle_interval }}"
-        exit_timeout: "{{ chia_darwin_companion_exit_timeout }}"
-        nofile: 8192
-        process_type: Standard
-        companion: true
-        enabled: "{{ chia_darwin_enable_chia_exporter | bool and chia_darwin_topology != 'vdf-only' }}"
-      - name: chia-healthcheck
-        label: "{{ chia_darwin_launchd_prefix }}.chia-healthcheck"
-        wrapper: "{{ chia_darwin_bin_dir }}/chia-healthcheck-run.sh"
-        wrapper_template: darwin/chia-healthcheck-run.sh.j2
-        release:
-          repository: Chia-Network/chia-healthcheck
-          tag_prefix: ""
-          tag: "{{ chia_darwin_chia_healthcheck_version }}"
-          archive: chia-healthcheck-darwin-arm64.zip
-          unpack: chia-healthcheck-darwin-arm64
-          binary: chia-healthcheck
-          checksum: "{{ chia_darwin_chia_healthcheck_sha256 }}"
-        throttle: "{{ chia_darwin_companion_throttle_interval }}"
-        exit_timeout: "{{ chia_darwin_companion_exit_timeout }}"
-        nofile: 8192
-        process_type: Standard
-        companion: true
-        enabled: "{{ chia_darwin_enable_chia_healthcheck | bool and chia_darwin_topology != 'vdf-only' }}"
-      - name: node-exporter
-        label: "{{ chia_darwin_launchd_prefix }}.node-exporter"
-        wrapper: "{{ chia_darwin_bin_dir }}/node-exporter-run.sh"
-        wrapper_template: darwin/node-exporter-run.sh.j2
-        release:
-          repository: prometheus/node_exporter
-          tag_prefix: v
-          tag: "{{ chia_darwin_node_exporter_version }}"
-          archive: "node_exporter-{{ chia_darwin_node_exporter_version }}.darwin-arm64.tar.gz"
-          unpack: "node_exporter-{{ chia_darwin_node_exporter_version }}.darwin-arm64"
-          binary: node_exporter
-          checksum: "{{ chia_darwin_node_exporter_sha256 }}"
-        throttle: "{{ chia_darwin_companion_throttle_interval }}"
-        exit_timeout: "{{ chia_darwin_companion_exit_timeout }}"
-        nofile: 8192
-        process_type: Standard
-        companion: true
-        enabled: "{{ chia_darwin_enable_node_exporter | bool }}"
-      - name: periodic-connect
-        label: "{{ chia_darwin_launchd_prefix }}.periodic-connect"
-        wrapper: "{{ chia_darwin_bin_dir }}/chia-periodic-connect-run.sh"
-        wrapper_template: darwin/chia-periodic-connect-run.sh.j2
-        plist_template: darwin/chia-periodic-connect.plist.j2
-        throttle: "{{ chia_darwin_companion_throttle_interval }}"
-        exit_timeout: "{{ chia_darwin_companion_exit_timeout }}"
-        start_interval: "{{ chia_darwin_periodic_connect_interval_seconds }}"
-        process_type: Background
-        companion: true
-        enabled: "{{ chia_periodic_connect_peers | length > 0 and chia_darwin_topology in ['local-internal', 'local-external'] }}"
-      - name: watchdog
-        label: "{{ chia_darwin_launchd_prefix }}.watchdog"
-        wrapper: "{{ chia_darwin_watchdog_script }}"
-        plist_template: darwin/chia-watchdog.plist.j2
-        throttle: "{{ chia_darwin_watchdog_throttle_interval }}"
-        exit_timeout: "{{ chia_darwin_watchdog_exit_timeout }}"
-        process_type: Standard
-        companion: true
-        enabled: "{{ chia_darwin_enable_watchdog | bool }}"
-  changed_when: false
-
-- name: Select the watchdog job
-  ansible.builtin.set_fact:
-    chia_darwin_watchdog_job: "{{ chia_darwin_companion_jobs | selectattr('name', 'equalto', 'watchdog') | first }}"
-  changed_when: false
 
 - name: Validate shared ASIC options before changing the host
   ansible.builtin.include_tasks: darwin-hw-vdf-validate.yml
@@ -636,7 +529,7 @@
 - name: Seed the full-node database from S3
   ansible.builtin.include_tasks: darwin-db-seed.yml
   when:
-    - chia_darwin_topology in ["local-internal", "local-external"]
+    - chia_darwin_local_full_node | bool
     - download_blockchain_db | bool
     - blockchain_backup_bucket | length > 0
 

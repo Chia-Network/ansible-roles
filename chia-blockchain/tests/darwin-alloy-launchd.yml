@@ -1,0 +1,30 @@
+---
+- name: Run the Darwin Alloy lifecycle
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../alloy/defaults/main.yml
+  tasks:
+    - name: Set the Alloy test paths above the defaults
+      ansible.builtin.set_fact:
+        alloy_darwin_brew: "{{ test_bin }}/brew"
+        alloy_darwin_brew_user: ""
+        alloy_darwin_binary: "{{ test_root }}/bin/alloy"
+        alloy_darwin_config_dir: "{{ test_root }}/etc/alloy"
+        alloy_darwin_config_file: "{{ test_root }}/etc/alloy/config.alloy"
+        alloy_darwin_state_dir: "{{ test_root }}/state"
+        alloy_darwin_launchd_dir: "{{ test_root }}/plists"
+        alloy_darwin_launchd_label: net.chia.alloy
+        alloy_darwin_launchctl: "{{ test_bin }}/launchctl"
+        alloy_darwin_become: false
+        alloy_darwin_owner: "{{ test_owner }}"
+        alloy_darwin_group: "{{ test_group }}"
+        alloy_start_now: "{{ test_start_now | default(true) | bool }}"
+        alloy_start_on_boot: "{{ test_start_on_boot | default(false) | bool }}"
+        loki_endpoint: ""
+
+    - name: Apply the Darwin Alloy tasks
+      ansible.builtin.include_role:
+        name: alloy
+        tasks_from: darwin

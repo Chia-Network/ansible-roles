@@ -17,3 +17,11 @@ result with `/usr/sbin/sshd -t`, and restarts launchd's `com.openssh.sshd`
 instead of a systemd `ssh` unit. Before disabling password authentication it
 refuses to continue unless the login account already has a non-empty
 `~/.ssh/authorized_keys`, so a misconfigured run cannot lock out the controller.
+The role selects its task file with `ansible_os_family`, so gather facts for
+these hosts.
+
+The Darwin paths and commands are variables (`base_setup_sshd_config`,
+`base_setup_authorized_keys_path`, `base_setup_sshd_validate`,
+`base_setup_sshd_effective_argv`, `base_setup_notify_restart`, and
+`base_setup_become`) so the safety checks can be exercised against temporary
+files without touching the real sshd configuration.

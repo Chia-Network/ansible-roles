@@ -78,6 +78,10 @@ alloy_darwin_config_file: "{{ alloy_darwin_config_dir }}/config.alloy"
 alloy_darwin_state_dir: /var/lib/alloy
 alloy_darwin_launchd_dir: /Library/LaunchDaemons
 alloy_darwin_launchd_label: net.chia.alloy
+alloy_darwin_launchctl: /bin/launchctl
+alloy_darwin_become: true
+alloy_darwin_owner: root
+alloy_darwin_group: wheel
 alloy_darwin_http_listen_addr: 127.0.0.1:12345
 alloy_darwin_watchdog_log: /var/log/chia-watchdog.log
 # Ship the Darwin watchdog log by default so restarts and alert skips reach

@@ -14,6 +14,7 @@
     - name: Read the companion-related role sources
       ansible.builtin.set_fact:
         darwin_text: "{{ lookup('file', role_dir ~ '/tasks/darwin.yml') }}"
+        jobs_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-jobs.yml') }}"
         companions_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-companions.yml') }}"
         sudo_policy_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-sudo-policy.yml') }}"
         apply_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-launchd-apply.yml') }}"
@@ -28,24 +29,30 @@
     - name: Parse the Darwin task files
       ansible.builtin.set_fact:
         darwin_tasks: "{{ darwin_text | from_yaml }}"
+        darwin_jobs_tasks: "{{ jobs_text | from_yaml }}"
 
     - name: The role defines every companion job and includes the install tasks
       ansible.builtin.assert:
         that:
-          - "'Build the Darwin companion LaunchDaemon job list' in (darwin_tasks | map(attribute='name') | list)"
+          - "'Build the Darwin companion LaunchDaemon job list' in (darwin_jobs_tasks | map(attribute='name') | list)"
           - "'Install the Darwin companion services and watchdog' in (darwin_tasks | map(attribute='name') | list)"
-          - "'chia_darwin_companion_jobs:' in darwin_text"
-          - "'chia_darwin_watchdog_job:' in darwin_text"
-          - "'release:' in darwin_text"
-          - "'wrapper_template:' in darwin_text"
-          - "'chia_darwin_enable_chia_exporter' in darwin_text"
-          - "'chia_darwin_enable_chia_healthcheck' in darwin_text"
-          - "'chia_darwin_enable_node_exporter' in darwin_text"
-          - "'chia_darwin_enable_watchdog' in darwin_text"
-          - "'periodic-connect' in darwin_text"
-          - "'chia_periodic_connect_peers' in darwin_text"
-          - "'chia_darwin_periodic_connect_interval_seconds' in darwin_text"
+          - "'chia_darwin_companion_jobs:' in jobs_text"
+          - "'chia_darwin_watchdog_job:' in jobs_text"
+          - "'release:' in jobs_text"
+          - "'wrapper_template:' in jobs_text"
+          - "'chia_darwin_enable_chia_exporter' in jobs_text"
+          - "'chia_darwin_enable_chia_healthcheck' in jobs_text"
+          - "'chia_darwin_enable_node_exporter' in jobs_text"
+          - "'chia_darwin_enable_watchdog' in jobs_text"
+          - "'periodic-connect' in jobs_text"
+          - "'chia_periodic_connect_peers' in jobs_text"
+          - "'chia_darwin_periodic_connect_interval_seconds' in jobs_text"
           - "'vdf-only' in darwin_text"
+          - "'chia_darwin_local_full_node' in jobs_text"
+          - "'chia_darwin_local_timelord' in jobs_text"
+          - "'chia_darwin_local_timelord' in companions_text"
+          - "'chia_darwin_hw_vdf_ip not in' in darwin_text"
+          - "'not (chia_darwin_local_timelord | bool)' in darwin_text"
           - "'darwin-companions.yml' in darwin_text"
         fail_msg: >-
           darwin.yml must define the companion jobs (including the periodic
@@ -56,10 +63,10 @@
     - name: The daemon keeps the daemon restart timeouts
       ansible.builtin.assert:
         that:
-          - "'chia_darwin_daemon_throttle_interval' in darwin_text.split('name: daemon')[1].split('name: full-node')[0]"
-          - "'chia_darwin_daemon_exit_timeout' in darwin_text.split('name: daemon')[1].split('name: full-node')[0]"
-          - "'chia_darwin_companion_throttle_interval' not in darwin_text.split('name: daemon')[1].split('name: full-node')[0]"
-          - "'chia_darwin_companion_exit_timeout' not in darwin_text.split('name: daemon')[1].split('name: full-node')[0]"
+          - "'chia_darwin_daemon_throttle_interval' in jobs_text.split('name: daemon')[1].split('name: full-node')[0]"
+          - "'chia_darwin_daemon_exit_timeout' in jobs_text.split('name: daemon')[1].split('name: full-node')[0]"
+          - "'chia_darwin_companion_throttle_interval' not in jobs_text.split('name: daemon')[1].split('name: full-node')[0]"
+          - "'chia_darwin_companion_exit_timeout' not in jobs_text.split('name: daemon')[1].split('name: full-node')[0]"
         fail_msg: >-
           The daemon job must keep chia_darwin_daemon_throttle_interval and
           chia_darwin_daemon_exit_timeout; the companion timeouts are only for
@@ -159,7 +166,7 @@
           - "'CHECK_EXPORTER' in watchdog_text"
           - "'CHECK_NODE' in watchdog_text"
           - "'CHECK_FULL_NODE_PORTS' in watchdog_text"
-          - "'CHECK_VDF_CONNS' in watchdog_text"
+          - "'CHECK_VDF_CONNS' not in watchdog_text"
           - "'DEBUG_THRESHOLD' in watchdog_text"
           - "'set_log_level' in watchdog_text"
           - "'debug_active=0' in watchdog_text"
@@ -177,6 +184,8 @@
           - chia_darwin_chia_exporter_version | length > 0
           - chia_darwin_chia_healthcheck_version | length > 0
           - chia_darwin_node_exporter_version | length > 0
+          - chia_darwin_watchdog_restart_grace | int == 600
+          - chia_darwin_watchdog_grace | int == 3600
           - chia_darwin_chia_exporter_sha256 | length == 64
           - chia_darwin_chia_healthcheck_sha256 | length == 64
           - chia_darwin_node_exporter_sha256 | length == 64

@@ -15,6 +15,8 @@ for full flexibility.
 On macOS the role installs `grafana-alloy` with Homebrew and runs it from a
 root LaunchDaemon (`net.chia.alloy`) so it can read Chia and system logs. Set
 `alloy_darwin_brew_user` when the SSH login does not own the Homebrew prefix.
+The role selects its task file with `ansible_os_family`, so gather facts for
+these hosts.
 The Darwin defaults ship `/var/log/system.log`, the Chia debug log, and
 `/var/log/chia-watchdog.log`; fail2ban is disabled because macOS does not run
 it.
