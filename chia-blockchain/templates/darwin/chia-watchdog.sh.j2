@@ -47,7 +47,7 @@ read -r -a SERVICE_JOBS <<<"$SERVICE_JOB_LIST"
 CHECK_HEALTHCHECK="{{ 1 if 'chia-healthcheck' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
 CHECK_FULL_NODE="{{ 1 if 'full-node' in chia_darwin_service_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
 CHECK_TIMELORD="{{ 1 if 'timelord' in chia_darwin_service_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
-CHECK_FULL_NODE_PORTS="{{ 1 if chia_darwin_watchdog_check_full_node_ports | bool else 0 }}"
+CHECK_FULL_NODE_PORTS="{{ 1 if chia_darwin_watchdog_check_full_node_ports | bool and chia_darwin_topology not in ['remote-node', 'vdf-only'] else 0 }}"
 CHECK_VDF_CONNS="{{ 1 if chia_darwin_topology != 'vdf-only' else 0 }}"
 CHECK_EXPORTER="{{ 1 if 'chia-exporter' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
 CHECK_NODE="{{ 1 if 'node-exporter' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
@@ -269,7 +269,7 @@ while :; do
 				tl_fail=$((tl_fail + 1))
 				log "/timelord HTTP $tl ($tl_fail/$FAIL_CYCLES)"
 			fi
-			if [ "$CHECK_FULL_NODE_PORTS" = 1 ]; then
+			if [ "$CHECK_FULL_NODE" = 1 ] && [ "$CHECK_FULL_NODE_PORTS" = 1 ]; then
 				if [ "$fnp" = "200" ]; then
 					fnp_fail=0
 				else
@@ -347,7 +347,14 @@ while :; do
 	if [ -n "$problems" ]; then
 		bad_restarts=$((bad_restarts + 1))
 		healthy_run=0
-		if [ "$scope" = full ]; then restart_full "$problems"; else restart_hwvdf "$problems"; fi
+		if [ "$scope" = full ]; then
+			restart_full "$problems"
+			# The restarted processes use the configured level, so allow DEBUG
+			# to be raised again if the node is still unhealthy.
+			debug_active=0
+		else
+			restart_hwvdf "$problems"
+		fi
 		alert "Watchdog restarted the Chia timelord services ($scope:$problems) on host $(hostname -s)"
 		fn_fail=0
 		tl_fail=0

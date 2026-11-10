@@ -87,7 +87,8 @@ loki.process "chia" {
 {% endif %}
 
 // ── Extra log files ──────────────────────────────────────────────────────────
-{% for extra in (alloy_extra_log_files + (alloy_darwin_extra_log_files | default([]))) %}
+{% set platform_extra_log_files = (alloy_darwin_extra_log_files | default([])) if (ansible_os_family | default('')) == 'Darwin' else [] %}
+{% for extra in (alloy_extra_log_files + platform_extra_log_files) %}
 
 loki.source.file "{{ extra.name }}" {
   targets = [

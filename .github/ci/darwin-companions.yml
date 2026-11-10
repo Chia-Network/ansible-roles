@@ -162,6 +162,8 @@
           - "'CHECK_VDF_CONNS' in watchdog_text"
           - "'DEBUG_THRESHOLD' in watchdog_text"
           - "'set_log_level' in watchdog_text"
+          - "'debug_active=0' in watchdog_text"
+          - "'The restarted processes use the configured level' in watchdog_text"
           - "'fnp_fail' in watchdog_text"
           - "'/full_node/ports' in watchdog_text"
           - "'alert skipped (no $TOKEN_FILE / $URL_FILE): $desc' in watchdog_text"

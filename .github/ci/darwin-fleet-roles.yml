@@ -35,6 +35,9 @@
           - "'PermitRootLogin no' in base_darwin"
           - "'KbdInteractiveAuthentication no' in base_darwin"
           - "'authorized_keys' in base_darwin"
+          - "'/usr/bin/dscl' in base_darwin"
+          - "'NFSHomeDirectory' in base_darwin"
+          - "'/etc/passwd' not in base_darwin"
           - "'/usr/sbin/sshd, -t, -f' in base_darwin"
           - "'restart-ssh-darwin' in base_darwin"
           - "'launchctl, kickstart, -k, system/com.openssh.sshd' in base_handlers"
@@ -172,3 +175,50 @@
           - "'--smartctl.path=/opt/homebrew/bin/smartctl' in text"
           - "'<key>KeepAlive</key><true/>' in text"
           - "'net.chia.smartctl_exporter' in text"
+
+- name: Render the Linux Alloy configuration
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../alloy/defaults/main.yml
+  vars:
+    ansible_os_family: Debian
+    ansible_hostname: linux-test
+    chia_root: /home/ubuntu/.chia
+    fleet_out: "{{ render_out | default('/tmp/darwin-fleet') }}"
+  tasks:
+    - name: Set the Linux Alloy variables
+      ansible.builtin.set_fact:
+        ansible_os_family: Debian
+        ansible_hostname: linux-test
+        chia_root: /home/ubuntu/.chia
+        alloy_darwin_chia_root: ""
+
+    - name: Create the Linux render directory
+      ansible.builtin.file:
+        path: "{{ fleet_out }}/linux"
+        state: directory
+        mode: "0755"
+
+    - name: Render the Linux Alloy config
+      ansible.builtin.template:
+        src: ../../alloy/templates/config.alloy.j2
+        dest: "{{ fleet_out }}/linux/config.alloy"
+        mode: "0644"
+
+    - name: Read the rendered Linux Alloy config
+      ansible.builtin.slurp:
+        src: "{{ fleet_out }}/linux/config.alloy"
+      register: alloy_linux_rendered
+
+    - name: Linux Alloy keeps Linux paths and excludes Darwin-only logs
+      vars:
+        config: "{{ alloy_linux_rendered.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - "'/var/log/syslog' in config"
+          - "'/var/log/fail2ban.log' in config"
+          - "'/home/ubuntu/.chia/log/debug.log' in config"
+          - "'/var/log/chia-watchdog.log' not in config"
+          - "'/var/log/system.log' not in config"

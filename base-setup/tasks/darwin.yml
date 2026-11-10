@@ -17,15 +17,26 @@
   become: true
   ansible.builtin.command:
     argv:
-      - /usr/bin/awk
-      - -F:
-      - -v
-      - u={{ base_setup_ssh_login | default(ansible_user | default('')) }}
-      - $1 == u { print $6 }
-      - /etc/passwd
+      - /usr/bin/dscl
+      - .
+      - -read
+      - "/Users/{{ base_setup_ssh_login | default(ansible_user | default('')) }}"
+      - NFSHomeDirectory
   register: base_setup_darwin_ssh_home
   changed_when: false
+  failed_when: false
   check_mode: false
+  when:
+    - base_setup_disable_ssh_password_login | bool
+    - (base_setup_ssh_login | default(ansible_user | default(''))) | length > 0
+
+- name: Resolve the SSH login home path
+  ansible.builtin.set_fact:
+    base_setup_darwin_ssh_home_path: >-
+      {{ (base_setup_darwin_ssh_home.stdout | default('') | regex_replace('^NFSHomeDirectory: *', '') | trim)
+         if (base_setup_darwin_ssh_home.rc | default(1) | int == 0 and
+             (base_setup_darwin_ssh_home.stdout | default('') | trim | length) > 0)
+         else '/Users/' ~ (base_setup_ssh_login | default(ansible_user | default(''))) }}
   when:
     - base_setup_disable_ssh_password_login | bool
     - (base_setup_ssh_login | default(ansible_user | default(''))) | length > 0
@@ -33,22 +44,24 @@
 - name: Stat the SSH login account's authorized_keys
   become: true
   ansible.builtin.stat:
-    path: "{{ base_setup_darwin_ssh_home.stdout | trim }}/.ssh/authorized_keys"
+    path: "{{ base_setup_darwin_ssh_home_path }}/.ssh/authorized_keys"
   register: base_setup_darwin_authorized_key
   when:
     - base_setup_disable_ssh_password_login | bool
-    - (base_setup_darwin_ssh_home.stdout | default('') | trim | length) > 0
+    - (base_setup_darwin_ssh_home_path | default('') | length) > 0
 
 - name: Refuse to disable password login without an authorized key
   ansible.builtin.assert:
     that:
-      - (base_setup_darwin_ssh_home.stdout | default('') | trim | length) > 0
+      - (base_setup_darwin_ssh_home_path | default('') | length) > 0
       - base_setup_darwin_authorized_key.stat.exists | default(false)
       - (base_setup_darwin_authorized_key.stat.size | default(0) | int) > 0
     fail_msg: >-
       Refusing to disable SSH password authentication: the login account
       {{ base_setup_ssh_login | default(ansible_user | default('')) }} has no
-      readable authorized_keys. Set up key authentication first, or set
+      readable authorized_keys at
+      {{ base_setup_darwin_ssh_home_path | default('/Users/' ~ (base_setup_ssh_login | default(ansible_user | default('')))) }}/.ssh/authorized_keys.
+      Set up key authentication first, or set
       base_setup_disable_ssh_password_login to false.
   when:
     - base_setup_disable_ssh_password_login | bool
