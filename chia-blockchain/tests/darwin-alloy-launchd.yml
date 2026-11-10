@@ -20,6 +20,8 @@
         alloy_darwin_become: false
         alloy_darwin_owner: "{{ test_owner }}"
         alloy_darwin_group: "{{ test_group }}"
+        alloy_darwin_unload_retries: "{{ test_unload_retries | default(30) }}"
+        alloy_darwin_unload_delay: "{{ test_unload_delay | default(1) }}"
         alloy_start_now: "{{ test_start_now | default(true) | bool }}"
         alloy_start_on_boot: "{{ test_start_on_boot | default(false) | bool }}"
         loki_endpoint: ""

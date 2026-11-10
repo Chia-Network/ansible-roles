@@ -36,11 +36,21 @@
       ]
   register: alloy_darwin_restart_loaded
   when: alloy_start_now | bool
-  retries: 30
-  delay: 1
+  retries: "{{ alloy_darwin_unload_retries | int }}"
+  delay: "{{ alloy_darwin_unload_delay | int }}"
   until: alloy_darwin_restart_loaded.rc != 0
   failed_when: false
   changed_when: false
+
+- name: Require Alloy to be unloaded before bootstrap
+  listen: restart alloy darwin
+  ansible.builtin.assert:
+    that:
+      - alloy_darwin_restart_loaded.rc | default(0) | int != 0
+    fail_msg: >-
+      Alloy is still loaded after waiting
+      {{ alloy_darwin_unload_retries }} tries; refusing to bootstrap.
+  when: alloy_start_now | bool
 
 - name: Enable Alloy before restart
   listen: restart alloy darwin

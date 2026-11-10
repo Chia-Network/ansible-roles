@@ -82,6 +82,8 @@ alloy_darwin_launchctl: /bin/launchctl
 alloy_darwin_become: true
 alloy_darwin_owner: root
 alloy_darwin_group: wheel
+alloy_darwin_unload_retries: 30
+alloy_darwin_unload_delay: 1
 alloy_darwin_http_listen_addr: 127.0.0.1:12345
 alloy_darwin_watchdog_log: /var/log/chia-watchdog.log
 # Ship the Darwin watchdog log by default so restarts and alert skips reach

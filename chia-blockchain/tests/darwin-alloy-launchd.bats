@@ -26,7 +26,7 @@ print)
 	exit 1
 	;;
 bootout)
-	rm -f "$state"
+	if [ "${FAKE_STICKY:-0}" != 1 ]; then rm -f "$state"; fi
 	printf 'bootout\n' >>"$FAKE_STATE/launchctl.log"
 	;;
 bootstrap)
@@ -83,4 +83,11 @@ run_alloy() {
 	run_alloy
 	[ "$status" -eq 0 ]
 	[ "$(tail -4 "$LOG" | tr '\n' ' ')" = "bootout enable bootstrap disable " ]
+}
+
+@test "a job that stays loaded fails before the handler bootstraps" {
+	export FAKE_STICKY=1
+	run_alloy -e test_unload_retries=1 -e test_unload_delay=0
+	[ "$status" -ne 0 ]
+	[ "$(grep -c '^bootstrap$' "$LOG")" -eq 1 ]
 }

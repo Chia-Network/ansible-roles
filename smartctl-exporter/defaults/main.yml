@@ -31,5 +31,7 @@ smartctl_exporter_darwin_launchctl: /bin/launchctl
 smartctl_exporter_darwin_become: true
 smartctl_exporter_darwin_owner: root
 smartctl_exporter_darwin_group: wheel
+smartctl_exporter_darwin_unload_retries: 30
+smartctl_exporter_darwin_unload_delay: 1
 # Tests set this false and provide the binary themselves.
 smartctl_exporter_darwin_install_binary: true

@@ -30,11 +30,20 @@
         "system/{{ smartctl_exporter_darwin_launchd_label }}",
       ]
   register: smartctl_exporter_darwin_restart_loaded
-  retries: 30
-  delay: 1
+  retries: "{{ smartctl_exporter_darwin_unload_retries | int }}"
+  delay: "{{ smartctl_exporter_darwin_unload_delay | int }}"
   until: smartctl_exporter_darwin_restart_loaded.rc != 0
   failed_when: false
   changed_when: false
+
+- name: Require smartctl_exporter to be unloaded before bootstrap
+  listen: restart smartctl_exporter darwin
+  ansible.builtin.assert:
+    that:
+      - smartctl_exporter_darwin_restart_loaded.rc | default(0) | int != 0
+    fail_msg: >-
+      smartctl_exporter is still loaded after waiting
+      {{ smartctl_exporter_darwin_unload_retries }} tries; refusing to bootstrap.
 
 - name: Enable smartctl_exporter before restart
   listen: restart smartctl_exporter darwin

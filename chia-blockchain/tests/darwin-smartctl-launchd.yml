@@ -21,6 +21,8 @@
         smartctl_exporter_darwin_become: false
         smartctl_exporter_darwin_owner: "{{ test_owner }}"
         smartctl_exporter_darwin_group: "{{ test_group }}"
+        smartctl_exporter_darwin_unload_retries: "{{ test_unload_retries | default(30) }}"
+        smartctl_exporter_darwin_unload_delay: "{{ test_unload_delay | default(1) }}"
         smartctl_exporter_darwin_install_binary: false
         smartctl_exporter_args: ""
 
