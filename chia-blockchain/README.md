@@ -23,11 +23,118 @@ same inventory entry shape covers additional Macs. See
 [DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#companion-services) for the service table,
 watchdog behavior, binary pins, and the approved-sudoers note.
 
-The role can also run a `vdf-only` topology: only the ASIC `hw-vdf` board jobs
-are installed. Set `chia_darwin_hw_vdf_ip` to the remote timelord's VDF server.
+With `chia_darwin_timelord_implementation: chia-blockchain`, the role can also
+run a `vdf-only` topology: only the ASIC `hw-vdf` board jobs are installed. Set `chia_darwin_hw_vdf_ip` to the remote timelord's VDF server.
 There is no local daemon, full node, timelord, chia-exporter, or healthcheck.
 The watchdog still supervises the board LaunchDaemons and checks the remote VDF
 connection count through `chia_darwin_hw_vdf_port`.
+
+## Timelord.app (optional Darwin implementation)
+
+Set `chia_darwin_timelord_implementation: timelord-app` to run the signed
+[Timelord.app](https://github.com/Chia-Network/timelord-app/releases/tag/v1.0.0)
+instead of the Python timelord. The default remains `chia-blockchain`, so
+existing plays are unchanged. The app is arm64-only and requires macOS 14 or
+later. The role pins version `1.0.0` and its DMG checksum, verifies the bundle
+with `codesign --verify --deep --strict`, and installs it at
+`/Applications/Timelord.app`. The upstream repository is private. Set
+`chia_darwin_timelord_app_github_token` (read access to the private repository)
+to use the pinned GitHub API asset (`chia_darwin_timelord_app_asset_id`), override
+`chia_darwin_timelord_app_dmg_url` with an internal mirror, or set
+`chia_darwin_timelord_app_download: false` and place the pinned DMG at
+`chia_darwin_timelord_app_dmg` before the play. The role still verifies its
+SHA256.
+
+The app owns both the timelord worker and the bundled `hw_vdf_client` ASIC
+clients. Role-managed `hw-vdf` jobs are refused in this mode, and the app's
+hardware registry and learned tuning stay app-owned. The app config is
+`~/Library/Application Support/Timelord/config.toml`; the vendor LaunchDaemon
+label is fixed at `net.chia.timelord.supervisor`, independent of
+`chia_darwin_launchd_prefix`. Worker status listens on `127.0.0.1:9257`.
+
+The app is the timelord monitoring source, including the Linux IPS series:
+`chia_timelord_estimated_ips`, `chain_estimated_ips`, `raw_ips`, verified-proof
+counters, submission timestamps, thermals, recoveries, chain availability, and
+the supervisor metrics. `chia_darwin_timelord_app_expose_observability` defaults
+to true, which enables the app deployment listener on `0.0.0.0:9258` and the
+supervisor listener on `0.0.0.0:9259` with `allow_remote_observability = true`.
+Set it false to keep the supervisor and probes on loopback and omit the 9258
+listener. The listeners have no authentication or TLS; restrict them to a
+private monitoring network or put an authenticated reverse proxy in front.
+
+A scrape configuration mirroring the upstream examples:
+
+```yaml
+- job_name: timelord-app
+  honor_labels: true
+  static_configs:
+    - targets: ["<mac>:9258"]
+- job_name: timelord-supervisor
+  honor_labels: true
+  static_configs:
+    - targets: ["<mac>:9259"]
+```
+
+Do not keep scraping a legacy timelord exporter as the same logical instance;
+the app's `chia_timelord_*` series replaces it. Re-point timelord probes from
+`chia-healthcheck`'s `/timelord` to the app's `/healthz` (liveness) or
+`/readyz` (readiness) on 9258/9259, which mirrors the Linux probe semantics.
+Full-node metrics still come from `chia-exporter` on local topologies.
+
+| Topology         | What runs                                                                 |
+| ---------------- | ------------------------------------------------------------------------- |
+| `local-internal` | Role-managed daemon/full node plus the app and its ASIC clients.           |
+| `local-external` | Same, with `~/.chia` on `chia_darwin_db_volume`; Full Disk Access still applies. |
+| `remote-node`    | The app only. No Python, chia-blockchain, daemon, full node, or local CHIA_ROOT. |
+| `vdf-only`       | Refused with `timelord-app`; use `chia-blockchain` for ASIC-only Macs.     |
+
+`local-*` app deployments still install the role-managed full node and daemon.
+`remote-node` app deployments skip the Homebrew Python, virtualenv,
+chia-blockchain install, and CHIA_ROOT setup entirely. They require a connection
+bundle created on the full-node host:
+
+```yaml
+chia_darwin_timelord_implementation: timelord-app
+chia_darwin_topology: remote-node
+# A directory already on the Mac:
+chia_darwin_timelord_app_bundle_path: "/Users/timelord/timelord-connection"
+# Or a controller directory copied to the Mac:
+# chia_darwin_timelord_app_bundle_src: "files/timelord-mainnet-connection"
+```
+
+The bundle must contain `connection.toml` and the dedicated peer and optional
+RPC identities. Create it with the node's Chia Python as described in
+[the upstream connection-bundle guide](https://github.com/Chia-Network/timelord-app/blob/v1.0.0/docs/connection-bundles.md).
+The role imports it with `timelord-service import-node` only when the bundle
+content fingerprint changes, so repeated runs do not create a new identity
+directory. Role-managed `local-*` deployments use
+`timelord-service local-node` against the existing CHIA_ROOT instead.
+
+The role renders the complete app config only when it is missing or
+`chia_darwin_timelord_app_force_config: true`. Node changes then use the app's
+own `local-node`/`import-node` commands and a reload, preserving app-written
+boards and learned tuning. Setting `force_config` replaces that state.
+`chia_darwin_timelord_app_prune_identities` (default true) removes identity
+directories left by earlier imports while keeping references from the live
+config and the supervisor's `last-good.toml`.
+
+In app mode the role keeps `chia-exporter` only for a local full node's
+`chia_full_node_*` metrics. It also keeps `chia-healthcheck` on local
+topologies for `/full_node` and `/full_node/ports`. Its `/timelord` endpoint is
+not a generic HTTP check: it subscribes to the Chia daemon websocket and only
+recognizes `finished_pot` from `chia_timelord`. The app is not that RPC service,
+so this is a protocol mismatch rather than a missing app metric. The app's own
+`/healthz`, `/readyz`, and `chia_timelord_*` series cover the timelord and use
+the same IPS/proof metric names, so dashboards and alerts carry over; only the
+probe and scrape targets change. `remote-node` app deployments disable
+`chia-healthcheck` entirely because there is no local full node or `CHIA_ROOT`
+to check. The watchdog also checks the app supervisor and worker `/healthz`
+endpoints and, for local topologies, that the full-node LaunchDaemon is still
+running. Restarting the app is done through
+`launchctl kickstart system/net.chia.timelord.supervisor`; the supervisor then
+replaces its worker. Switching back to `chia-blockchain` unregisters the app
+service if this role registered it, but leaves the app bundle, config, and
+credentials in place.
 
 The Darwin watchdog matches the Linux monit defaults more closely than earlier
 releases: `chia_darwin_watchdog_grace` is the 3600-second boot delay, and

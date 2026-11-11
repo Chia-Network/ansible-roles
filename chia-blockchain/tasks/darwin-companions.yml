@@ -6,9 +6,9 @@
 # jobs. A companion-only change restarts only these jobs.
 - name: Confirm the companion CHIA_ROOT is readable by the service user
   when: >-
-    (chia_darwin_enable_chia_exporter | bool or
-    chia_darwin_enable_chia_healthcheck | bool) and
-    chia_darwin_local_timelord | bool
+    chia_darwin_local_timelord | bool and
+    (('chia-exporter' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list) or
+    ('chia-healthcheck' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list))
   block:
     - name: Stat the companion CHIA_ROOT config
       become: true
@@ -33,7 +33,9 @@
   when:
     - chia_darwin_local_timelord | bool
     - chia_darwin_companion_chia_root != chia_root
-    - chia_darwin_enable_chia_exporter | bool or chia_darwin_enable_chia_healthcheck | bool
+    - >-
+      ('chia-exporter' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list) or
+      ('chia-healthcheck' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list)
   block:
     - name: Stat the live and companion config files
       become: true

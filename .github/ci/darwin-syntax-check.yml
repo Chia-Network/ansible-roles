@@ -12,6 +12,12 @@
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-companions.yml
     - name: Import the Darwin job-list tasks
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-jobs.yml
+    - name: Import the Darwin implementation checks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-implementation-validate.yml
+    - name: Import the Darwin Timelord.app tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-timelord-app.yml
+    - name: Import the Darwin Timelord.app removal tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-timelord-app-remove.yml
     - name: Import the Darwin hw-vdf board tasks
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-hw-vdf-boards.yml
     - name: Import the Darwin hw-vdf install tasks

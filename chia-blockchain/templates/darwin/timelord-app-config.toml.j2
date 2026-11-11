@@ -1,0 +1,26 @@
+# Managed by the chia-blockchain Ansible role. The role writes this complete
+# file only when the app config is missing or
+# chia_darwin_timelord_app_force_config is true. Node credentials are filled in
+# by `timelord-service local-node` or `import-node`; hardware boards and learned
+# tuning stay app-owned and are intentionally omitted here.
+schema_version = 1
+
+[node]
+host = {{ ('localhost' if chia_darwin_local_full_node | bool else chia_timelord_full_node_peer_host) | to_json }}
+port = {{ full_node_port | int }}
+network = {{ network | to_json }}
+server_name = "chia.net"
+
+[service]
+status_listen = {{ chia_darwin_timelord_app_status_listen | to_json }}
+{% if chia_darwin_timelord_app_observability_listen | length > 0 %}
+observability_listen = {{ chia_darwin_timelord_app_observability_listen | to_json }}
+{% endif %}
+allow_remote_observability = {{ 'true' if chia_darwin_timelord_app_allow_remote_observability | bool else 'false' }}
+supervisor_observability_listen = {{ chia_darwin_timelord_app_supervisor_listen | to_json }}
+start_automatically = {{ 'true' if chia_darwin_start_on_boot | bool else 'false' }}
+tuning_paused = false
+
+[hardware]
+client_binary = {{ chia_darwin_timelord_app_client_binary | to_json }}
+driver_library = {{ chia_darwin_timelord_app_driver_library | to_json }}

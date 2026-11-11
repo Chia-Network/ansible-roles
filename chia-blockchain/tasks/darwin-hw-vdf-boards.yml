@@ -12,6 +12,8 @@
     chia_darwin_hw_vdf_discovered_boards: []
     chia_darwin_hw_vdf_slots: []
     chia_darwin_hw_vdf_takeover_labels: []
+    chia_darwin_hw_vdf_input: []
+    chia_darwin_hw_vdf_legacy: false
   changed_when: false
 
 - name: Build the role-owned ASIC slot table

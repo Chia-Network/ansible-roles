@@ -25,6 +25,7 @@
       - chia-timelord-run.sh
       - chia-watchdog.plist
       - launchdaemon.plist
+      - timelord-app-config.toml
       - node-exporter-run.sh
       - pppc.mobileconfig
       - rotpipe.py
@@ -348,3 +349,177 @@
           - "'<key>StartInterval</key><integer>300</integer>' in plist"
           - "'<key>RunAtLoad</key><true/>' in plist"
           - "'<key>KeepAlive</key>' not in plist"
+
+    - name: Read the Timelord.app configs
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/{{ item }}/timelord-app-config.toml"
+      loop:
+        - local-external
+        - remote-node
+      register: timelord_app_configs
+
+    - name: Timelord.app configs use the app listeners and identity-free setup
+      vars:
+        local_config: "{{ timelord_app_configs.results[0].content | b64decode }}"
+        remote_config: "{{ timelord_app_configs.results[1].content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - "'schema_version = 1' in local_config"
+          - "'status_listen = \"127.0.0.1:9257\"' in local_config"
+          - "'observability_listen = \"0.0.0.0:9258\"' in local_config"
+          - "'allow_remote_observability = true' in local_config"
+          - "'supervisor_observability_listen = \"0.0.0.0:9259\"' in local_config"
+          - "'host = \"localhost\"' in local_config"
+          - "'port = 8444' in local_config"
+          - "'network = \"mainnet\"' in local_config"
+          - "'client_binary = \"/Applications/Timelord.app/Contents/Helpers/hw_vdf_client\"' in local_config"
+          - "'driver_library = \"/Applications/Timelord.app/Contents/Frameworks/libftd2xx.dylib\"' in local_config"
+          - "'certificate =' not in local_config"
+          - "'private_key =' not in local_config"
+          - "'host = \"10.0.0.5\"' in remote_config"
+
+    - name: Create the loopback Timelord.app config fixture directory
+      ansible.builtin.file:
+        path: "{{ render_out }}/timelord-app-loopback"
+        state: directory
+        mode: "0755"
+
+    - name: Render the loopback Timelord.app config
+      ansible.builtin.template:
+        src: "../../chia-blockchain/templates/darwin/timelord-app-config.toml.j2"
+        dest: "{{ render_out }}/timelord-app-loopback/timelord-app-config.toml"
+        mode: "0644"
+      vars:
+        chia_darwin_local_full_node: true
+        chia_darwin_timelord_app_expose_observability: false
+
+    - name: Read the loopback Timelord.app config
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/timelord-app-loopback/timelord-app-config.toml"
+      register: timelord_app_loopback_config
+
+    - name: The loopback Timelord.app config omits the deployment listener
+      vars:
+        text: "{{ timelord_app_loopback_config.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - "'observability_listen = \"0.0.0.0:9258\"' not in text"
+          - "'allow_remote_observability = false' in text"
+          - "'supervisor_observability_listen = \"127.0.0.1:9259\"' in text"
+
+    - name: Create the Timelord.app watchdog fixture directory
+      ansible.builtin.file:
+        path: "{{ render_out }}/timelord-app-watchdog"
+        state: directory
+        mode: "0755"
+
+    - name: Set the Timelord.app service and companion lists
+      ansible.builtin.set_fact:
+        chia_darwin_timelord_app_enabled: true
+        chia_darwin_local_full_node: true
+        chia_darwin_local_timelord: true
+        chia_darwin_service_jobs:
+          - name: daemon
+            enabled: true
+          - name: full-node
+            enabled: true
+          - name: timelord
+            enabled: false
+        chia_darwin_companion_jobs:
+          - name: chia-exporter
+            enabled: true
+          - name: chia-healthcheck
+            enabled: true
+          - name: node-exporter
+            enabled: true
+          - name: periodic-connect
+            enabled: true
+          - name: watchdog
+            enabled: true
+
+    - name: Render the Timelord.app watchdog
+      ansible.builtin.template:
+        src: "../../chia-blockchain/templates/darwin/chia-watchdog.sh.j2"
+        dest: "{{ render_out }}/timelord-app-watchdog/chia-watchdog.sh"
+        mode: "0644"
+      vars:
+        chia_darwin_topology: local-external
+
+    - name: Read the Timelord.app watchdog
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/timelord-app-watchdog/chia-watchdog.sh"
+      register: timelord_app_watchdog
+
+    - name: The Timelord.app watchdog checks both app listeners and the full node
+      vars:
+        text: "{{ timelord_app_watchdog.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - '''CHECK_APP="1"'' in text'
+          - '''CHECK_TIMELORD="0"'' in text'
+          - '''CHECK_HEALTHCHECK="1"'' in text'
+          - '''CHECK_FULL_NODE="1"'' in text'
+          - '''CHECK_FULL_NODE_PORTS="1"'' in text'
+          - '''CHECK_FULL_NODE_JOB="1"'' in text'
+          - '''SERVICE_JOB_LIST="daemon full-node"'' in text'
+          - '''if [ "$CHECK_TIMELORD" = 1 ]; then'' in text'
+          - "'APP_LABEL=net.chia.timelord.supervisor' in text"
+          - "'APP_STATUS=http://127.0.0.1:9257' in text"
+          - "'APP_SUPERVISOR=http://127.0.0.1:9259' in text"
+          - "'timelord-app-health' in text"
+          - "'restart_app' in text"
+          - "'kick_app' in text"
+          - "'http_code_at' in text"
+
+    - name: Set the remote Timelord.app watchdog fixture
+      ansible.builtin.set_fact:
+        chia_darwin_local_full_node: false
+        chia_darwin_service_jobs:
+          - name: daemon
+            enabled: false
+          - name: full-node
+            enabled: false
+          - name: timelord
+            enabled: false
+        chia_darwin_companion_jobs:
+          - name: chia-exporter
+            enabled: false
+          - name: chia-healthcheck
+            enabled: false
+          - name: node-exporter
+            enabled: true
+          - name: periodic-connect
+            enabled: false
+          - name: watchdog
+            enabled: true
+
+    - name: Create the remote Timelord.app watchdog fixture directory
+      ansible.builtin.file:
+        path: "{{ render_out }}/timelord-app-remote-watchdog"
+        state: directory
+        mode: "0755"
+
+    - name: Render the remote Timelord.app watchdog
+      ansible.builtin.template:
+        src: "../../chia-blockchain/templates/darwin/chia-watchdog.sh.j2"
+        dest: "{{ render_out }}/timelord-app-remote-watchdog/chia-watchdog.sh"
+        mode: "0644"
+      vars:
+        chia_darwin_topology: remote-node
+
+    - name: Read the remote Timelord.app watchdog
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/timelord-app-remote-watchdog/chia-watchdog.sh"
+      register: remote_timelord_app_watchdog
+
+    - name: The remote Timelord.app watchdog has no local full-node jobs
+      vars:
+        text: "{{ remote_timelord_app_watchdog.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - '''CHECK_APP="1"'' in text'
+          - '''CHECK_FULL_NODE="0"'' in text'
+          - '''CHECK_FULL_NODE_PORTS="0"'' in text'
+          - '''CHECK_FULL_NODE_JOB="0"'' in text'
+          - '''CHECK_HEALTHCHECK="0"'' in text'
+          - '''SERVICE_JOB_LIST=""'' in text'

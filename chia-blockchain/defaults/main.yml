@@ -379,10 +379,20 @@ chia_wallet_connect_to_unknown_peers: true
 # index, and chia_darwin_pip_extra_index is added with --extra-index-url.
 #
 # chia_darwin_enable_hw_vdf is independent of chia_enable_hw_vdf. The Linux
-# flag still selects apt chiavdf-hw and monit, and stays false by default.
+# flag still selects apt chiavdf-hw and monit, and stays false by default. The
+# Darwin default is true for chia-blockchain and false for timelord-app, which
+# refuses role-managed ASIC clients.
 # ---------------------------------------------------------------------------
 chia_darwin_topology: local-external
-chia_darwin_enable_hw_vdf: true
+# chia-blockchain runs the Python timelord and the role-managed hw_vdf_client
+# jobs. timelord-app runs the signed Timelord.app supervisor instead; the app
+# owns both the timelord and the ASIC USB clients, so role-managed hw-vdf jobs
+# are refused. local-internal and local-external still install the role-managed
+# full node and daemon. remote-node with the app skips Python and chia-blockchain
+# entirely and imports a prebuilt connection bundle. vdf-only is incompatible.
+chia_darwin_timelord_implementation: chia-blockchain
+chia_darwin_timelord_app_enabled: "{{ chia_darwin_timelord_implementation == 'timelord-app' }}"
+chia_darwin_enable_hw_vdf: "{{ chia_darwin_timelord_implementation == 'chia-blockchain' }}"
 # The service account normally has no sudo. A deployment that uses the
 # service account as the SSH/automation login must explicitly accept the
 # weaker posture of a root-capable network-facing account.
@@ -562,6 +572,94 @@ chia_darwin_companion_exit_timeout: 30
 # job. Reuses chia_periodic_connect_peers and full_node_port. Set the list empty
 # to skip the job. 300s matches the Linux */5 cron interval.
 chia_darwin_periodic_connect_interval_seconds: 300
+# ---------------------------------------------------------------------------
+# Signed Timelord.app (chia_darwin_timelord_implementation: timelord-app).
+#
+# The app owns the timelord worker and the bundled hw_vdf_client ASIC clients.
+# The role still installs the full node and daemon for local-internal and
+# local-external. remote-node app deployments install no Python or
+# chia-blockchain and must provide a connection bundle created on the full-node
+# host. The app writes learned board settings into its config, so the role only
+# renders the full base config when it is missing or force_config is true; it
+# updates the node section through the app's own local-node/import-node commands
+# and leaves hardware state alone.
+#
+# Release: https://github.com/Chia-Network/timelord-app/releases/tag/v1.0.0
+# The DMG is arm64, requires macOS 14 or later, and is signed and notarized.
+# The upstream repository is private; see the download variables below.
+chia_darwin_timelord_app_version: "1.0.0"
+chia_darwin_timelord_app_sha256: "c2032d433ba095b62a3dd6e0561122236f6f371b45912b39850e375d7f37287a"
+chia_darwin_timelord_app_dmg_name: "Timelord-{{ chia_darwin_timelord_app_version }}-macos-arm64.dmg"
+chia_darwin_timelord_app_dmg_url: >-
+  https://github.com/Chia-Network/timelord-app/releases/download/v{{ chia_darwin_timelord_app_version }}/{{ chia_darwin_timelord_app_dmg_name }}
+# Private release assets need the API endpoint with Accept:
+# application/octet-stream. Update the asset ID with the version and checksum.
+chia_darwin_timelord_app_asset_id: "715836523"
+chia_darwin_timelord_app_api_url: >-
+  https://api.github.com/repos/Chia-Network/timelord-app/releases/assets/{{ chia_darwin_timelord_app_asset_id }}
+chia_darwin_timelord_app_dmg: "{{ chia_darwin_companion_download_dir }}/timelord-app-{{ chia_darwin_timelord_app_version }}/{{ chia_darwin_timelord_app_dmg_name }}"
+# The upstream repository is private. Set github_token to use the pinned GitHub
+# API asset, point dmg_url at an internal mirror, or set download false and
+# place the pinned DMG at chia_darwin_timelord_app_dmg before the play runs.
+chia_darwin_timelord_app_download: true
+chia_darwin_timelord_app_github_token: ""
+chia_darwin_timelord_app_mountpoint: "{{ chia_darwin_companion_download_dir }}/timelord-app-{{ chia_darwin_timelord_app_version }}/mnt"
+chia_darwin_timelord_app_path: /Applications/Timelord.app
+chia_darwin_timelord_app_stage_path: "/Applications/.Timelord.app.ansible-new"
+chia_darwin_timelord_app_backup_path: "/Applications/.Timelord.app.ansible-old"
+chia_darwin_timelord_app_helpers_dir: "{{ chia_darwin_timelord_app_path }}/Contents/Helpers"
+chia_darwin_timelord_app_service_binary: "{{ chia_darwin_timelord_app_helpers_dir }}/timelord-service"
+chia_darwin_timelord_app_supervisor_binary: "{{ chia_darwin_timelord_app_helpers_dir }}/timelord-supervisor"
+chia_darwin_timelord_app_client_binary: "{{ chia_darwin_timelord_app_helpers_dir }}/hw_vdf_client"
+chia_darwin_timelord_app_driver_library: "{{ chia_darwin_timelord_app_path }}/Contents/Frameworks/libftd2xx.dylib"
+chia_darwin_timelord_app_installer: "{{ chia_darwin_timelord_app_path }}/Contents/Resources/install-service.sh"
+# Fixed by the vendor installer; do not put chia_darwin_launchd_prefix here.
+chia_darwin_timelord_app_service_label: net.chia.timelord.supervisor
+chia_darwin_timelord_app_config_dir: "{{ chia_darwin_home }}/Library/Application Support/Timelord"
+chia_darwin_timelord_app_config: "{{ chia_darwin_timelord_app_config_dir }}/config.toml"
+chia_darwin_timelord_app_stage_dir: "{{ chia_darwin_timelord_app_config_dir }}/.ansible"
+chia_darwin_timelord_app_stage_config: "{{ chia_darwin_timelord_app_stage_dir }}/config.toml"
+chia_darwin_timelord_app_status_listen: 127.0.0.1:9257
+# The app serves Prometheus metrics and health probes directly; no chia-exporter
+# is needed for the timelord. Match the Linux timelord monitoring posture by
+# exposing the worker deployment listener (9258) and supervisor listener (9259)
+# to the fleet scrape. Set chia_darwin_timelord_app_expose_observability false to
+# keep both on loopback and leave observability_listen unset.
+chia_darwin_timelord_app_expose_observability: true
+chia_darwin_timelord_app_observability_listen: >-
+  {{ '0.0.0.0:9258'
+  if chia_darwin_timelord_app_expose_observability | bool else '' }}
+chia_darwin_timelord_app_supervisor_listen: >-
+  {{ '0.0.0.0:9259'
+  if chia_darwin_timelord_app_expose_observability | bool else '127.0.0.1:9259' }}
+chia_darwin_timelord_app_allow_remote_observability: >-
+  {{ chia_darwin_timelord_app_expose_observability | bool }}
+chia_darwin_timelord_app_manage_service: true
+chia_darwin_timelord_app_status_port: "{{ chia_darwin_timelord_app_status_listen | split(':') | last | int }}"
+chia_darwin_timelord_app_supervisor_port: "{{ chia_darwin_timelord_app_supervisor_listen | split(':') | last | int }}"
+chia_darwin_timelord_app_observability_port: >-
+  {{ chia_darwin_timelord_app_observability_listen | split(':') | last | int
+  if chia_darwin_timelord_app_observability_listen | length > 0 else 0 }}
+chia_darwin_timelord_app_supervisor_probe_host: >-
+  {{ '127.0.0.1'
+  if chia_darwin_timelord_app_supervisor_listen.split(':')[0] in
+  ['0.0.0.0', '127.0.0.1', 'localhost']
+  else chia_darwin_timelord_app_supervisor_listen.rsplit(':', 1)[0] }}
+# App connection bundle. For remote-node set either a directory already on the
+# target (chia_darwin_timelord_app_bundle_path) or a controller directory copied
+# to chia_darwin_timelord_app_bundle_dest (chia_darwin_timelord_app_bundle_src).
+chia_darwin_timelord_app_bundle_path: ""
+chia_darwin_timelord_app_bundle_src: ""
+chia_darwin_timelord_app_bundle_dest: "{{ chia_darwin_timelord_app_config_dir }}/connection-bundle"
+chia_darwin_timelord_app_bundle_manifest: connection.toml
+chia_darwin_timelord_app_bundle_fingerprint_file: "{{ chia_darwin_timelord_app_config_dir }}/.ansible-bundle.sha256"
+chia_darwin_timelord_app_managed_marker: "{{ chia_darwin_etc_dir }}/timelord-app-managed"
+# Set true to replace the complete app config from the role template. That also
+# discards app-learned board tuning and the hardware registry.
+chia_darwin_timelord_app_force_config: false
+# Remove identity directories left by earlier bundle imports. References from
+# config.toml and the supervisor's last-good checkpoint are always kept.
+chia_darwin_timelord_app_prune_identities: true
 # Watchdog: the macOS equivalent of the Linux monit checks. It runs as root so
 # it can kickstart LaunchDaemons. The alert files stay root-only and are only
 # written when the corresponding variable is nonempty. The token and URL must

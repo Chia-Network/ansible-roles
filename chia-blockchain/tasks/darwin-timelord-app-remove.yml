@@ -1,0 +1,60 @@
+---
+# Remove the Timelord.app LaunchDaemon only when this role registered it. A
+# manually installed app is left alone. The app bundle, config, identities, and
+# learned board state are preserved so switching back is non-destructive.
+- name: Check whether this role installed the Timelord.app service
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.stat:
+    path: "{{ chia_darwin_timelord_app_managed_marker }}"
+  register: chia_darwin_timelord_app_marker
+
+- name: Remove the role-managed Timelord.app registration
+  when: chia_darwin_timelord_app_marker.stat.exists | default(false)
+  block:
+    - name: Check for the vendor service installer
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_timelord_app_installer }}"
+      register: chia_darwin_timelord_app_installer_stat
+
+    - name: Unregister Timelord.app with the vendor installer
+      become: true
+      ansible.builtin.command:
+        argv:
+          - /bin/bash
+          - "{{ chia_darwin_timelord_app_installer }}"
+          - remove
+      when: chia_darwin_timelord_app_installer_stat.stat.exists | default(false)
+      changed_when: true
+      failed_when: false
+
+    - name: Boot out a leftover Timelord.app registration
+      become: true
+      ansible.builtin.command:
+        argv:
+          - "{{ chia_darwin_launchctl }}"
+          - bootout
+          - "system/{{ chia_darwin_timelord_app_service_label }}"
+      register: chia_darwin_timelord_app_bootout
+      changed_when: chia_darwin_timelord_app_bootout.rc == 0
+      failed_when: false
+
+    - name: Remove a leftover Timelord.app plist
+      become: true
+      ansible.builtin.file:
+        path: "{{ chia_darwin_launchd_dir }}/{{ chia_darwin_timelord_app_service_label }}.plist"
+        state: absent
+
+    - name: Wait for the Timelord.app supervisor to stop
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ chia_darwin_timelord_app_supervisor_port | int }}"
+        state: stopped
+        timeout: 60
+
+    - name: Clear the role-managed Timelord.app marker
+      become: true
+      become_user: "{{ user }}"
+      ansible.builtin.file:
+        path: "{{ chia_darwin_timelord_app_managed_marker }}"
+        state: absent

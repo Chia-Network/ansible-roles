@@ -27,7 +27,11 @@
 - name: Build the Darwin LaunchDaemon job list
   ansible.builtin.include_tasks: darwin-jobs.yml
 
+- name: Validate the Darwin timelord implementation
+  ansible.builtin.include_tasks: darwin-implementation-validate.yml
+
 - name: Require a pinned chia-blockchain version
+  when: chia_darwin_install_chia_blockchain | bool
   ansible.builtin.assert:
     that:
       - chia_darwin_pip_version | length > 0
@@ -68,6 +72,7 @@
   when:
     - chia_darwin_local_timelord | bool
     - not (chia_darwin_local_full_node | bool)
+    - not (chia_darwin_timelord_app_enabled | bool)
 
 - name: Require the external database volume for local-external
   ansible.builtin.assert:
@@ -176,7 +181,12 @@
     - "{{ chia_darwin_etc_dir }}"
     - "{{ chia_darwin_log_dir }}"
 
+- name: Remove a previously role-managed Timelord.app service
+  when: not (chia_darwin_timelord_app_enabled | bool)
+  ansible.builtin.include_tasks: darwin-timelord-app-remove.yml
+
 - name: Inspect ~/.chia before choosing where CHIA_ROOT lives
+  when: chia_darwin_install_chia_blockchain | bool
   ansible.builtin.stat:
     path: "{{ chia_darwin_home }}/.chia"
   register: chia_darwin_dot_chia
@@ -192,7 +202,9 @@
       {{ chia_darwin_home }}/.chia exists and is not a symlink to
       {{ chia_darwin_volume_chia_dir }}. Move it aside before using
       local-external. This role will not delete an existing CHIA_ROOT.
-  when: chia_darwin_topology == "local-external"
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - chia_darwin_topology == "local-external"
 
 - name: Refuse to follow an external-volume symlink for an internal CHIA_ROOT
   ansible.builtin.assert:
@@ -203,14 +215,18 @@
       ({{ chia_darwin_dot_chia.stat.lnk_target | default('') }}).
       local-internal and remote-node keep CHIA_ROOT on the internal disk.
       Remove the symlink manually before switching topology.
-  when: chia_darwin_topology != "local-external"
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - chia_darwin_topology != "local-external"
 
 - name: Read mounted filesystems
   ansible.builtin.command:
     argv: [/sbin/mount]
   register: chia_darwin_mounts
   changed_when: false
-  when: chia_darwin_topology == "local-external"
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - chia_darwin_topology == "local-external"
 
 - name: Require the database volume to be mounted now
   ansible.builtin.assert:
@@ -219,7 +235,9 @@
     fail_msg: >-
       {{ chia_darwin_db_volume }} is not mounted. Mount it before running
       local-external. The role does not format or mount disks.
-  when: chia_darwin_topology == "local-external"
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - chia_darwin_topology == "local-external"
 
 - name: Ensure the on-volume chia directory exists
   become: true
@@ -229,7 +247,9 @@
     owner: "{{ user }}"
     group: "{{ chia_darwin_group }}"
     mode: "0755"
-  when: chia_darwin_topology == "local-external"
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - chia_darwin_topology == "local-external"
 
 - name: Link ~/.chia at the external volume
   become: true
@@ -240,7 +260,9 @@
     owner: "{{ user }}"
     group: "{{ chia_darwin_group }}"
     force: false
-  when: chia_darwin_topology == "local-external"
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - chia_darwin_topology == "local-external"
 
 - name: Ensure the internal CHIA_ROOT directory exists
   become: true
@@ -249,9 +271,12 @@
     path: "{{ chia_root }}"
     state: directory
     mode: "0755"
-  when: chia_darwin_topology != "local-external"
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - chia_darwin_topology != "local-external"
 
 - name: Install Homebrew packages as the Homebrew prefix owner
+  when: chia_darwin_install_chia_blockchain | bool or chia_darwin_enable_hw_vdf | bool
   become: "{{ chia_darwin_brew_user | length > 0 }}"
   become_user: "{{ chia_darwin_brew_user if chia_darwin_brew_user | length > 0 else omit }}"
   block:
@@ -386,6 +411,7 @@
   ansible.builtin.include_tasks: darwin-hw-vdf-launchd.yml
 
 - name: Create the chia virtualenv
+  when: chia_darwin_install_chia_blockchain | bool
   become: true
   become_user: "{{ user }}"
   ansible.builtin.command:
@@ -402,6 +428,7 @@
 # runs Ansible modules. A fresh Homebrew python@3.13 has neither. Call this
 # virtualenv's pip instead. PyPI remains the default index.
 - name: Ensure pip, setuptools, and wheel are in the virtualenv
+  when: chia_darwin_install_chia_blockchain | bool
   become: true
   become_user: "{{ user }}"
   ansible.builtin.command:
@@ -419,6 +446,7 @@
   changed_when: "'Successfully installed' in chia_darwin_pip_bootstrap.stdout"
 
 - name: Install pinned chia-blockchain into the virtualenv
+  when: chia_darwin_install_chia_blockchain | bool
   become: true
   become_user: "{{ user }}"
   ansible.builtin.command:
@@ -437,6 +465,7 @@
   changed_when: "'Successfully installed' in chia_darwin_pip_pinned.stdout"
 
 - name: Ensure CHIA_ROOT config and db directories exist
+  when: chia_darwin_install_chia_blockchain | bool
   become: true
   become_user: "{{ user }}"
   ansible.builtin.file:
@@ -448,11 +477,18 @@
     - db
 
 - name: Check for an existing chia config
+  when: chia_darwin_install_chia_blockchain | bool
   ansible.builtin.stat:
     path: "{{ chia_root }}/config/config.yaml"
   register: chia_darwin_config_stat
 
 - name: Initialize CHIA_ROOT
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - >-
+      (chia_darwin_pip_pinned.changed | default(false)) or
+      (chia_force_init | bool) or
+      (not (chia_darwin_config_stat.stat.exists | default(false)))
   become: true
   become_user: "{{ user }}"
   ansible.builtin.command:
@@ -463,22 +499,23 @@
   environment:
     HOME: "{{ chia_darwin_home }}"
     CHIA_ROOT: "{{ chia_root }}"
-  when: >-
-    (chia_darwin_pip_pinned.changed | default(false)) or
-    (chia_force_init | bool) or
-    (not (chia_darwin_config_stat.stat.exists | default(false)))
   changed_when: true
 
 - name: Create the custom CA directory
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - chia_darwin_custom_ca | bool
   become: true
   become_user: "{{ user }}"
   ansible.builtin.file:
     path: "{{ chia_darwin_home }}/chia-ca"
     state: directory
     mode: "0700"
-  when: chia_darwin_custom_ca | bool
 
 - name: Write custom CA files
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - chia_darwin_custom_ca | bool
   become: true
   become_user: "{{ user }}"
   no_log: true
@@ -500,9 +537,12 @@
       filename: private_ca.key
       mode: "0600"
   register: chia_darwin_ca_content
-  when: chia_darwin_custom_ca | bool
 
 - name: Initialize with the custom CA
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - chia_darwin_custom_ca | bool
+    - chia_darwin_ca_content.changed | default(false)
   become: true
   become_user: "{{ user }}"
   ansible.builtin.command:
@@ -514,11 +554,11 @@
   environment:
     HOME: "{{ chia_darwin_home }}"
     CHIA_ROOT: "{{ chia_root }}"
-  when: chia_darwin_ca_content.changed | default(false)
   changed_when: true
   notify: restart-chia-darwin
 
 - name: Write the chia config
+  when: chia_darwin_install_chia_blockchain | bool
   become: true
   become_user: "{{ user }}"
   ansible.builtin.template:
@@ -534,6 +574,7 @@
     - blockchain_backup_bucket | length > 0
 
 - name: Write the reference chia config used to detect restarts
+  when: chia_darwin_install_chia_blockchain | bool
   become: true
   become_user: "{{ user }}"
   ansible.builtin.template:
@@ -543,6 +584,7 @@
   notify: restart-chia-darwin
 
 - name: Read the installed chia version
+  when: chia_darwin_install_chia_blockchain | bool
   become: true
   become_user: "{{ user }}"
   ansible.builtin.command:
@@ -556,11 +598,13 @@
   changed_when: false
 
 - name: Record the installed chia version # noqa: var-naming[pattern]
+  when: chia_darwin_install_chia_blockchain | bool
   ansible.builtin.set_fact:
     # version.j2 expects this name; it matches the Linux tasks.
     CHIA_DETECTED_VERSION: "{{ chia_version_output.stdout }}"
 
 - name: Write the reference chia version used to detect restarts
+  when: chia_darwin_install_chia_blockchain | bool
   become: true
   become_user: "{{ user }}"
   ansible.builtin.template:
@@ -570,6 +614,9 @@
   notify: restart-chia-darwin
 
 - name: Export CHIA_ROOT for interactive zsh
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - chia_root_to_env | bool
   become: true
   become_user: "{{ user }}"
   ansible.builtin.lineinfile:
@@ -578,9 +625,11 @@
     line: "export CHIA_ROOT={{ chia_root }}"
     create: true
     mode: "0644"
-  when: chia_root_to_env | bool
 
 - name: Put the chia virtualenv on PATH for interactive zsh
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - chia_root_to_env | bool
   become: true
   become_user: "{{ user }}"
   ansible.builtin.lineinfile:
@@ -589,9 +638,11 @@
     line: "export PATH={{ chia_darwin_venv }}/bin:{{ chia_darwin_homebrew_prefix }}/bin:$PATH"
     create: true
     mode: "0644"
-  when: chia_root_to_env | bool
 
 - name: Add Chia keys
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - keys | length > 0
   become: true
   become_user: "{{ user }}"
   no_log: true
@@ -607,7 +658,6 @@
     HOME: "{{ chia_darwin_home }}"
     CHIA_ROOT: "{{ chia_root }}"
   loop: "{{ keys }}"
-  when: keys | length > 0
   register: chia_darwin_key_add
   changed_when: "'already' not in (chia_darwin_key_add.stdout | lower)"
 
@@ -618,7 +668,10 @@
     path: "{{ chia_darwin_etc_dir }}/hw-vdf.env"
     state: absent
 
-- name: Install LaunchDaemon wrapper scripts
+- name: Install the chia LaunchDaemon wrapper scripts
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - item.when | default(true) | bool
   become: true
   become_user: "{{ user }}"
   ansible.builtin.template:
@@ -634,31 +687,44 @@
       dest: "{{ chia_darwin_bin_dir }}/chia-full-node-run.sh"
     - src: darwin/chia-timelord-run.sh.j2
       dest: "{{ chia_darwin_bin_dir }}/chia-timelord-run.sh"
-    - src: darwin/rotpipe.py.j2
-      dest: "{{ chia_darwin_bin_dir }}/rotpipe.py"
+      when: "{{ chia_darwin_role_timelord | bool }}"
   loop_control:
     label: "{{ item.dest }}"
   notify: restart-chia-darwin
 
+- name: Install the log rotation helper
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.template:
+    src: darwin/rotpipe.py.j2
+    dest: "{{ chia_darwin_bin_dir }}/rotpipe.py"
+    mode: "0755"
+  notify: restart-chia-darwin-companions
+
 - name: Write the Full Disk Access note
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - chia_darwin_emit_pppc | bool
   become: true
   become_user: "{{ user }}"
   ansible.builtin.template:
     src: darwin/FULL-DISK-ACCESS.txt.j2
     dest: "{{ chia_darwin_fda_note_dest }}"
     mode: "0644"
-  when: chia_darwin_emit_pppc | bool
 
 - name: Write the PPPC profile template for MDM
+  when:
+    - chia_darwin_install_chia_blockchain | bool
+    - chia_darwin_emit_pppc | bool
   become: true
   become_user: "{{ user }}"
   ansible.builtin.template:
     src: darwin/pppc.mobileconfig.j2
     dest: "{{ chia_darwin_pppc_dest }}"
     mode: "0644"
-  when: chia_darwin_emit_pppc | bool
 
 - name: Confirm the service user can read CHIA_ROOT
+  when: chia_darwin_install_chia_blockchain | bool
   become: true
   become_user: "{{ user }}"
   ansible.builtin.stat:
@@ -667,6 +733,7 @@
   failed_when: false
 
 - name: Fail when the service user cannot read CHIA_ROOT
+  when: chia_darwin_install_chia_blockchain | bool
   ansible.builtin.assert:
     that:
       - chia_darwin_root_stat.stat.exists | default(false)
@@ -687,6 +754,10 @@
 
 - name: Install and apply the Darwin LaunchDaemons
   ansible.builtin.include_tasks: darwin-launchd-apply.yml
+
+- name: Install and configure Timelord.app
+  when: chia_darwin_timelord_app_enabled | bool
+  ansible.builtin.include_tasks: darwin-timelord-app.yml
 
 - name: Note the testnet full node port
   ansible.builtin.debug:
@@ -714,10 +785,25 @@
   ansible.builtin.debug:
     msg: >-
       topology={{ chia_darwin_topology }} network={{ network }}
+      implementation={{ chia_darwin_timelord_implementation }}
       CHIA_ROOT={{ chia_root }} log_level={{ log_level }}
       full_node_peer={{ chia_timelord_full_node_peer_host }}:{{ full_node_port }}
       outbound_peers={{ target_outbound_peer_count }}
       jobs={{ chia_darwin_launchd_jobs | selectattr('enabled', 'truthy') | map(attribute='label') | list | join(', ') }}
+      {% if chia_darwin_timelord_app_enabled | bool %}
+      Timelord.app owns the timelord and ASIC clients. Config:
+      {{ chia_darwin_timelord_app_config }}. Service:
+      {{ chia_darwin_timelord_app_service_label }}. Status:
+      http://127.0.0.1:{{ chia_darwin_timelord_app_status_port }}/v1/status.
+      {% if chia_darwin_timelord_app_observability_listen | length > 0 %}
+      Metrics: http://{{ chia_darwin_timelord_app_observability_listen }}/metrics;
+      supervisor metrics:
+      http://{{ chia_darwin_timelord_app_supervisor_listen }}/metrics.
+      {% endif %}
+      {% if not (chia_darwin_local_full_node | bool) %}
+      Connection bundle: {{ chia_darwin_timelord_app_bundle_source }}.
+      {% endif %}
+      {% endif %}
       {% if chia_darwin_topology == 'local-external' %}
       Full Disk Access for {{ chia_darwin_interpreter }} is required before
       launchd can read {{ chia_darwin_db_volume }}. See {{ chia_darwin_fda_note_dest }}.
