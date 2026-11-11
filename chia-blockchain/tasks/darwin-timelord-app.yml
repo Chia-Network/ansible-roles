@@ -676,7 +676,9 @@
   failed_when: false
 
 - name: Wait for the stopped Timelord.app service to unload
-  when: chia_darwin_timelord_app_stop.changed | default(false)
+  # A failed bootout can leave the job loaded, so wait whenever the stop task
+  # ran, not only when it reported a successful unload.
+  when: not (chia_darwin_timelord_app_stop.skipped | default(false))
   ansible.builtin.include_tasks: darwin-timelord-app-wait.yml
 
 - name: Set the Timelord.app boot preference
