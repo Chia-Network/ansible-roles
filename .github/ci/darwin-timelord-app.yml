@@ -19,6 +19,8 @@
         jobs_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-jobs.yml') }}"
         app_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-timelord-app.yml') }}"
         remove_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-timelord-app-remove.yml') }}"
+        stop_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-timelord-app-stop.yml') }}"
+        wait_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-timelord-app-wait.yml') }}"
         validate_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-implementation-validate.yml') }}"
         config_text: "{{ lookup('file', role_dir ~ '/templates/darwin/timelord-app-config.toml.j2') }}"
         watchdog_text: "{{ lookup('file', role_dir ~ '/templates/darwin/chia-watchdog.sh.j2') }}"
@@ -27,12 +29,18 @@
       ansible.builtin.assert:
         that:
           - "'chia_darwin_timelord_implementation: chia-blockchain' in defaults_text"
-          - "'chia_darwin_timelord_app_version: \"1.0.0\"' in defaults_text"
+          - '''chia_darwin_timelord_app_version: "1.0.0"'' in defaults_text'
           - "'c2032d433ba095b62a3dd6e0561122236f6f371b45912b39850e375d7f37287a' in defaults_text"
           - "'net.chia.timelord.supervisor' in defaults_text"
           - "'chia_darwin_timelord_app_download: true' in defaults_text"
-          - "'chia_darwin_timelord_app_asset_id: \"715836523\"' in defaults_text"
+          - '''chia_darwin_timelord_app_asset_id: "715836523"'' in defaults_text'
           - "'chia_darwin_timelord_app_expose_observability: true' in defaults_text"
+          - "'chia_darwin_timelord_app_stop_timeout: 60' in defaults_text"
+          - "'darwin-timelord-app-stop.yml' in app_text"
+          - "'darwin-timelord-app-wait.yml' in app_text"
+          - "'bootout' in stop_text"
+          - "'launchctl' in wait_text"
+          - "'until' in wait_text"
           - "'chia_darwin_timelord_app_github_token' in app_text"
           - "'chia_darwin_timelord_app_enabled' in jobs_text"
           - "'chia_darwin_role_timelord' in jobs_text"

@@ -1,0 +1,26 @@
+---
+# A launchd bootout can return before the job is gone. Replacing the app bundle
+# or bootstrapping a new registration while the old supervisor remains loaded
+# races with a live process, so wait for the label to disappear.
+- name: Wait for the Timelord.app LaunchDaemon to unload
+  become: true
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_launchctl }}"
+      - print
+      - "system/{{ chia_darwin_timelord_app_service_label }}"
+  register: chia_darwin_timelord_app_unload
+  until: chia_darwin_timelord_app_unload.rc != 0
+  retries: "{{ (chia_darwin_timelord_app_stop_timeout | int / 2) | round(0, 'ceil') | int }}"
+  delay: 2
+  changed_when: false
+  failed_when: false
+
+- name: Require the Timelord.app LaunchDaemon to unload
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_timelord_app_unload.rc | default(0) | int != 0
+    fail_msg: >-
+      {{ chia_darwin_timelord_app_service_label }} is still loaded after
+      {{ chia_darwin_timelord_app_stop_timeout }} seconds. Stop the app
+      manually before replacing its bundle or switching implementations.

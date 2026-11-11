@@ -81,12 +81,12 @@ the app's `chia_timelord_*` series replaces it. Re-point timelord probes from
 `/readyz` (readiness) on 9258/9259, which mirrors the Linux probe semantics.
 Full-node metrics still come from `chia-exporter` on local topologies.
 
-| Topology         | What runs                                                                 |
-| ---------------- | ------------------------------------------------------------------------- |
-| `local-internal` | Role-managed daemon/full node plus the app and its ASIC clients.           |
+| Topology         | What runs                                                                        |
+| ---------------- | -------------------------------------------------------------------------------- |
+| `local-internal` | Role-managed daemon/full node plus the app and its ASIC clients.                 |
 | `local-external` | Same, with `~/.chia` on `chia_darwin_db_volume`; Full Disk Access still applies. |
 | `remote-node`    | The app only. No Python, chia-blockchain, daemon, full node, or local CHIA_ROOT. |
-| `vdf-only`       | Refused with `timelord-app`; use `chia-blockchain` for ASIC-only Macs.     |
+| `vdf-only`       | Refused with `timelord-app`; use `chia-blockchain` for ASIC-only Macs.           |
 
 `local-*` app deployments still install the role-managed full node and daemon.
 `remote-node` app deployments skip the Homebrew Python, virtualenv,

@@ -635,6 +635,9 @@ chia_darwin_timelord_app_supervisor_listen: >-
 chia_darwin_timelord_app_allow_remote_observability: >-
   {{ chia_darwin_timelord_app_expose_observability | bool }}
 chia_darwin_timelord_app_manage_service: true
+# Seconds to wait for the vendor supervisor label to disappear from launchctl
+# before replacing the app bundle or reporting removal complete.
+chia_darwin_timelord_app_stop_timeout: 60
 chia_darwin_timelord_app_status_port: "{{ chia_darwin_timelord_app_status_listen | split(':') | last | int }}"
 chia_darwin_timelord_app_supervisor_port: "{{ chia_darwin_timelord_app_supervisor_listen | split(':') | last | int }}"
 chia_darwin_timelord_app_observability_port: >-

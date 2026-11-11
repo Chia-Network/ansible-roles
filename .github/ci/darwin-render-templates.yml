@@ -30,6 +30,24 @@
       - pppc.mobileconfig
       - rotpipe.py
       - FULL-DISK-ACCESS.txt
+    no_local_service_jobs:
+      - name: daemon
+        enabled: false
+      - name: full-node
+        enabled: false
+      - name: timelord
+        enabled: false
+    minimal_companion_jobs:
+      - name: chia-exporter
+        enabled: false
+      - name: chia-healthcheck
+        enabled: false
+      - name: node-exporter
+        enabled: true
+      - name: periodic-connect
+        enabled: false
+      - name: watchdog
+        enabled: true
   tasks:
     - name: Set the render variables
       ansible.builtin.set_fact:
@@ -239,24 +257,8 @@
 
     - name: Set the vdf-only service and companion lists
       ansible.builtin.set_fact:
-        chia_darwin_service_jobs:
-          - name: daemon
-            enabled: false
-          - name: full-node
-            enabled: false
-          - name: timelord
-            enabled: false
-        chia_darwin_companion_jobs:
-          - name: chia-exporter
-            enabled: false
-          - name: chia-healthcheck
-            enabled: false
-          - name: node-exporter
-            enabled: true
-          - name: periodic-connect
-            enabled: false
-          - name: watchdog
-            enabled: true
+        chia_darwin_service_jobs: "{{ no_local_service_jobs }}"
+        chia_darwin_companion_jobs: "{{ minimal_companion_jobs }}"
 
     - name: Render the vdf-only watchdog with no local services
       ansible.builtin.template:
@@ -365,18 +367,18 @@
       ansible.builtin.assert:
         that:
           - "'schema_version = 1' in local_config"
-          - "'status_listen = \"127.0.0.1:9257\"' in local_config"
-          - "'observability_listen = \"0.0.0.0:9258\"' in local_config"
+          - '''status_listen = "127.0.0.1:9257"'' in local_config'
+          - '''observability_listen = "0.0.0.0:9258"'' in local_config'
           - "'allow_remote_observability = true' in local_config"
-          - "'supervisor_observability_listen = \"0.0.0.0:9259\"' in local_config"
-          - "'host = \"localhost\"' in local_config"
+          - '''supervisor_observability_listen = "0.0.0.0:9259"'' in local_config'
+          - '''host = "localhost"'' in local_config'
           - "'port = 8444' in local_config"
-          - "'network = \"mainnet\"' in local_config"
-          - "'client_binary = \"/Applications/Timelord.app/Contents/Helpers/hw_vdf_client\"' in local_config"
-          - "'driver_library = \"/Applications/Timelord.app/Contents/Frameworks/libftd2xx.dylib\"' in local_config"
+          - '''network = "mainnet"'' in local_config'
+          - '''client_binary = "/Applications/Timelord.app/Contents/Helpers/hw_vdf_client"'' in local_config'
+          - '''driver_library = "/Applications/Timelord.app/Contents/Frameworks/libftd2xx.dylib"'' in local_config'
           - "'certificate =' not in local_config"
           - "'private_key =' not in local_config"
-          - "'host = \"10.0.0.5\"' in remote_config"
+          - '''host = "10.0.0.5"'' in remote_config'
 
     - name: Create the loopback Timelord.app config fixture directory
       ansible.builtin.file:
@@ -403,9 +405,9 @@
         text: "{{ timelord_app_loopback_config.content | b64decode }}"
       ansible.builtin.assert:
         that:
-          - "'observability_listen = \"0.0.0.0:9258\"' not in text"
+          - '''observability_listen = "0.0.0.0:9258"'' not in text'
           - "'allow_remote_observability = false' in text"
-          - "'supervisor_observability_listen = \"127.0.0.1:9259\"' in text"
+          - '''supervisor_observability_listen = "127.0.0.1:9259"'' in text'
 
     - name: Create the Timelord.app watchdog fixture directory
       ansible.builtin.file:
@@ -474,24 +476,8 @@
     - name: Set the remote Timelord.app watchdog fixture
       ansible.builtin.set_fact:
         chia_darwin_local_full_node: false
-        chia_darwin_service_jobs:
-          - name: daemon
-            enabled: false
-          - name: full-node
-            enabled: false
-          - name: timelord
-            enabled: false
-        chia_darwin_companion_jobs:
-          - name: chia-exporter
-            enabled: false
-          - name: chia-healthcheck
-            enabled: false
-          - name: node-exporter
-            enabled: true
-          - name: periodic-connect
-            enabled: false
-          - name: watchdog
-            enabled: true
+        chia_darwin_service_jobs: "{{ no_local_service_jobs }}"
+        chia_darwin_companion_jobs: "{{ minimal_companion_jobs }}"
 
     - name: Create the remote Timelord.app watchdog fixture directory
       ansible.builtin.file:
