@@ -1,5 +1,8 @@
 ---
 dependencies:
   - role: apt-update
+    when: ansible_os_family != "Darwin"
   - role: unattended-upgrades
+    when: ansible_os_family != "Darwin"
   - role: ssh-ca
+    when: ansible_os_family != "Darwin"

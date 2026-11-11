@@ -1,0 +1,157 @@
+---
+# smartctl_exporter on macOS. smartmontools comes from Homebrew; the exporter
+# itself is a pinned upstream darwin artifact run from a root LaunchDaemon.
+- name: Require Homebrew for smartctl_exporter
+  ansible.builtin.stat:
+    path: "{{ smartctl_exporter_darwin_brew }}"
+  register: smartctl_exporter_darwin_brew_stat
+
+- name: Fail when Homebrew is not installed
+  ansible.builtin.assert:
+    that:
+      - smartctl_exporter_darwin_brew_stat.stat.exists | default(false)
+      - smartctl_exporter_darwin_brew_stat.stat.executable | default(false)
+    fail_msg: >-
+      Homebrew was not found at {{ smartctl_exporter_darwin_brew }}. Install it
+      for the Homebrew prefix owner before running this role. Set
+      smartctl_exporter_darwin_brew_user when the SSH login does not own the
+      prefix.
+
+- name: Check whether smartmontools is installed
+  become: "{{ smartctl_exporter_darwin_brew_user | length > 0 }}"
+  become_user: "{{ smartctl_exporter_darwin_brew_user if smartctl_exporter_darwin_brew_user | length > 0 else omit }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ smartctl_exporter_darwin_brew }}"
+      - list
+      - --versions
+      - "{{ smartctl_exporter_darwin_formula }}"
+  register: smartctl_exporter_darwin_formula_list
+  changed_when: false
+  failed_when: false
+
+- name: Install smartmontools with Homebrew
+  become: "{{ smartctl_exporter_darwin_brew_user | length > 0 }}"
+  become_user: "{{ smartctl_exporter_darwin_brew_user if smartctl_exporter_darwin_brew_user | length > 0 else omit }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ smartctl_exporter_darwin_brew }}"
+      - install
+      - "{{ smartctl_exporter_darwin_formula }}"
+  when: smartctl_exporter_darwin_formula_list.rc != 0
+  changed_when: true
+
+- name: Require the smartctl binary
+  ansible.builtin.stat:
+    path: "{{ smartctl_exporter_darwin_smartctl }}"
+  register: smartctl_exporter_darwin_smartctl_stat
+
+- name: Fail when smartctl is missing
+  ansible.builtin.assert:
+    that:
+      - smartctl_exporter_darwin_smartctl_stat.stat.exists | default(false)
+      - smartctl_exporter_darwin_smartctl_stat.stat.executable | default(false)
+    fail_msg: >-
+      {{ smartctl_exporter_darwin_smartctl }} does not exist after installing
+      {{ smartctl_exporter_darwin_formula }}.
+
+- name: Ensure smartctl_exporter directories exist
+  become: "{{ smartctl_exporter_darwin_become | bool }}"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ smartctl_exporter_darwin_owner }}"
+    group: "{{ smartctl_exporter_darwin_group }}"
+    mode: "0755"
+  loop:
+    - "{{ smartctl_exporter_darwin_install_dir }}"
+    - "{{ smartctl_exporter_darwin_state_dir }}"
+    - "{{ smartctl_exporter_darwin_download_dir }}"
+
+- name: Download smartctl_exporter
+  become: "{{ smartctl_exporter_darwin_become | bool }}"
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/prometheus-community/smartctl_exporter/releases/download/v{{ smartctl_exporter_darwin_version }}/smartctl_exporter-{{ smartctl_exporter_darwin_version }}.{{ smartctl_exporter_darwin_arch }}.tar.gz
+    dest: >-
+      {{ smartctl_exporter_darwin_download_dir }}/smartctl_exporter-{{ smartctl_exporter_darwin_version }}.{{ smartctl_exporter_darwin_arch }}.tar.gz
+    checksum: "sha256:{{ smartctl_exporter_darwin_sha256[smartctl_exporter_darwin_arch] }}"
+    mode: "0644"
+  register: smartctl_exporter_darwin_download
+  when: smartctl_exporter_darwin_install_binary | bool
+
+- name: Check for the extracted smartctl_exporter binary
+  ansible.builtin.stat:
+    path: "{{ smartctl_exporter_darwin_install_dir }}/smartctl_exporter"
+  register: smartctl_exporter_darwin_extracted
+  when: smartctl_exporter_darwin_install_binary | bool
+
+- name: Extract smartctl_exporter
+  become: "{{ smartctl_exporter_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/tar
+      - -xzf
+      - >-
+        {{ smartctl_exporter_darwin_download_dir }}/smartctl_exporter-{{ smartctl_exporter_darwin_version }}.{{ smartctl_exporter_darwin_arch }}.tar.gz
+      - -C
+      - "{{ smartctl_exporter_darwin_install_dir }}"
+      - --strip-components=1
+  when: >-
+    (smartctl_exporter_darwin_install_binary | bool) and
+    ((smartctl_exporter_darwin_download.changed | default(false)) or
+    not (smartctl_exporter_darwin_extracted.stat.exists | default(false)))
+  changed_when: true
+
+- name: Install the smartctl_exporter binary
+  become: "{{ smartctl_exporter_darwin_become | bool }}"
+  ansible.builtin.copy:
+    src: "{{ smartctl_exporter_darwin_install_dir }}/smartctl_exporter"
+    dest: "{{ smartctl_exporter_darwin_bin }}"
+    remote_src: true
+    owner: "{{ smartctl_exporter_darwin_owner }}"
+    group: "{{ smartctl_exporter_darwin_group }}"
+    mode: "0755"
+  when: smartctl_exporter_darwin_install_binary | bool
+  notify: restart smartctl_exporter darwin
+
+- name: Install the smartctl_exporter LaunchDaemon
+  become: "{{ smartctl_exporter_darwin_become | bool }}"
+  ansible.builtin.template:
+    src: smartctl_exporter.plist.j2
+    dest: "{{ smartctl_exporter_darwin_launchd_dir }}/{{ smartctl_exporter_darwin_launchd_label }}.plist"
+    owner: "{{ smartctl_exporter_darwin_owner }}"
+    group: "{{ smartctl_exporter_darwin_group }}"
+    mode: "0644"
+  notify: restart smartctl_exporter darwin
+
+- name: Check whether the smartctl_exporter LaunchDaemon is loaded
+  become: "{{ smartctl_exporter_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ smartctl_exporter_darwin_launchctl }}"
+      - print
+      - "system/{{ smartctl_exporter_darwin_launchd_label }}"
+  register: smartctl_exporter_darwin_loaded
+  changed_when: false
+  failed_when: false
+
+- name: Enable the smartctl_exporter LaunchDaemon at boot
+  become: "{{ smartctl_exporter_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ smartctl_exporter_darwin_launchctl }}"
+      - enable
+      - "system/{{ smartctl_exporter_darwin_launchd_label }}"
+  changed_when: false
+
+- name: Bootstrap the smartctl_exporter LaunchDaemon
+  become: "{{ smartctl_exporter_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ smartctl_exporter_darwin_launchctl }}"
+      - bootstrap
+      - system
+      - "{{ smartctl_exporter_darwin_launchd_dir }}/{{ smartctl_exporter_darwin_launchd_label }}.plist"
+  when: smartctl_exporter_darwin_loaded.rc != 0
+  changed_when: true

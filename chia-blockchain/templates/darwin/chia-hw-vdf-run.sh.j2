@@ -9,6 +9,8 @@
 
 FREQ={{ chia_darwin_hw_vdf_freq | quote }}
 VOLTAGE={{ chia_darwin_hw_vdf_voltage | quote }}
+MAX_FREQ={{ chia_darwin_hw_vdf_max_freq | int }}
+AUTO_FREQ_PERIOD={{ chia_darwin_hw_vdf_auto_freq_period | int }}
 VDF_THREADS={{ chia_darwin_hw_vdf_vdf_threads | quote }}
 PROOF_THREADS={{ chia_darwin_hw_vdf_proof_threads | quote }}
 CHECKPOINT_THRESHOLD={{ chia_darwin_hw_vdf_checkpoint_threshold | quote }}
@@ -27,8 +29,13 @@ N_VDFS={{ chia_hw_board.n_vdfs | quote }}
 SERIAL={{ chia_hw_board.expected_serial | quote }}
 {% endif %}
 
+{% if chia_darwin_local_timelord | default(true) | bool == false %}
+# vdf-only has no local timelord: connect to the remote VDF server and do not
+# block on a local listener that will never appear.
+{% else %}
 wait_for_db_volume
 wait_for_listen "$PORT" # timelord vdf_server must be up (hw_vdf_client exits if it can't connect)
+{% endif %}
 sleep {{ chia_darwin_hw_vdf_settle_seconds | int }}
 {% if per_board %}
 OPEN_DELAY={{ chia_hw_board.open_delay | int }}
@@ -36,10 +43,12 @@ OPEN_DELAY={{ chia_hw_board.open_delay | int }}
 {% endif %}
 
 LOG={{ chia_darwin_log_dir | quote }}/{{ chia_hw_board.log_name if per_board else 'hw-vdf.log' }}
-log "starting hw_vdf_client freq=$FREQ voltage=$VOLTAGE vdf-threads=$VDF_THREADS proof-threads=$PROOF_THREADS mask=$VDFS_MASK serial=$SERIAL -> $IP:$PORT x$N_VDFS" >>"$LOG"
+log "starting hw_vdf_client freq=$FREQ max-freq=$MAX_FREQ auto-freq-period=$AUTO_FREQ_PERIOD voltage=$VOLTAGE vdf-threads=$VDF_THREADS proof-threads=$PROOF_THREADS mask=$VDFS_MASK serial=$SERIAL -> $IP:$PORT x$N_VDFS" >>"$LOG"
 
 cmd=("$HW_VDF_CLIENT" --freq "$FREQ")
 [ -n "$VOLTAGE" ] && cmd+=(--voltage "$VOLTAGE")
+[ "$MAX_FREQ" -gt 0 ] && cmd+=(--max-freq "$MAX_FREQ")
+[ "$AUTO_FREQ_PERIOD" -gt 0 ] && cmd+=(--auto-freq-period "$AUTO_FREQ_PERIOD")
 cmd+=(--vdf-threads "$VDF_THREADS" --proof-threads "$PROOF_THREADS")
 [ "$RETAIN_ASIC_VALUES" = "1" ] && cmd+=(--retain-asic-values)
 {% if per_board %}

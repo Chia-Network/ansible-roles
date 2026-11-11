@@ -2,5 +2,6 @@
 # Managed by the chia-blockchain Ansible role.
 # Mirrors the Linux node-exporter unit: run as the service user on :9100.
 . {{ chia_darwin_env_script | quote }}
-log "starting node_exporter (listen :{{ chia_darwin_node_exporter_port | int }})"
-exec {{ chia_darwin_companion_bin_dir | quote }}/node_exporter --web.listen-address=:{{ chia_darwin_node_exporter_port | int }}
+LOG={{ chia_darwin_log_dir | quote }}/node-exporter.log
+log "starting node_exporter (listen :{{ chia_darwin_node_exporter_port | int }})" >>"$LOG"
+exec {{ chia_darwin_companion_bin_dir | quote }}/node_exporter --web.listen-address=:{{ chia_darwin_node_exporter_port | int }} > >({{ chia_darwin_bin_dir | quote }}/rotpipe.py "$LOG" {{ chia_darwin_companion_rotpipe_max_bytes | quote }} {{ chia_darwin_companion_rotpipe_backups | quote }}) 2>&1

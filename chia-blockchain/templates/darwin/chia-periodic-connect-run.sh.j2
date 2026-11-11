@@ -1,0 +1,15 @@
+#!/bin/zsh
+# Managed by the chia-blockchain Ansible role.
+# Mirrors the Linux periodic peer-connect cron job. launchd runs this on a
+# StartInterval; chia_periodic_connect_peers drives which peers are contacted.
+. {{ chia_darwin_env_script | quote }}
+LOG={{ chia_darwin_log_dir | quote }}/periodic-connect.log
+rc=0
+{% for peer in chia_periodic_connect_peers %}
+log "connecting full_node peer {{ peer }}:{{ full_node_port }}" >>"$LOG"
+{{ chia_darwin_venv | quote }}/bin/chia peer full_node -a {{ peer | quote }}:{{ full_node_port | quote }} >>"$LOG" 2>&1 || {
+	log "peer connect {{ peer }} failed" >>"$LOG"
+	rc=1
+}
+{% endfor %}
+exit "$rc"

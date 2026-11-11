@@ -13,9 +13,19 @@ loki_endpoint: ""
 loki_basic_auth_username: ""
 loki_basic_auth_password: ""
 
+# Platform paths. Linux uses syslog/fail2ban; macOS uses system.log and has no
+# fail2ban by default. A host can override any of these paths.
+alloy_syslog_path: "{{ '/var/log/system.log' if ansible_os_family | default('') == 'Darwin' else '/var/log/syslog' }}"
+alloy_fail2ban_log_path: /var/log/fail2ban.log
+# macOS keeps CHIA_ROOT under the service user, not /home/ubuntu. Set
+# alloy_darwin_chia_root when the inventory's chia_root is not already the
+# Darwin path; otherwise the generic chia_root is used.
+alloy_darwin_chia_root: ""
+alloy_chia_log_path: "{{ (alloy_darwin_chia_root if alloy_darwin_chia_root | length > 0 else chia_root) }}/log/debug.log"
+
 # Built-in log sources (opt-out)
 alloy_enable_syslog_source: true
-alloy_enable_fail2ban_source: true
+alloy_enable_fail2ban_source: "{{ ansible_os_family | default('') != 'Darwin' }}"
 alloy_enable_chia_source: true
 
 # Chia log labels (only used when alloy_enable_chia_source is true)
@@ -52,3 +62,33 @@ alloy_additional_files: []
 
 alloy_start_on_boot: true
 alloy_start_now: true
+
+# ---------------------------------------------------------------------------
+# Darwin (Homebrew + launchd). Unused on Linux.
+# ---------------------------------------------------------------------------
+alloy_darwin_homebrew_prefix: /opt/homebrew
+alloy_darwin_brew: "{{ alloy_darwin_homebrew_prefix }}/bin/brew"
+# When the SSH/automation login is not the Homebrew prefix owner, set this to
+# the owner. Homebrew tasks then run as that user through sudo.
+alloy_darwin_brew_user: ""
+alloy_darwin_formula: grafana-alloy
+alloy_darwin_binary: "{{ alloy_darwin_homebrew_prefix }}/bin/alloy"
+alloy_darwin_config_dir: /usr/local/etc/alloy
+alloy_darwin_config_file: "{{ alloy_darwin_config_dir }}/config.alloy"
+alloy_darwin_state_dir: /var/lib/alloy
+alloy_darwin_launchd_dir: /Library/LaunchDaemons
+alloy_darwin_launchd_label: net.chia.alloy
+alloy_darwin_launchctl: /bin/launchctl
+alloy_darwin_become: true
+alloy_darwin_owner: root
+alloy_darwin_group: wheel
+alloy_darwin_unload_retries: 30
+alloy_darwin_unload_delay: 1
+alloy_darwin_http_listen_addr: 127.0.0.1:12345
+alloy_darwin_watchdog_log: /var/log/chia-watchdog.log
+# Ship the Darwin watchdog log by default so restarts and alert skips reach
+# Loki even when the webhook sink is not configured.
+alloy_darwin_extra_log_files:
+  - name: chia-watchdog
+    path: "{{ alloy_darwin_watchdog_log }}"
+    job: chia-watchdog

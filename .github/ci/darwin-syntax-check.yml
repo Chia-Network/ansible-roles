@@ -10,6 +10,8 @@
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-db-seed.yml
     - name: Import the Darwin companion tasks
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-companions.yml
+    - name: Import the Darwin job-list tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-jobs.yml
     - name: Import the Darwin hw-vdf board tasks
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-hw-vdf-boards.yml
     - name: Import the Darwin hw-vdf install tasks
@@ -22,6 +24,12 @@
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-launchd-job.yml
     - name: Import the Darwin restart tasks
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-restart-job.yml
+    - name: Import the Darwin base-setup tasks
+      ansible.builtin.import_tasks: ../../base-setup/tasks/darwin.yml
+    - name: Import the Darwin Alloy tasks
+      ansible.builtin.import_tasks: ../../alloy/tasks/darwin.yml
+    - name: Import the Darwin smartctl_exporter tasks
+      ansible.builtin.import_tasks: ../../smartctl-exporter/tasks/darwin.yml
 
 - name: Syntax check the chia-blockchain role on Darwin
   hosts: localhost

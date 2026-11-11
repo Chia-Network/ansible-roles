@@ -1,0 +1,163 @@
+---
+# Grafana Alloy on macOS. Homebrew owns the binary; this role owns a root
+# LaunchDaemon and a config directory so Alloy can read the Chia service logs.
+- name: Require Homebrew for Alloy
+  ansible.builtin.stat:
+    path: "{{ alloy_darwin_brew }}"
+  register: alloy_darwin_brew_stat
+
+- name: Fail when Homebrew is not installed
+  ansible.builtin.assert:
+    that:
+      - alloy_darwin_brew_stat.stat.exists | default(false)
+      - alloy_darwin_brew_stat.stat.executable | default(false)
+    fail_msg: >-
+      Homebrew was not found at {{ alloy_darwin_brew }}. Install it for the
+      Homebrew prefix owner before running this role. Set
+      alloy_darwin_brew_user when the SSH login does not own the prefix.
+
+- name: Check whether Grafana Alloy is installed
+  become: "{{ alloy_darwin_brew_user | length > 0 }}"
+  become_user: "{{ alloy_darwin_brew_user if alloy_darwin_brew_user | length > 0 else omit }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ alloy_darwin_brew }}"
+      - list
+      - --versions
+      - "{{ alloy_darwin_formula }}"
+  register: alloy_darwin_formula_list
+  changed_when: false
+  failed_when: false
+
+- name: Install Grafana Alloy with Homebrew
+  become: "{{ alloy_darwin_brew_user | length > 0 }}"
+  become_user: "{{ alloy_darwin_brew_user if alloy_darwin_brew_user | length > 0 else omit }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ alloy_darwin_brew }}"
+      - install
+      - "{{ alloy_darwin_formula }}"
+  when: alloy_darwin_formula_list.rc != 0
+  changed_when: true
+
+- name: Require the Alloy binary
+  ansible.builtin.stat:
+    path: "{{ alloy_darwin_binary }}"
+  register: alloy_darwin_binary_stat
+
+- name: Fail when the Alloy binary is missing
+  ansible.builtin.assert:
+    that:
+      - alloy_darwin_binary_stat.stat.exists | default(false)
+      - alloy_darwin_binary_stat.stat.executable | default(false)
+    fail_msg: >-
+      {{ alloy_darwin_binary }} does not exist after installing
+      {{ alloy_darwin_formula }}. Set alloy_darwin_binary if the Homebrew
+      layout differs.
+
+- name: Ensure Alloy directories exist
+  become: "{{ alloy_darwin_become | bool }}"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ alloy_darwin_owner }}"
+    group: "{{ alloy_darwin_group }}"
+    mode: "0755"
+  loop:
+    - "{{ alloy_darwin_config_dir }}"
+    - "{{ alloy_darwin_state_dir }}"
+
+- name: Deploy optional Alloy snippet files
+  become: "{{ alloy_darwin_become | bool }}"
+  ansible.builtin.copy:
+    dest: "{{ item.path }}"
+    content: "{{ item.content }}"
+    owner: "{{ alloy_darwin_owner }}"
+    group: "{{ alloy_darwin_group }}"
+    mode: "0640"
+  loop: "{{ alloy_additional_files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  notify: restart alloy darwin
+
+- name: Template Alloy main config
+  become: "{{ alloy_darwin_become | bool }}"
+  ansible.builtin.template:
+    src: config.alloy.j2
+    dest: "{{ alloy_darwin_config_file }}"
+    owner: "{{ alloy_darwin_owner }}"
+    group: "{{ alloy_darwin_group }}"
+    mode: "0640"
+  notify: restart alloy darwin
+
+- name: Install the Alloy LaunchDaemon
+  become: "{{ alloy_darwin_become | bool }}"
+  ansible.builtin.template:
+    src: alloy.plist.j2
+    dest: "{{ alloy_darwin_launchd_dir }}/{{ alloy_darwin_launchd_label }}.plist"
+    owner: "{{ alloy_darwin_owner }}"
+    group: "{{ alloy_darwin_group }}"
+    mode: "0644"
+  notify: restart alloy darwin
+
+- name: Check whether the Alloy LaunchDaemon is loaded
+  become: "{{ alloy_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      [
+        "{{ alloy_darwin_launchctl }}",
+        print,
+        "system/{{ alloy_darwin_launchd_label }}",
+      ]
+  register: alloy_darwin_loaded
+  changed_when: false
+  failed_when: false
+
+- name: Remove a stopped Alloy LaunchDaemon
+  become: "{{ alloy_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      [
+        "{{ alloy_darwin_launchctl }}",
+        bootout,
+        "system/{{ alloy_darwin_launchd_label }}",
+      ]
+  when:
+    - alloy_darwin_loaded.rc == 0
+    - not (alloy_start_now | bool)
+  changed_when: true
+  failed_when: false
+
+- name: Enable the Alloy LaunchDaemon before bootstrap
+  become: "{{ alloy_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ alloy_darwin_launchctl }}"
+      - enable
+      - "system/{{ alloy_darwin_launchd_label }}"
+  when:
+    - alloy_start_now | bool
+    - alloy_darwin_loaded.rc != 0
+  changed_when: false
+
+- name: Bootstrap the Alloy LaunchDaemon
+  become: "{{ alloy_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ alloy_darwin_launchctl }}"
+      - bootstrap
+      - system
+      - "{{ alloy_darwin_launchd_dir }}/{{ alloy_darwin_launchd_label }}.plist"
+  when:
+    - alloy_start_now | bool
+    - alloy_darwin_loaded.rc != 0
+  changed_when: true
+
+- name: Set the Alloy LaunchDaemon boot state
+  become: "{{ alloy_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ alloy_darwin_launchctl }}"
+      - "{{ 'enable' if alloy_start_on_boot | bool else 'disable' }}"
+      - "system/{{ alloy_darwin_launchd_label }}"
+  changed_when: false

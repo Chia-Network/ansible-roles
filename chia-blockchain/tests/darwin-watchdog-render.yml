@@ -1,0 +1,53 @@
+---
+# Render the production Darwin watchdog for the behavior tests. The job lists
+# come from the same task file the role uses, so topology changes cannot drift
+# between production and the tests.
+- name: Render the Darwin watchdog
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../defaults/main.yml
+  tasks:
+    - name: Set the test variables above the defaults
+      ansible.builtin.set_fact:
+        user: timelord
+        log_level: INFO
+        network: mainnet
+        chia_darwin_topology: "{{ watchdog_topology }}"
+        chia_root: "{{ test_root }}/home/.chia/mainnet"
+        chia_darwin_home: "{{ test_root }}/home"
+        chia_darwin_venv: "{{ test_root }}/venv"
+        chia_darwin_bin_dir: "{{ test_root }}/home/bin"
+        chia_darwin_etc_dir: "{{ test_root }}/home/etc"
+        chia_darwin_log_dir: "{{ test_root }}/home/logs"
+        chia_darwin_watchdog_conf_dir: "{{ test_root }}/watchdog-conf"
+        chia_darwin_watchdog_script: "{{ test_root }}/watchdog.sh"
+        chia_darwin_watchdog_log: "{{ test_root }}/watchdog.log"
+        chia_darwin_launchd_dir: "{{ test_root }}/plists"
+        chia_darwin_sudo: sudo
+        chia_darwin_hw_vdf_jobs:
+          - name: hw-vdf
+            label: net.chia.timelord.hw-vdf
+            enabled: true
+            board:
+              n_vdfs: 1
+          - name: hw-vdf-2
+            label: net.chia.timelord.hw-vdf-2
+            enabled: true
+            board:
+              n_vdfs: 1
+          - name: hw-vdf-3
+            label: net.chia.timelord.hw-vdf-3
+            enabled: true
+            board:
+              n_vdfs: 1
+
+    - name: Build the production Darwin job lists
+      ansible.builtin.include_tasks: ../tasks/darwin-jobs.yml
+
+    - name: Render the watchdog
+      ansible.builtin.template:
+        src: ../templates/darwin/chia-watchdog.sh.j2
+        dest: "{{ watchdog_out }}"
+        mode: "0755"

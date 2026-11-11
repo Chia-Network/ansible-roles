@@ -12,6 +12,7 @@
       - local-internal
       - local-external
       - remote-node
+      - vdf-only
     templates:
       - chia-daemon-run.sh
       - chia-env.sh
@@ -19,8 +20,9 @@
       - chia-full-node-run.sh
       - chia-healthcheck-run.sh
       - chia-hw-vdf-run.sh
+      - chia-periodic-connect-run.sh
+      - chia-periodic-connect.plist
       - chia-timelord-run.sh
-      - chia-watchdog.sh
       - chia-watchdog.plist
       - launchdaemon.plist
       - node-exporter-run.sh
@@ -34,6 +36,8 @@
         chia_root: /Users/timelord/.chia
         chia_darwin_hw_vdf_expected_serial: "FT'TEST 01"
         chia_timelord_full_node_peer_host: 10.0.0.5
+        chia_periodic_connect_peers:
+          - seed.example.net
         chia_darwin_hw_vdf_jobs:
           - name: hw-vdf
             enabled: true
@@ -69,6 +73,7 @@
           wrapper: /Users/timelord/bin/chia-timelord-run.sh
           throttle: 10
           exit_timeout: 30
+          start_interval: 300
 
     - name: Create the topology output directories
       ansible.builtin.file:
@@ -84,6 +89,8 @@
         mode: "0644"
       vars:
         chia_darwin_topology: "{{ item.0 }}"
+        chia_darwin_local_full_node: "{{ item.0 in ['local-internal', 'local-external'] }}"
+        chia_darwin_local_timelord: "{{ item.0 != 'vdf-only' }}"
       loop: "{{ topologies | product(templates) | list }}"
       loop_control:
         label: "{{ item.0 }}/{{ item.1 }}"
@@ -125,9 +132,28 @@
           - '''CHECK_FULL_NODE="0"'' in text'
           - '''SERVICE_JOB_LIST="daemon timelord"'' in text'
           - '''CHECK_HEALTHCHECK="1"'' in text'
+          - '''CHECK_FULL_NODE_PORTS="0"'' in text'
           - '''CHECK_EXPORTER="1"'' in text'
           - '''CHECK_NODE="1"'' in text'
           - '''EXPECTED_VDFS="3"'' in text'
+
+    - name: Restore the local full-service list
+      ansible.builtin.set_fact:
+        chia_darwin_service_jobs:
+          - name: daemon
+            enabled: true
+          - name: full-node
+            enabled: true
+          - name: timelord
+            enabled: true
+
+    - name: Render the local-external watchdog
+      ansible.builtin.template:
+        src: "../../chia-blockchain/templates/darwin/chia-watchdog.sh.j2"
+        dest: "{{ render_out }}/local-external/chia-watchdog.sh"
+        mode: "0644"
+      vars:
+        chia_darwin_topology: local-external
 
     - name: Read the local watchdog
       ansible.builtin.slurp:
@@ -152,6 +178,13 @@
           - >-
             'EXPECTED_VDFS="3"' in text
           - "'ENABLE_ON_BOOT=1' in text"
+          - '''CHECK_FULL_NODE_PORTS="1"'' in text'
+          - "'DEBUG_THRESHOLD=2' in text"
+          - "'set_log_level' in text"
+          - "'fnp_fail' in text"
+          - "'/full_node/ports' in text"
+          - "'GRACE_BOOT=${WATCHDOG_BOOT_GRACE:-3600}' in text"
+          - "'GRACE_RESTART=${WATCHDOG_RESTART_GRACE:-600}' in text"
 
     - name: Create the no-boot watchdog fixture directory
       ansible.builtin.file:
@@ -183,3 +216,135 @@
             'launchctl enable "system/$PREFIX.$1"' in text
           - >-
             'launchctl disable "system/$PREFIX.$1"' in text
+
+    - name: Read the vdf-only hw-vdf wrapper
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/vdf-only/chia-hw-vdf-run.sh"
+      register: vdf_only_wrapper
+
+    - name: vdf-only skips the local timelord wait
+      vars:
+        text: "{{ vdf_only_wrapper.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - "'vdf-only has no local timelord' in text"
+          - '''wait_for_listen "$PORT"'' not in text'
+
+    - name: Create the vdf-only watchdog fixture directory
+      ansible.builtin.file:
+        path: "{{ render_out }}/vdf-only-no-services"
+        state: directory
+        mode: "0755"
+
+    - name: Set the vdf-only service and companion lists
+      ansible.builtin.set_fact:
+        chia_darwin_service_jobs:
+          - name: daemon
+            enabled: false
+          - name: full-node
+            enabled: false
+          - name: timelord
+            enabled: false
+        chia_darwin_companion_jobs:
+          - name: chia-exporter
+            enabled: false
+          - name: chia-healthcheck
+            enabled: false
+          - name: node-exporter
+            enabled: true
+          - name: periodic-connect
+            enabled: false
+          - name: watchdog
+            enabled: true
+
+    - name: Render the vdf-only watchdog with no local services
+      ansible.builtin.template:
+        src: "../../chia-blockchain/templates/darwin/chia-watchdog.sh.j2"
+        dest: "{{ render_out }}/vdf-only-no-services/chia-watchdog.sh"
+        mode: "0644"
+      vars:
+        chia_darwin_topology: vdf-only
+
+    - name: Read the vdf-only watchdog
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/vdf-only-no-services/chia-watchdog.sh"
+      register: vdf_only_watchdog
+
+    - name: The vdf-only watchdog checks boards but not local HTTP services
+      vars:
+        text: "{{ vdf_only_watchdog.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - '''CHECK_FULL_NODE="0"'' in text'
+          - '''CHECK_HEALTHCHECK="0"'' in text'
+          - '''CHECK_FULL_NODE_PORTS="0"'' in text'
+          - "'CHECK_VDF_CONNS' not in text"
+          - '''SERVICE_JOB_LIST=""'' in text'
+          - '''EXPECTED_VDFS="3"'' in text'
+          - "'hw_jobs_running' in text"
+
+    - name: Create the VDF tuning fixture directory
+      ansible.builtin.file:
+        path: "{{ render_out }}/vdf-tuning"
+        state: directory
+        mode: "0755"
+
+    - name: Render the hw-vdf wrapper with auto-freq and max-freq
+      ansible.builtin.template:
+        src: "../../chia-blockchain/templates/darwin/chia-hw-vdf-run.sh.j2"
+        dest: "{{ render_out }}/vdf-tuning/chia-hw-vdf-run.sh"
+        mode: "0644"
+      vars:
+        chia_darwin_topology: local-external
+        chia_darwin_local_full_node: true
+        chia_darwin_local_timelord: true
+        chia_darwin_hw_vdf_auto_freq_period: 60
+        chia_darwin_hw_vdf_max_freq: 1620
+
+    - name: Read the tuned hw-vdf wrapper
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/vdf-tuning/chia-hw-vdf-run.sh"
+      register: tuned_hw_vdf
+
+    - name: The hw-vdf wrapper passes the Linux tuning flags
+      vars:
+        text: "{{ tuned_hw_vdf.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - '''--max-freq "$MAX_FREQ"'' in text'
+          - '''--auto-freq-period "$AUTO_FREQ_PERIOD"'' in text'
+          - "'MAX_FREQ=1620' in text"
+          - "'AUTO_FREQ_PERIOD=60' in text"
+
+    - name: Read the node-exporter wrapper
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/local-external/node-exporter-run.sh"
+      register: node_exporter_wrapper
+
+    - name: The node-exporter wrapper rotates its log
+      vars:
+        text: "{{ node_exporter_wrapper.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - "'node-exporter.log' in text"
+          - "'rotpipe.py' in text"
+
+    - name: Read the periodic peer-connect wrapper and plist
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/local-external/{{ item }}"
+      loop:
+        - chia-periodic-connect-run.sh
+        - chia-periodic-connect.plist
+      register: periodic_files
+
+    - name: The periodic peer job connects on a launchd interval
+      vars:
+        wrapper: "{{ periodic_files.results[0].content | b64decode }}"
+        plist: "{{ periodic_files.results[1].content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - "'chia peer full_node -a seed.example.net:8444' in wrapper"
+          - "'periodic-connect.log' in wrapper"
+          - "'<key>StartInterval</key><integer>300</integer>' in plist"
+          - "'<key>RunAtLoad</key><true/>' in plist"
+          - "'<key>KeepAlive</key>' not in plist"

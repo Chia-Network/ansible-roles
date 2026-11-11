@@ -9,3 +9,85 @@
   register: systemd_action
   retries: 10
   until: systemd_action is success
+
+- name: Boot out Alloy for restart
+  listen: restart alloy darwin
+  become: "{{ alloy_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      [
+        "{{ alloy_darwin_launchctl }}",
+        bootout,
+        "system/{{ alloy_darwin_launchd_label }}",
+      ]
+  when: alloy_start_now | bool
+  failed_when: false
+  changed_when: true
+
+- name: Wait for Alloy to unload before restart
+  listen: restart alloy darwin
+  become: "{{ alloy_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      [
+        "{{ alloy_darwin_launchctl }}",
+        print,
+        "system/{{ alloy_darwin_launchd_label }}",
+      ]
+  register: alloy_darwin_restart_loaded
+  when: alloy_start_now | bool
+  retries: "{{ alloy_darwin_unload_retries | int }}"
+  delay: "{{ alloy_darwin_unload_delay | int }}"
+  until: alloy_darwin_restart_loaded.rc != 0
+  failed_when: false
+  changed_when: false
+
+- name: Require Alloy to be unloaded before bootstrap
+  listen: restart alloy darwin
+  ansible.builtin.assert:
+    that:
+      - alloy_darwin_restart_loaded.rc | default(0) | int != 0
+    fail_msg: >-
+      Alloy is still loaded after waiting
+      {{ alloy_darwin_unload_retries }} tries; refusing to bootstrap.
+  when: alloy_start_now | bool
+
+- name: Enable Alloy before restart
+  listen: restart alloy darwin
+  become: "{{ alloy_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      [
+        "{{ alloy_darwin_launchctl }}",
+        enable,
+        "system/{{ alloy_darwin_launchd_label }}",
+      ]
+  when: alloy_start_now | bool
+  changed_when: false
+
+- name: Bootstrap Alloy after restart
+  listen: restart alloy darwin
+  become: "{{ alloy_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ alloy_darwin_launchctl }}"
+      - bootstrap
+      - system
+      - "{{ alloy_darwin_launchd_dir }}/{{ alloy_darwin_launchd_label }}.plist"
+  when: alloy_start_now | bool
+  changed_when: true
+
+- name: Restore the Alloy boot state after restart
+  listen: restart alloy darwin
+  become: "{{ alloy_darwin_become | bool }}"
+  ansible.builtin.command:
+    argv:
+      [
+        "{{ alloy_darwin_launchctl }}",
+        disable,
+        "system/{{ alloy_darwin_launchd_label }}",
+      ]
+  when:
+    - alloy_start_now | bool
+    - not (alloy_start_on_boot | bool)
+  changed_when: false

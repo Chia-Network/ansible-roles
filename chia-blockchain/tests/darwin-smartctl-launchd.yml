@@ -1,0 +1,32 @@
+---
+- name: Run the Darwin smartctl_exporter lifecycle
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../smartctl-exporter/defaults/main.yml
+  tasks:
+    - name: Set the smartctl_exporter test paths above the defaults
+      ansible.builtin.set_fact:
+        smartctl_exporter_darwin_brew: "{{ test_bin }}/brew"
+        smartctl_exporter_darwin_brew_user: ""
+        smartctl_exporter_darwin_smartctl: "{{ test_root }}/bin/smartctl"
+        smartctl_exporter_darwin_bin: "{{ test_root }}/bin/smartctl_exporter"
+        smartctl_exporter_darwin_install_dir: "{{ test_root }}/install"
+        smartctl_exporter_darwin_download_dir: "{{ test_root }}/downloads"
+        smartctl_exporter_darwin_state_dir: "{{ test_root }}/state"
+        smartctl_exporter_darwin_launchd_dir: "{{ test_root }}/plists"
+        smartctl_exporter_darwin_launchd_label: net.chia.smartctl_exporter
+        smartctl_exporter_darwin_launchctl: "{{ test_bin }}/launchctl"
+        smartctl_exporter_darwin_become: false
+        smartctl_exporter_darwin_owner: "{{ test_owner }}"
+        smartctl_exporter_darwin_group: "{{ test_group }}"
+        smartctl_exporter_darwin_unload_retries: "{{ test_unload_retries | default(30) }}"
+        smartctl_exporter_darwin_unload_delay: "{{ test_unload_delay | default(1) }}"
+        smartctl_exporter_darwin_install_binary: false
+        smartctl_exporter_args: ""
+
+    - name: Apply the Darwin smartctl_exporter tasks
+      ansible.builtin.include_role:
+        name: smartctl-exporter
+        tasks_from: darwin

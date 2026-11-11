@@ -2,3 +2,36 @@
 smartctl_exporter_version: "0.14.0"
 smartctl_exporter_port: 9633
 smartctl_exporter_args: ""
+
+# ---------------------------------------------------------------------------
+# Darwin (Homebrew smartmontools + release binary + launchd). Unused on Linux.
+# smartctl_exporter publishes darwin-arm64 and darwin-amd64 archives. The
+# checksums are for the pinned release archives published on GitHub.
+# ---------------------------------------------------------------------------
+smartctl_exporter_darwin_version: "0.15.0"
+smartctl_exporter_darwin_arch: >-
+  {{ 'darwin-arm64' if ansible_architecture in ['arm64', 'aarch64'] else 'darwin-amd64' }}
+smartctl_exporter_darwin_sha256:
+  darwin-arm64: "513345e9075a65dabad8b3de3e65e612c37024adfe10267d828fcaf22c12799b"
+  darwin-amd64: "1732f5c0f259e8f548f5691059de6f12631728d0469b2a6cd77a7c68b00e169a"
+smartctl_exporter_darwin_homebrew_prefix: /opt/homebrew
+smartctl_exporter_darwin_brew: "{{ smartctl_exporter_darwin_homebrew_prefix }}/bin/brew"
+# When the SSH/automation login is not the Homebrew prefix owner, set this to
+# the owner. Homebrew tasks then run as that user through sudo.
+smartctl_exporter_darwin_brew_user: ""
+smartctl_exporter_darwin_formula: smartmontools
+smartctl_exporter_darwin_smartctl: "{{ smartctl_exporter_darwin_homebrew_prefix }}/bin/smartctl"
+smartctl_exporter_darwin_bin: /usr/local/bin/smartctl_exporter
+smartctl_exporter_darwin_install_dir: /usr/local/libexec/smartctl_exporter
+smartctl_exporter_darwin_state_dir: /var/lib/smartctl_exporter
+smartctl_exporter_darwin_download_dir: /var/tmp/smartctl_exporter
+smartctl_exporter_darwin_launchd_dir: /Library/LaunchDaemons
+smartctl_exporter_darwin_launchd_label: net.chia.smartctl_exporter
+smartctl_exporter_darwin_launchctl: /bin/launchctl
+smartctl_exporter_darwin_become: true
+smartctl_exporter_darwin_owner: root
+smartctl_exporter_darwin_group: wheel
+smartctl_exporter_darwin_unload_retries: 30
+smartctl_exporter_darwin_unload_delay: 1
+# Tests set this false and provide the binary themselves.
+smartctl_exporter_darwin_install_binary: true

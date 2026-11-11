@@ -349,6 +349,12 @@ chia_wallet_connect_to_unknown_peers: true
 #                    later the remote full node accepts inbound timelords only
 #                    from localhost or exempt_peer_networks, so that node must
 #                    list this Mac.
+#   vdf-only         Only the ASIC hw_vdf_client jobs. The daemon, full node,
+#                    timelord, chia-exporter, and chia-healthcheck jobs are not
+#                    installed. Set chia_darwin_hw_vdf_ip to the remote
+#                    timelord's VDF server address. The watchdog still watches
+#                    the board LaunchDaemons. This topology is for a Mac that
+#                    only supplies ASIC VDF engines to a timelord elsewhere.
 #
 # Network: the same `network` variable as Linux (mainnet or testnet11). Darwin
 # CHIA_ROOT defaults to ~/.chia/<network>, so the two networks do not share a
@@ -384,6 +390,9 @@ chia_darwin_allow_root_capable_service_user: false
 chia_darwin_group: staff
 chia_darwin_home: "/Users/{{ user }}"
 chia_darwin_root: "{{ chia_darwin_home }}/.chia/{{ network }}"
+# Darwin uses the shared log_level and target_outbound_peer_count. Set them in
+# the Darwin host/group vars (log_level: INFO and target_outbound_peer_count: 30
+# match the Linux timelord fleet). This role no longer silently overrides them.
 chia_darwin_homebrew_prefix: /opt/homebrew
 chia_darwin_brew: "{{ chia_darwin_homebrew_prefix }}/bin/brew"
 # When the SSH/automation login is the service user, set this to the account
@@ -447,11 +456,17 @@ chia_darwin_restart_unload_margin: 30
 # spawning CPU clients next to the ASIC.
 chia_darwin_process_count: 0
 chia_darwin_interpreter: /bin/zsh
+chia_darwin_sudo: /usr/bin/sudo
 # hw_vdf_client argv. Linux does not use these.
 # Frequency and voltage apply to every board. They are the role defaults
 # (1540 MHz, 1.0 V), not chiavdf's own 1100 / 0.88 defaults.
 chia_darwin_hw_vdf_freq: 1540
 chia_darwin_hw_vdf_voltage: "1.0"
+# 0 disables the flag, matching the Linux hw_vdf unit. Set these in inventory
+# to use the same runtime tuning as the Linux ASIC fleet (for example freq 1620,
+# auto-freq 60).
+chia_darwin_hw_vdf_max_freq: 0
+chia_darwin_hw_vdf_auto_freq_period: 0
 # Host threads per VDF engine. A board with two engines uses about twice the
 # CPU of a board with one engine at the same pair. Inventory entries may set
 # vdf_threads and proof_threads; the role does not invent a new pair from the
@@ -543,12 +558,31 @@ chia_darwin_companion_rotpipe_max_bytes: 20971520
 chia_darwin_companion_rotpipe_backups: 3
 chia_darwin_companion_throttle_interval: 15
 chia_darwin_companion_exit_timeout: 30
+# Periodic full-node peer connect. Linux uses cron; launchd uses a StartInterval
+# job. Reuses chia_periodic_connect_peers and full_node_port. Set the list empty
+# to skip the job. 300s matches the Linux */5 cron interval.
+chia_darwin_periodic_connect_interval_seconds: 300
 # Watchdog: the macOS equivalent of the Linux monit checks. It runs as root so
 # it can kickstart LaunchDaemons. The alert files stay root-only and are only
-# written when the corresponding variable is nonempty.
+# written when the corresponding variable is nonempty. The token and URL must
+# be set together; the role refuses a half-configured alert sink.
 chia_darwin_watchdog_cycle: 60
-chia_darwin_watchdog_grace: 600
+# Delay the first check after the watchdog starts. Match the Linux monit
+# "start delay 3600" so boot-time launchd churn settles. This is not used after
+# a watchdog-initiated restart; chia_darwin_watchdog_restart_grace is.
+chia_darwin_watchdog_grace: 3600
+# Delay after a watchdog-initiated restart. Matches the previous Darwin
+# behavior and the Linux monit cycle behavior, where checks resume promptly.
+chia_darwin_watchdog_restart_grace: 600
 chia_darwin_watchdog_fail_cycles: 3
+# Raise Chia to DEBUG after this many failed /full_node or /timelord checks,
+# then restore log_level when the healthcheck recovers. Matches the
+# Linux monit chia_monit_log_debug_threshold behavior.
+chia_darwin_watchdog_log_debug_threshold: 2
+# Also monitor /full_node/ports (process liveness) so a full node whose RPC is
+# up but whose peer ports are dead is restarted. Off on Linux by default to
+# preserve the existing monit files; on Darwin there is no legacy file to keep.
+chia_darwin_watchdog_check_full_node_ports: true
 chia_darwin_watchdog_board_stop_timeout: "{{ chia_darwin_hw_vdf_exit_timeout | int + chia_darwin_restart_unload_margin | int }}"
 chia_darwin_watchdog_throttle_interval: 30
 chia_darwin_watchdog_exit_timeout: 30

@@ -1,0 +1,22 @@
+---
+- name: Run the Darwin SSH preflight
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    base_setup_become: false
+    base_setup_notify_restart: false
+    base_setup_disable_ssh_password_login: true
+    base_setup_disable_ssh_root_login: true
+    base_setup_ssh_login: timelord
+    base_setup_sshd_config: "{{ test_root }}/sshd_config"
+    base_setup_authorized_keys_path: "{{ test_root }}/authorized_keys"
+    base_setup_sshd_validate: "{{ test_bin }}/sshd -t -f %s"
+    base_setup_sshd_effective_argv:
+      - "{{ test_bin }}/sshd"
+      - -T
+  environment:
+    FAKE_EFFECTIVE_PASSWORD: "{{ fake_effective_password | default('no') }}"
+  tasks:
+    - name: Import the Darwin SSH tasks
+      ansible.builtin.import_tasks: ../../base-setup/tasks/darwin.yml

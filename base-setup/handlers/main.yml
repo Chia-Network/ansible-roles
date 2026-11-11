@@ -1,3 +1,4 @@
+---
 - name: restart-ssh
   become: true
   ansible.builtin.service:
@@ -6,3 +7,9 @@
   register: systemd_action
   retries: 10
   until: systemd_action is success
+
+- name: restart-ssh-darwin
+  become: true
+  ansible.builtin.command:
+    argv: [/bin/launchctl, kickstart, -k, system/com.openssh.sshd]
+  changed_when: true
