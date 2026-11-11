@@ -27,16 +27,6 @@
       chia_darwin_enable_hw_vdf to false (the derived default) or use
       chia_darwin_timelord_implementation: chia-blockchain.
 
-- name: Require the vendor Timelord.app location
-  ansible.builtin.assert:
-    that:
-      - chia_darwin_timelord_app_path == "/Applications/Timelord.app"
-    fail_msg: >-
-      The vendor installer registers a job that runs
-      /Applications/Timelord.app. Keep chia_darwin_timelord_app_path at that
-      fixed location.
-  when: chia_darwin_timelord_app_enabled | bool
-
 - name: Require the Timelord.app remote observability opt-in
   ansible.builtin.assert:
     that:

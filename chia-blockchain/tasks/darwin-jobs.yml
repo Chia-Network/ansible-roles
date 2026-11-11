@@ -7,7 +7,6 @@
 
 - name: Derive the Darwin timelord implementation capabilities
   ansible.builtin.set_fact:
-    chia_darwin_timelord_app_enabled: "{{ chia_darwin_timelord_implementation == 'timelord-app' }}"
     # The app runs its own timelord worker and ASIC clients.
     chia_darwin_role_timelord: >-
       {{ chia_darwin_local_timelord | bool and
@@ -17,11 +16,14 @@
     chia_darwin_install_chia_blockchain: >-
       {{ chia_darwin_timelord_implementation != 'timelord-app' or
       chia_darwin_local_full_node | bool }}
+  changed_when: false
+
+- name: Derive the Darwin daemon capability
+  ansible.builtin.set_fact:
     # The daemon is only useful when the local full node/timelord keeps it.
     chia_darwin_role_daemon: >-
       {{ chia_darwin_local_timelord | bool and
-      (chia_darwin_timelord_implementation != 'timelord-app' or
-      chia_darwin_local_full_node | bool) }}
+      chia_darwin_install_chia_blockchain | bool }}
   changed_when: false
 
 - name: Build the non-ASIC LaunchDaemon job list
@@ -72,9 +74,7 @@
         companion: true
         enabled: >-
           {{ chia_darwin_enable_chia_exporter | bool and
-          chia_darwin_local_timelord | bool and
-          (not chia_darwin_timelord_app_enabled | bool or
-          chia_darwin_local_full_node | bool) }}
+          chia_darwin_role_daemon | bool }}
       - name: chia-healthcheck
         label: "{{ chia_darwin_launchd_prefix }}.chia-healthcheck"
         wrapper: "{{ chia_darwin_bin_dir }}/chia-healthcheck-run.sh"
@@ -94,10 +94,7 @@
         companion: true
         enabled: >-
           {{ chia_darwin_enable_chia_healthcheck | bool and
-          ((chia_darwin_local_timelord | bool and
-          not (chia_darwin_timelord_app_enabled | bool)) or
-          (chia_darwin_timelord_app_enabled | bool and
-          chia_darwin_local_full_node | bool)) }}
+          chia_darwin_role_daemon | bool }}
       - name: node-exporter
         label: "{{ chia_darwin_launchd_prefix }}.node-exporter"
         wrapper: "{{ chia_darwin_bin_dir }}/node-exporter-run.sh"

@@ -83,7 +83,7 @@
             ('chia_darwin_pip_package }}==' ~ '{' ~ '{ chia_darwin_pip_version')
             in darwin_text
           - darwin_text.count('Successfully installed') == 2
-          - darwin_text.count("-m\n      - pip\n      - install") == 2
+          - darwin_text.count("-m\n          - pip\n          - install") == 2
           - "'chia_darwin_venv }}/bin/python' in darwin_text"
         fail_msg: >-
           Darwin installs must run chia_darwin_venv/bin/python -m pip.
@@ -120,10 +120,8 @@
           - "'Require the database volume to be mounted now' in darwin_text"
           - "'is not mounted' in darwin_text"
           - >-
-            (darwin_tasks | map(attribute='name') | list).index(
-            'Require the database volume to be mounted now') <
-            (darwin_tasks | map(attribute='name') | list).index(
-            'Seed the full-node database from S3')
+            darwin_text.index('Require the database volume to be mounted now') <
+            darwin_text.index('Seed the full-node database from S3')
         fail_msg: >-
           local-external must check the mount in darwin.yml before the seed
           include. The seed itself does not repeat that preflight.

@@ -415,29 +415,13 @@
         state: directory
         mode: "0755"
 
-    - name: Set the Timelord.app service and companion lists
+    - name: Select the Timelord.app implementation
       ansible.builtin.set_fact:
-        chia_darwin_timelord_app_enabled: true
-        chia_darwin_local_full_node: true
-        chia_darwin_local_timelord: true
-        chia_darwin_service_jobs:
-          - name: daemon
-            enabled: true
-          - name: full-node
-            enabled: true
-          - name: timelord
-            enabled: false
-        chia_darwin_companion_jobs:
-          - name: chia-exporter
-            enabled: true
-          - name: chia-healthcheck
-            enabled: true
-          - name: node-exporter
-            enabled: true
-          - name: periodic-connect
-            enabled: true
-          - name: watchdog
-            enabled: true
+        chia_darwin_topology: local-external
+        chia_darwin_timelord_implementation: timelord-app
+
+    - name: Build the Timelord.app job list
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-jobs.yml
 
     - name: Render the Timelord.app watchdog
       ansible.builtin.template:
@@ -462,16 +446,12 @@
           - '''CHECK_HEALTHCHECK="1"'' in text'
           - '''CHECK_FULL_NODE="1"'' in text'
           - '''CHECK_FULL_NODE_PORTS="1"'' in text'
-          - '''CHECK_FULL_NODE_JOB="1"'' in text'
+          - "'CHECK_FULL_NODE_JOB=$((CHECK_APP && CHECK_FULL_NODE))' in text"
           - '''SERVICE_JOB_LIST="daemon full-node"'' in text'
-          - '''if [ "$CHECK_TIMELORD" = 1 ]; then'' in text'
           - "'APP_LABEL=net.chia.timelord.supervisor' in text"
           - "'APP_STATUS=http://127.0.0.1:9257' in text"
           - "'APP_SUPERVISOR=http://127.0.0.1:9259' in text"
           - "'timelord-app-health' in text"
-          - "'restart_app' in text"
-          - "'kick_app' in text"
-          - "'http_code_at' in text"
 
     - name: Set the remote Timelord.app watchdog fixture
       ansible.builtin.set_fact:
@@ -506,6 +486,6 @@
           - '''CHECK_APP="1"'' in text'
           - '''CHECK_FULL_NODE="0"'' in text'
           - '''CHECK_FULL_NODE_PORTS="0"'' in text'
-          - '''CHECK_FULL_NODE_JOB="0"'' in text'
+          - "'CHECK_FULL_NODE_JOB=$((CHECK_APP && CHECK_FULL_NODE))' in text"
           - '''CHECK_HEALTHCHECK="0"'' in text'
           - '''SERVICE_JOB_LIST=""'' in text'

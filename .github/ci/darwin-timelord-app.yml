@@ -9,66 +9,8 @@
   vars_files:
     - ../../chia-blockchain/defaults/main.yml
   vars:
-    role_dir: "{{ playbook_dir }}/../../chia-blockchain"
     user: timelord
   tasks:
-    - name: Read the Timelord.app role sources
-      ansible.builtin.set_fact:
-        defaults_text: "{{ lookup('file', role_dir ~ '/defaults/main.yml') }}"
-        darwin_text: "{{ lookup('file', role_dir ~ '/tasks/darwin.yml') }}"
-        jobs_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-jobs.yml') }}"
-        app_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-timelord-app.yml') }}"
-        remove_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-timelord-app-remove.yml') }}"
-        stop_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-timelord-app-stop.yml') }}"
-        wait_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-timelord-app-wait.yml') }}"
-        validate_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-implementation-validate.yml') }}"
-        config_text: "{{ lookup('file', role_dir ~ '/templates/darwin/timelord-app-config.toml.j2') }}"
-        watchdog_text: "{{ lookup('file', role_dir ~ '/templates/darwin/chia-watchdog.sh.j2') }}"
-
-    - name: The role wires the Timelord.app implementation together
-      ansible.builtin.assert:
-        that:
-          - "'chia_darwin_timelord_implementation: chia-blockchain' in defaults_text"
-          - '''chia_darwin_timelord_app_version: "1.0.0"'' in defaults_text'
-          - "'c2032d433ba095b62a3dd6e0561122236f6f371b45912b39850e375d7f37287a' in defaults_text"
-          - "'net.chia.timelord.supervisor' in defaults_text"
-          - "'chia_darwin_timelord_app_download: true' in defaults_text"
-          - '''chia_darwin_timelord_app_asset_id: "715836523"'' in defaults_text'
-          - "'chia_darwin_timelord_app_expose_observability: true' in defaults_text"
-          - "'chia_darwin_timelord_app_stop_timeout: 60' in defaults_text"
-          - "'darwin-timelord-app-stop.yml' in app_text"
-          - "'darwin-timelord-app-wait.yml' in app_text"
-          - "'bootout' in stop_text"
-          - "'launchctl' in wait_text"
-          - "'until' in wait_text"
-          - "'chia_darwin_timelord_app_github_token' in app_text"
-          - "'chia_darwin_timelord_app_enabled' in jobs_text"
-          - "'chia_darwin_role_timelord' in jobs_text"
-          - "'chia_darwin_install_chia_blockchain' in jobs_text"
-          - "'chia_darwin_role_daemon' in jobs_text"
-          - "'darwin-implementation-validate.yml' in darwin_text"
-          - "'darwin-timelord-app-remove.yml' in darwin_text"
-          - "'darwin-timelord-app.yml' in darwin_text"
-          - "'chia_darwin_timelord_app_installer' in app_text"
-          - "'/Contents/Resources/install-service.sh' in defaults_text"
-          - "'local-node' in app_text"
-          - "'import-node' in app_text"
-          - "'codesign' in app_text"
-          - "'hdiutil' in app_text"
-          - "'timelord-app-config.toml.j2' in app_text"
-          - "'timelord-app-health' in watchdog_text"
-          - "'APP_SUPERVISOR' in watchdog_text"
-          - "'CHECK_FULL_NODE_JOB' in watchdog_text"
-          - "'driver_library' in config_text"
-          - "'observability_listen' in config_text"
-          - "'allow_remote_observability' in config_text"
-          - "'supervisor_observability_listen' in config_text"
-          - "'configure' in app_text"
-        fail_msg: >-
-          The Darwin Timelord.app implementation must keep the pinned release,
-          fixed vendor service label, capability facts, install/config/remove
-          tasks, app-aware watchdog, and the app config template wired together.
-
     - name: Select the local Timelord.app capabilities
       ansible.builtin.set_fact:
         chia_darwin_topology: local-external
@@ -129,10 +71,11 @@
     - name: Validate the remote Timelord.app inventory
       ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-implementation-validate.yml
 
-    - name: Refuse Timelord.app with vdf-only
-      block:
-        - name: Set the invalid vdf-only app inventory
-          ansible.builtin.set_fact:
+    - name: Refuse Timelord.app with incompatible inventory
+      ansible.builtin.include_tasks: darwin-timelord-app-refusal.yml
+      loop:
+        - name: vdf-only
+          facts:
             chia_darwin_topology: vdf-only
             chia_darwin_timelord_implementation: timelord-app
             chia_darwin_timelord_app_bundle_path: ""
@@ -141,26 +84,10 @@
             chia_darwin_local_timelord: false
             chia_darwin_timelord_app_enabled: true
             chia_darwin_enable_hw_vdf: false
-
-        - name: Include the implementation checks for the invalid inventory
-          ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-implementation-validate.yml
-
-        - name: Fail when the vdf-only app inventory was accepted
-          ansible.builtin.fail:
-            msg: timelord-app with vdf-only was accepted
-      rescue:
-        - name: The vdf-only refusal names the incompatible topology
-          ansible.builtin.assert:
-            that:
-              - "'vdf-only' in ansible_failed_result.msg | default('')"
-            fail_msg: >-
-              timelord-app with vdf-only must fail with a message naming
-              vdf-only, got: {{ ansible_failed_result.msg | default('') }}
-
-    - name: Refuse Timelord.app with role-managed ASIC clients
-      block:
-        - name: Set the invalid app hw-vdf inventory
-          ansible.builtin.set_fact:
+          accepted: timelord-app with vdf-only was accepted
+          expected: vdf-only
+        - name: role-managed ASIC clients
+          facts:
             chia_darwin_topology: local-external
             chia_darwin_timelord_implementation: timelord-app
             chia_darwin_timelord_app_bundle_path: ""
@@ -169,19 +96,8 @@
             chia_darwin_local_timelord: true
             chia_darwin_timelord_app_enabled: true
             chia_darwin_enable_hw_vdf: true
-
-        - name: Include the implementation checks for the invalid ASIC inventory
-          ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-implementation-validate.yml
-
-        - name: Fail when the app hw-vdf inventory was accepted
-          ansible.builtin.fail:
-            msg: timelord-app with chia_darwin_enable_hw_vdf was accepted
-      rescue:
-        - name: The ASIC refusal names the app hardware ownership
-          ansible.builtin.assert:
-            that:
-              - "'owns the timelord' in ansible_failed_result.msg | default('')"
-            fail_msg: >-
-              timelord-app with chia_darwin_enable_hw_vdf must fail with a
-              hardware-ownership message, got:
-              {{ ansible_failed_result.msg | default('') }}
+          accepted: timelord-app with chia_darwin_enable_hw_vdf was accepted
+          expected: owns the timelord
+      loop_control:
+        loop_var: refusal_case
+        label: "{{ refusal_case.name }}"

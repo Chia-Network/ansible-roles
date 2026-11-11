@@ -60,11 +60,11 @@ CHECK_TIMELORD="{{ 1 if 'timelord' in chia_darwin_service_jobs | selectattr('ena
 CHECK_FULL_NODE_PORTS="{{ 1 if chia_darwin_watchdog_check_full_node_ports | bool and 'chia-healthcheck' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list and 'full-node' in chia_darwin_service_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
 CHECK_EXPORTER="{{ 1 if 'chia-exporter' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
 CHECK_NODE="{{ 1 if 'node-exporter' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
-CHECK_APP="{{ 1 if chia_darwin_timelord_app_enabled | default(false) | bool else 0 }}"
+CHECK_APP="{{ 1 if chia_darwin_timelord_app_enabled | bool else 0 }}"
 APP_LABEL={{ chia_darwin_timelord_app_service_label }}
 APP_STATUS=http://127.0.0.1:{{ chia_darwin_timelord_app_status_port | int }}
 APP_SUPERVISOR=http://{{ chia_darwin_timelord_app_supervisor_probe_host }}:{{ chia_darwin_timelord_app_supervisor_port | int }}
-CHECK_FULL_NODE_JOB="{{ 1 if chia_darwin_timelord_app_enabled | default(false) | bool and chia_darwin_local_full_node | default(false) | bool and 'full-node' in chia_darwin_service_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
+CHECK_FULL_NODE_JOB=$((CHECK_APP && CHECK_FULL_NODE))
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 # The ports probe is meaningless without a local full node.
 [ "$CHECK_FULL_NODE" = 1 ] || CHECK_FULL_NODE_PORTS=0
@@ -78,9 +78,9 @@ log() {
 	fi
 }
 
-http_code() { curl -s -o /dev/null -m 10 -w '%{http_code}' "$HC$1" 2>/dev/null; }
-
 http_code_at() { curl -s -o /dev/null -m 10 -w '%{http_code}' "$1$2" 2>/dev/null; }
+
+http_code() { http_code_at "$HC" "$1"; }
 
 listening() { netstat -an -p tcp | grep -E "[.:]$1 .*LISTEN" >/dev/null; }
 
@@ -139,20 +139,12 @@ set_log_level() { # DEBUG|INFO|configured level
 	fi
 }
 
-kick() { # label
+kick() { # full label
 	if [ "$DRY" = 1 ]; then
-		log "DRY kickstart $PREFIX.$1"
+		log "DRY kickstart $1"
 		return 0
 	fi
-	launchctl kickstart -k "system/$PREFIX.$1" >>"$LOG" 2>&1 || log "kickstart $1 failed"
-}
-
-kick_app() {
-	if [ "$DRY" = 1 ]; then
-		log "DRY kickstart $APP_LABEL"
-		return 0
-	fi
-	launchctl kickstart -k "system/$APP_LABEL" >>"$LOG" 2>&1 || log "kickstart $APP_LABEL failed"
+	launchctl kickstart -k "system/$1" >>"$LOG" 2>&1 || log "kickstart $1 failed"
 }
 
 stop_board() { # label
@@ -204,11 +196,11 @@ restart_full() {
 	done
 	sleep 2
 	for j in "${SERVICE_JOBS[@]}"; do
-		kick "$j"
+		kick "$PREFIX.$j"
 		sleep 8
 	done
 	if [ "$CHECK_APP" = 1 ]; then
-		kick_app
+		kick "$APP_LABEL"
 		sleep 8
 	fi
 	for j in "${HW_JOBS[@]}"; do
@@ -219,7 +211,7 @@ restart_full() {
 
 restart_app() {
 	log "RESTART Timelord.app: $1"
-	kick_app
+	kick "$APP_LABEL"
 	sleep 8
 }
 
@@ -292,7 +284,7 @@ while :; do
 			fnp_fail=0
 			log "healthcheck :{{ chia_darwin_chia_healthcheck_port | int }} unreachable ($hc_fail/$FAIL_CYCLES)"
 			if [ $hc_fail -ge $FAIL_CYCLES ]; then
-				kick chia-healthcheck
+				kick "$PREFIX.chia-healthcheck"
 				hc_fail=0
 			fi
 		else
@@ -410,7 +402,7 @@ while :; do
 		if listening {{ chia_darwin_chia_exporter_port | int }}; then ce_fail=0; else ce_fail=$((ce_fail + 1)); fi
 		if [ $ce_fail -ge $FAIL_CYCLES ]; then
 			log "chia-exporter :{{ chia_darwin_chia_exporter_port | int }} not listening"
-			kick chia-exporter
+			kick "$PREFIX.chia-exporter"
 			ce_fail=0
 		fi
 	fi
@@ -418,7 +410,7 @@ while :; do
 		if listening {{ chia_darwin_node_exporter_port | int }}; then ne_fail=0; else ne_fail=$((ne_fail + 1)); fi
 		if [ $ne_fail -ge $FAIL_CYCLES ]; then
 			log "node-exporter :{{ chia_darwin_node_exporter_port | int }} not listening"
-			kick node-exporter
+			kick "$PREFIX.node-exporter"
 			ne_fail=0
 		fi
 	fi

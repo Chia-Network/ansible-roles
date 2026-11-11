@@ -419,14 +419,6 @@ Board restarts enable the job before bootstrap and disable it again when
 ordered restart stops the watchdog first and restores it even when a service or
 board restart fails, so a failed apply does not leave monitoring down.
 
-Checks for a disabled companion service are skipped, and the full-stack
-restart only kicks the core service jobs that are enabled. With
-`chia_darwin_timelord_implementation: timelord-app`, the watchdog additionally
-checks the vendor supervisor and worker `/healthz` endpoints and the local
-full-node LaunchDaemon when that topology installs one. An app-only failure
-restarts only `net.chia.timelord.supervisor`; it does not stop the ASIC clients
-the app owns.
-
 The watchdog uses two separate graces. `chia_darwin_watchdog_grace` (default
 3600, matching the Linux monit start delay) delays the first check after the
 watchdog starts. `chia_darwin_watchdog_restart_grace` (default 600) delays
