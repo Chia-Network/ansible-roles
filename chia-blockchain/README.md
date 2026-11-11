@@ -23,11 +23,34 @@ same inventory entry shape covers additional Macs. See
 [DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#companion-services) for the service table,
 watchdog behavior, binary pins, and the approved-sudoers note.
 
-The role can also run a `vdf-only` topology: only the ASIC `hw-vdf` board jobs
-are installed. Set `chia_darwin_hw_vdf_ip` to the remote timelord's VDF server.
+With `chia_darwin_timelord_implementation: chia-blockchain`, the role can also
+run a `vdf-only` topology: only the ASIC `hw-vdf` board jobs are installed. Set `chia_darwin_hw_vdf_ip` to the remote timelord's VDF server.
 There is no local daemon, full node, timelord, chia-exporter, or healthcheck.
 The watchdog still supervises the board LaunchDaemons and checks the remote VDF
 connection count through `chia_darwin_hw_vdf_port`.
+
+## Timelord.app (optional implementation)
+
+| Topology         | What runs                                                                        |
+| ---------------- | -------------------------------------------------------------------------------- |
+| `local-internal` | Role-managed daemon/full node plus the app and its ASIC clients.                 |
+| `local-external` | Same, with `~/.chia` on `chia_darwin_db_volume`; Full Disk Access still applies. |
+| `remote-node`    | The app only. No Python, chia-blockchain, daemon, full node, or local CHIA_ROOT. |
+| `vdf-only`       | Refused with `timelord-app`; use `chia-blockchain` for ASIC-only Macs.           |
+
+Remote-node deployments require a connection bundle created on the full-node host:
+
+```yaml
+chia_darwin_timelord_implementation: timelord-app
+chia_darwin_topology: remote-node
+# A directory already on the Mac:
+chia_darwin_timelord_app_bundle_path: "/Users/timelord/timelord-connection"
+# Or a controller directory copied to the Mac:
+# chia_darwin_timelord_app_bundle_src: "files/timelord-mainnet-connection"
+```
+
+See [DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#timelordapp) for download options,
+configuration, observability, and pruning.
 
 The Darwin watchdog matches the Linux monit defaults more closely than earlier
 releases: `chia_darwin_watchdog_grace` is the 3600-second boot delay, and

@@ -1,0 +1,29 @@
+---
+- name: Refuse Timelord.app with {{ refusal_case.name }}
+  block:
+    - name: Set the invalid {{ refusal_case.name }} inventory
+      ansible.builtin.set_fact:
+        chia_darwin_topology: "{{ refusal_case.facts.chia_darwin_topology }}"
+        chia_darwin_timelord_implementation: "{{ refusal_case.facts.chia_darwin_timelord_implementation }}"
+        chia_darwin_timelord_app_bundle_path: "{{ refusal_case.facts.chia_darwin_timelord_app_bundle_path }}"
+        chia_darwin_timelord_app_bundle_src: "{{ refusal_case.facts.chia_darwin_timelord_app_bundle_src }}"
+        chia_darwin_local_full_node: "{{ refusal_case.facts.chia_darwin_local_full_node }}"
+        chia_darwin_local_timelord: "{{ refusal_case.facts.chia_darwin_local_timelord }}"
+        chia_darwin_timelord_app_enabled: "{{ refusal_case.facts.chia_darwin_timelord_app_enabled }}"
+        chia_darwin_enable_hw_vdf: "{{ refusal_case.facts.chia_darwin_enable_hw_vdf }}"
+
+    - name: Include the implementation checks for the invalid inventory
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-implementation-validate.yml
+
+    - name: Fail when the {{ refusal_case.name }} inventory was accepted
+      ansible.builtin.fail:
+        msg: "{{ refusal_case.accepted }}"
+  rescue:
+    - name: The {{ refusal_case.name }} refusal names the expected problem
+      ansible.builtin.assert:
+        that:
+          - refusal_case.expected in ansible_failed_result.msg | default('')
+        fail_msg: >-
+          {{ refusal_case.name }} must fail with a message containing
+          {{ refusal_case.expected }}, got:
+          {{ ansible_failed_result.msg | default('') }}

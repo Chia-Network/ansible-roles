@@ -1,0 +1,103 @@
+---
+# Static checks for the Timelord.app implementation. The CI runner is Linux and
+# cannot install a macOS app, so this exercises the capability facts, job
+# gating, refusals, and source wiring without touching a host.
+- name: Check Darwin Timelord.app assumptions
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+  vars:
+    user: timelord
+  tasks:
+    - name: Select the local Timelord.app capabilities
+      ansible.builtin.set_fact:
+        chia_darwin_topology: local-external
+        chia_darwin_timelord_implementation: timelord-app
+        chia_darwin_timelord_app_bundle_path: ""
+        chia_darwin_timelord_app_bundle_src: ""
+
+    - name: Build the local Timelord.app job list
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-jobs.yml
+
+    - name: Local Timelord.app keeps the full node but owns the timelord
+      vars:
+        services: "{{ chia_darwin_service_jobs | items2dict(key_name='name', value_name='enabled') }}"
+        companions: "{{ chia_darwin_companion_jobs | items2dict(key_name='name', value_name='enabled') }}"
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_timelord_app_enabled | bool
+          - chia_darwin_local_full_node | bool
+          - chia_darwin_install_chia_blockchain | bool
+          - not (chia_darwin_role_timelord | bool)
+          - services['daemon'] | bool
+          - services['full-node'] | bool
+          - not (services['timelord'] | bool)
+          - companions['chia-exporter'] | bool
+          - companions['chia-healthcheck'] | bool
+          - companions['node-exporter'] | bool
+          - companions['watchdog'] | bool
+
+    - name: Validate the local Timelord.app inventory
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-implementation-validate.yml
+
+    - name: Select the remote Timelord.app capabilities
+      ansible.builtin.set_fact:
+        chia_darwin_topology: remote-node
+        chia_darwin_timelord_app_bundle_path: /Users/timelord/timelord-connection
+
+    - name: Build the remote Timelord.app job list
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-jobs.yml
+
+    - name: Remote Timelord.app installs no Python, daemon, or local node jobs
+      vars:
+        services: "{{ chia_darwin_service_jobs | items2dict(key_name='name', value_name='enabled') }}"
+        companions: "{{ chia_darwin_companion_jobs | items2dict(key_name='name', value_name='enabled') }}"
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_timelord_app_enabled | bool
+          - not (chia_darwin_local_full_node | bool)
+          - not (chia_darwin_install_chia_blockchain | bool)
+          - not (chia_darwin_role_timelord | bool)
+          - not (services['daemon'] | bool)
+          - not (services['full-node'] | bool)
+          - not (services['timelord'] | bool)
+          - not (companions['chia-exporter'] | bool)
+          - not (companions['chia-healthcheck'] | bool)
+          - companions['node-exporter'] | bool
+          - companions['watchdog'] | bool
+
+    - name: Validate the remote Timelord.app inventory
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-implementation-validate.yml
+
+    - name: Refuse Timelord.app with incompatible inventory
+      ansible.builtin.include_tasks: darwin-timelord-app-refusal.yml
+      loop:
+        - name: vdf-only
+          facts:
+            chia_darwin_topology: vdf-only
+            chia_darwin_timelord_implementation: timelord-app
+            chia_darwin_timelord_app_bundle_path: ""
+            chia_darwin_timelord_app_bundle_src: ""
+            chia_darwin_local_full_node: false
+            chia_darwin_local_timelord: false
+            chia_darwin_timelord_app_enabled: true
+            chia_darwin_enable_hw_vdf: false
+          accepted: timelord-app with vdf-only was accepted
+          expected: vdf-only
+        - name: role-managed ASIC clients
+          facts:
+            chia_darwin_topology: local-external
+            chia_darwin_timelord_implementation: timelord-app
+            chia_darwin_timelord_app_bundle_path: ""
+            chia_darwin_timelord_app_bundle_src: ""
+            chia_darwin_local_full_node: true
+            chia_darwin_local_timelord: true
+            chia_darwin_timelord_app_enabled: true
+            chia_darwin_enable_hw_vdf: true
+          accepted: timelord-app with chia_darwin_enable_hw_vdf was accepted
+          expected: owns the timelord
+      loop_control:
+        loop_var: refusal_case
+        label: "{{ refusal_case.name }}"

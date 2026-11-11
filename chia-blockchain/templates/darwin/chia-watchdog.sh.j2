@@ -10,6 +10,12 @@
 #   ESTABLISHED conns to the VDF port != expected, or an hw-vdf job not running
 #                                       -> restart every hw-vdf board
 #   exporter ports not listening for FAIL_CYCLES -> kickstart that exporter job
+# Timelord.app mode (chia_darwin_timelord_implementation: timelord-app):
+#   supervisor /healthz or worker /healthz != 200 for FAIL_CYCLES
+#                                       -> restart the app supervisor
+#   chia-healthcheck /timelord is ignored; the app owns timelord progress.
+#   On local topologies /full_node and /full_node/ports still come from
+#   chia-healthcheck, and the full-node LaunchDaemon must be running.
 # After DEBUG_THRESHOLD failed health checks, raise Chia to DEBUG via the RPC;
 # restore the configured level when health recovers (like monit-set-log-level).
 # If the healthcheck itself is down (no HTTP reply), only the healthcheck job is kickstarted.
@@ -51,9 +57,14 @@ read -r -a SERVICE_JOBS <<<"$SERVICE_JOB_LIST"
 CHECK_HEALTHCHECK="{{ 1 if 'chia-healthcheck' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
 CHECK_FULL_NODE="{{ 1 if 'full-node' in chia_darwin_service_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
 CHECK_TIMELORD="{{ 1 if 'timelord' in chia_darwin_service_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
-CHECK_FULL_NODE_PORTS="{{ 1 if chia_darwin_watchdog_check_full_node_ports | bool and 'full-node' in chia_darwin_service_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
+CHECK_FULL_NODE_PORTS="{{ 1 if chia_darwin_watchdog_check_full_node_ports | bool and 'chia-healthcheck' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list and 'full-node' in chia_darwin_service_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
 CHECK_EXPORTER="{{ 1 if 'chia-exporter' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
 CHECK_NODE="{{ 1 if 'node-exporter' in chia_darwin_companion_jobs | selectattr('enabled', 'equalto', true) | map(attribute='name') | list else 0 }}"
+CHECK_APP="{{ 1 if chia_darwin_timelord_app_enabled | bool else 0 }}"
+APP_LABEL={{ chia_darwin_timelord_app_service_label }}
+APP_STATUS=http://127.0.0.1:{{ chia_darwin_timelord_app_status_port | int }}
+APP_SUPERVISOR=http://{{ chia_darwin_timelord_app_supervisor_probe_host }}:{{ chia_darwin_timelord_app_supervisor_port | int }}
+CHECK_FULL_NODE_JOB=$((CHECK_APP && CHECK_FULL_NODE))
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 # The ports probe is meaningless without a local full node.
 [ "$CHECK_FULL_NODE" = 1 ] || CHECK_FULL_NODE_PORTS=0
@@ -67,7 +78,9 @@ log() {
 	fi
 }
 
-http_code() { curl -s -o /dev/null -m 10 -w '%{http_code}' "$HC$1" 2>/dev/null; }
+http_code_at() { curl -s -o /dev/null -m 10 -w '%{http_code}' "$1$2" 2>/dev/null; }
+
+http_code() { http_code_at "$HC" "$1"; }
 
 listening() { netstat -an -p tcp | grep -E "[.:]$1 .*LISTEN" >/dev/null; }
 
@@ -126,12 +139,12 @@ set_log_level() { # DEBUG|INFO|configured level
 	fi
 }
 
-kick() { # label
+kick() { # full label
 	if [ "$DRY" = 1 ]; then
-		log "DRY kickstart $PREFIX.$1"
+		log "DRY kickstart $1"
 		return 0
 	fi
-	launchctl kickstart -k "system/$PREFIX.$1" >>"$LOG" 2>&1 || log "kickstart $1 failed"
+	launchctl kickstart -k "system/$1" >>"$LOG" 2>&1 || log "kickstart $1 failed"
 }
 
 stop_board() { # label
@@ -183,13 +196,23 @@ restart_full() {
 	done
 	sleep 2
 	for j in "${SERVICE_JOBS[@]}"; do
-		kick "$j"
+		kick "$PREFIX.$j"
 		sleep 8
 	done
+	if [ "$CHECK_APP" = 1 ]; then
+		kick "$APP_LABEL"
+		sleep 8
+	fi
 	for j in "${HW_JOBS[@]}"; do
 		start_board "$j"
 		sleep 8
 	done
+}
+
+restart_app() {
+	log "RESTART Timelord.app: $1"
+	kick "$APP_LABEL"
+	sleep 8
 }
 
 restart_hwvdf() {
@@ -212,6 +235,9 @@ vdf_fail=0
 ce_fail=0
 hc_fail=0
 ne_fail=0
+app_sup_fail=0
+app_worker_fail=0
+fnj_fail=0
 log_fail=0
 debug_active=0
 bad_restarts=0
@@ -258,7 +284,7 @@ while :; do
 			fnp_fail=0
 			log "healthcheck :{{ chia_darwin_chia_healthcheck_port | int }} unreachable ($hc_fail/$FAIL_CYCLES)"
 			if [ $hc_fail -ge $FAIL_CYCLES ]; then
-				kick chia-healthcheck
+				kick "$PREFIX.chia-healthcheck"
 				hc_fail=0
 			fi
 		else
@@ -271,11 +297,13 @@ while :; do
 					log "/full_node HTTP $fn ($fn_fail/$FAIL_CYCLES)"
 				fi
 			fi
-			if [ "$tl" = "200" ]; then
-				tl_fail=0
-			else
-				tl_fail=$((tl_fail + 1))
-				log "/timelord HTTP $tl ($tl_fail/$FAIL_CYCLES)"
+			if [ "$CHECK_TIMELORD" = 1 ]; then
+				if [ "$tl" = "200" ]; then
+					tl_fail=0
+				else
+					tl_fail=$((tl_fail + 1))
+					log "/timelord HTTP $tl ($tl_fail/$FAIL_CYCLES)"
+				fi
 			fi
 			if [ "$CHECK_FULL_NODE_PORTS" = 1 ]; then
 				if [ "$fnp" = "200" ]; then
@@ -289,7 +317,7 @@ while :; do
 				problems="$problems full_node-health"
 				scope=full
 			fi
-			if [ $tl_fail -ge $FAIL_CYCLES ]; then
+			if [ "$CHECK_TIMELORD" = 1 ] && [ $tl_fail -ge $FAIL_CYCLES ]; then
 				problems="$problems timelord-health"
 				scope=full
 			fi
@@ -300,11 +328,46 @@ while :; do
 		fi
 	fi
 
+	if [ "$CHECK_APP" = 1 ]; then
+		app_sup=$(http_code_at "$APP_SUPERVISOR" /healthz)
+		app_worker=$(http_code_at "$APP_STATUS" /healthz)
+		if [ "$app_sup" = "200" ]; then
+			app_sup_fail=0
+		else
+			app_sup_fail=$((app_sup_fail + 1))
+			log "Timelord.app supervisor /healthz HTTP $app_sup ($app_sup_fail/$FAIL_CYCLES)"
+		fi
+		if [ "$app_sup" = "200" ] && [ "$app_worker" = "200" ]; then
+			app_worker_fail=0
+		else
+			app_worker_fail=$((app_worker_fail + 1))
+			log "Timelord.app worker /healthz HTTP $app_worker ($app_worker_fail/$FAIL_CYCLES)"
+		fi
+		if [ $app_sup_fail -ge $FAIL_CYCLES ] || [ $app_worker_fail -ge $FAIL_CYCLES ]; then
+			problems="$problems timelord-app-health"
+			[ -z "$scope" ] && scope=app
+		fi
+	fi
+
+	if [ "$CHECK_FULL_NODE_JOB" = 1 ]; then
+		if job_running full-node; then
+			fnj_fail=0
+		else
+			fnj_fail=$((fnj_fail + 1))
+			log "full-node LaunchDaemon is not running ($fnj_fail/$FAIL_CYCLES)"
+		fi
+		if [ $fnj_fail -ge $FAIL_CYCLES ]; then
+			problems="$problems full_node-job"
+			scope=full
+		fi
+	fi
+
 	# Mirror the Linux monit log-level escalation: raise to DEBUG after a short
 	# health failure, then restore the configured level when the healthcheck
 	# succeeds again. Do not escalate while the healthcheck itself is down.
 	if [ "$CHECK_HEALTHCHECK" = 1 ] && [ "$hc_down" = 0 ]; then
-		if { [ "$CHECK_FULL_NODE" = 1 ] && [ "$fn" != "200" ]; } || [ "$tl" != "200" ]; then
+		if { [ "$CHECK_FULL_NODE" = 1 ] && [ "$fn" != "200" ]; } ||
+			{ [ "$CHECK_TIMELORD" = 1 ] && [ "$tl" != "200" ]; }; then
 			log_fail=$((log_fail + 1))
 			if [ $log_fail -ge $DEBUG_THRESHOLD ] && [ "$debug_active" = 0 ]; then
 				set_log_level DEBUG
@@ -339,7 +402,7 @@ while :; do
 		if listening {{ chia_darwin_chia_exporter_port | int }}; then ce_fail=0; else ce_fail=$((ce_fail + 1)); fi
 		if [ $ce_fail -ge $FAIL_CYCLES ]; then
 			log "chia-exporter :{{ chia_darwin_chia_exporter_port | int }} not listening"
-			kick chia-exporter
+			kick "$PREFIX.chia-exporter"
 			ce_fail=0
 		fi
 	fi
@@ -347,7 +410,7 @@ while :; do
 		if listening {{ chia_darwin_node_exporter_port | int }}; then ne_fail=0; else ne_fail=$((ne_fail + 1)); fi
 		if [ $ne_fail -ge $FAIL_CYCLES ]; then
 			log "node-exporter :{{ chia_darwin_node_exporter_port | int }} not listening"
-			kick node-exporter
+			kick "$PREFIX.node-exporter"
 			ne_fail=0
 		fi
 	fi
@@ -360,6 +423,8 @@ while :; do
 			# The restarted processes use the configured level, so allow DEBUG
 			# to be raised again if the node is still unhealthy.
 			debug_active=0
+		elif [ "$scope" = app ]; then
+			restart_app "$problems"
 		else
 			restart_hwvdf "$problems"
 		fi
@@ -369,6 +434,9 @@ while :; do
 		fnp_fail=0
 		log_fail=0
 		vdf_fail=0
+		app_sup_fail=0
+		app_worker_fail=0
+		fnj_fail=0
 		extra=$(((bad_restarts - 1) * 300))
 		[ $extra -gt 900 ] && extra=900
 		grace_until=$(($(date +%s) + GRACE_RESTART + extra))
@@ -379,7 +447,7 @@ while :; do
 			bad_restarts=0
 			log "healthy for 5 cycles; restart backoff reset"
 		fi
-		[ $((healthy_run % 30)) -eq 1 ] && log "ok fn=$fn fnp=$fnp tl=$tl vdf=$vdf"
+		[ $((healthy_run % 30)) -eq 1 ] && log "ok fn=$fn fnp=$fnp tl=$tl vdf=$vdf app_sup=${app_sup:-n/a} app_worker=${app_worker:-n/a}"
 	fi
 	[ "$WATCHDOG_ONCE" = 1 ] && {
 		log "once: fn=$fn fnp=$fnp tl=$tl vdf=$vdf problems='$problems'"

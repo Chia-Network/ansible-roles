@@ -1,0 +1,58 @@
+---
+# Deterministic refusals for the Darwin timelord implementation. Included before
+# the role changes the host, and by the CI harness with synthetic facts.
+- name: Require a known Darwin timelord implementation
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_timelord_implementation in ["chia-blockchain", "timelord-app"]
+    fail_msg: >-
+      chia_darwin_timelord_implementation must be chia-blockchain or
+      timelord-app. Got {{ chia_darwin_timelord_implementation }}.
+
+- name: Refuse timelord-app for the vdf-only topology
+  ansible.builtin.assert:
+    that:
+      - not (chia_darwin_timelord_app_enabled | bool and chia_darwin_topology == "vdf-only")
+    fail_msg: >-
+      timelord-app runs both the timelord and its bundled ASIC clients, so it
+      cannot be combined with vdf-only. Use chia-blockchain for vdf-only, or
+      choose local-internal, local-external, or remote-node.
+
+- name: Refuse role-managed ASIC clients when the app owns the hardware
+  ansible.builtin.assert:
+    that:
+      - not (chia_darwin_timelord_app_enabled | bool and chia_darwin_enable_hw_vdf | bool)
+    fail_msg: >-
+      timelord-app owns the timelord and the ASIC USB clients. Set
+      chia_darwin_enable_hw_vdf to false (the derived default) or use
+      chia_darwin_timelord_implementation: chia-blockchain.
+
+- name: Require the Timelord.app remote observability opt-in
+  ansible.builtin.assert:
+    that:
+      - >-
+        chia_darwin_timelord_app_allow_remote_observability | bool or
+        (chia_darwin_timelord_app_observability_listen | length == 0 and
+        chia_darwin_timelord_app_supervisor_probe_host in ['127.0.0.1', '[::1]'])
+    fail_msg: >-
+      Non-loopback Timelord.app worker or supervisor observability listeners
+      require chia_darwin_timelord_app_allow_remote_observability: true. The
+      app listener has no authentication or TLS; use a private network or an
+      authenticated reverse proxy.
+  when: chia_darwin_timelord_app_enabled | bool
+
+- name: Require a remote connection bundle for timelord-app without a local full node
+  ansible.builtin.assert:
+    that:
+      - >-
+        (chia_darwin_timelord_app_bundle_path | length > 0) or
+        (chia_darwin_timelord_app_bundle_src | length > 0)
+    fail_msg: >-
+      timelord-app on remote-node has no local CHIA_ROOT to read identities
+      from. Set chia_darwin_timelord_app_bundle_path to a connection bundle
+      already on this Mac, or chia_darwin_timelord_app_bundle_src to a
+      controller directory to copy. The bundle must contain connection.toml and
+      the dedicated peer/RPC client identities created on the full-node host.
+  when:
+    - chia_darwin_timelord_app_enabled | bool
+    - not (chia_darwin_local_full_node | bool)

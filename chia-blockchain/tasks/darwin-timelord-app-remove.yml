@@ -1,0 +1,23 @@
+---
+# Remove the Timelord.app LaunchDaemon only when this role registered it. A
+# manually installed app is left alone. The app bundle, config, identities, and
+# learned board state are preserved so switching back is non-destructive.
+- name: Check whether this role installed the Timelord.app service
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.stat:
+    path: "{{ chia_darwin_timelord_app_managed_marker }}"
+  register: chia_darwin_timelord_app_marker
+
+- name: Remove the role-managed Timelord.app registration
+  when: chia_darwin_timelord_app_marker.stat.exists | default(false)
+  block:
+    - name: Stop and unregister the Timelord.app service
+      ansible.builtin.include_tasks: darwin-timelord-app-stop.yml
+
+    - name: Clear the role-managed Timelord.app marker
+      become: true
+      become_user: "{{ user }}"
+      ansible.builtin.file:
+        path: "{{ chia_darwin_timelord_app_managed_marker }}"
+        state: absent
