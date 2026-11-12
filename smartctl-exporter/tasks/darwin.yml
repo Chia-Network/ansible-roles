@@ -67,6 +67,7 @@
     - "{{ smartctl_exporter_darwin_install_dir }}"
     - "{{ smartctl_exporter_darwin_state_dir }}"
     - "{{ smartctl_exporter_darwin_download_dir }}"
+    - "{{ smartctl_exporter_darwin_bin | dirname }}"
 
 - name: Download smartctl_exporter
   become: "{{ smartctl_exporter_darwin_become | bool }}"

@@ -148,6 +148,47 @@
           - "'--storage.path=/var/lib/alloy' in plist"
           - "'<key>KeepAlive</key><true/>' in plist"
 
+    - name: The Darwin Alloy block labels are valid identifiers
+      ansible.builtin.command:
+        argv:
+          - python3
+          - -c
+          - |
+            import re
+            import sys
+            from pathlib import Path
+
+            text = Path(sys.argv[1]).read_text()
+            labels = re.findall(r'(?m)^[A-Za-z_][A-Za-z0-9_.]*\s+"([^"]+)"\s*\{', text)
+            bad = [label for label in labels if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', label)]
+            if bad:
+                sys.exit("invalid Alloy block labels: " + ", ".join(bad))
+            if "chia_watchdog" not in labels:
+                sys.exit("missing the chia_watchdog block label")
+            if not re.search(r'job\s*=\s*"chia-watchdog"', text):
+                sys.exit("the chia-watchdog job value was sanitized")
+          - "{{ fleet_out }}/config.alloy"
+      changed_when: false
+
+    - name: Check for the Alloy formatter
+      ansible.builtin.command:
+        argv:
+          - sh
+          - -c
+          - command -v alloy
+      register: alloy_binary
+      changed_when: false
+      failed_when: false
+
+    - name: The Darwin Alloy config passes alloy fmt
+      ansible.builtin.command:
+        argv:
+          - alloy
+          - fmt
+          - "{{ fleet_out }}/config.alloy"
+      changed_when: false
+      when: alloy_binary.rc == 0
+
 - name: Render the Darwin smartctl_exporter LaunchDaemon
   hosts: localhost
   connection: local
