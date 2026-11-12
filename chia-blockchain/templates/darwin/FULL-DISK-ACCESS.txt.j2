@@ -41,5 +41,14 @@ files, including external volumes. That is the interpreter the running
 deployment uses. This role will not swap in a different interpreter or a
 custom Mach-O stub.
 
+Companion binaries
+------------------
+For local-external, also add the launchd-run chia-exporter and chia-healthcheck
+binaries to Full Disk Access. They live in {{ chia_darwin_companion_bin_dir }}.
+The sibling MDM profile does not cover these companion binaries; add them by
+hand in System Settings. The interpreter grant alone can still leave them
+failing with "open .../config.yaml: operation not permitted".
+This role cannot grant TCC Full Disk Access.
+
 This role only writes this note and the profile template. It never runs
 `profiles`, `tccutil`, or SQL against TCC.db.

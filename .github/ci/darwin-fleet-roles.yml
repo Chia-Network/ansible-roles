@@ -148,6 +148,26 @@
           - "'--storage.path=/var/lib/alloy' in plist"
           - "'<key>KeepAlive</key><true/>' in plist"
 
+    - name: The Darwin Alloy block labels are valid and unique
+      ansible.builtin.command:
+        argv:
+          - python3
+          - "{{ playbook_dir }}/check_alloy_labels.py"
+          - --require-label
+          - chia_watchdog
+          - --require-job
+          - chia-watchdog
+          - "{{ fleet_out }}/config.alloy"
+      changed_when: false
+
+    - name: The Darwin Alloy config passes alloy validate
+      ansible.builtin.command:
+        argv:
+          - alloy
+          - validate
+          - "{{ fleet_out }}/config.alloy"
+      changed_when: false
+
 - name: Render the Darwin smartctl_exporter LaunchDaemon
   hosts: localhost
   connection: local
@@ -206,6 +226,13 @@
         ansible_hostname: linux-test
         chia_root: /home/ubuntu/.chia
         alloy_darwin_chia_root: ""
+        alloy_extra_log_files:
+          - name: 9lives
+            path: /var/log/9lives.log
+            job: 9lives
+          - name: app.v2
+            path: /var/log/app.v2.log
+            job: app.v2
 
     - name: Create the Linux render directory
       ansible.builtin.file:
@@ -234,3 +261,27 @@
           - "'/home/ubuntu/.chia/log/debug.log' in config"
           - "'/var/log/chia-watchdog.log' not in config"
           - "'/var/log/system.log' not in config"
+
+    - name: The Linux Alloy block labels are valid and unique
+      ansible.builtin.command:
+        argv:
+          - python3
+          - "{{ playbook_dir }}/check_alloy_labels.py"
+          - --require-label
+          - _9lives
+          - --require-label
+          - app_v2
+          - --require-job
+          - 9lives
+          - --require-job
+          - app.v2
+          - "{{ fleet_out }}/linux/config.alloy"
+      changed_when: false
+
+    - name: The Linux Alloy config passes alloy validate
+      ansible.builtin.command:
+        argv:
+          - alloy
+          - validate
+          - "{{ fleet_out }}/linux/config.alloy"
+      changed_when: false

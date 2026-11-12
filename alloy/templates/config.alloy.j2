@@ -89,8 +89,10 @@ loki.process "chia" {
 // ── Extra log files ──────────────────────────────────────────────────────────
 {% set platform_extra_log_files = (alloy_darwin_extra_log_files | default([])) if (ansible_os_family | default('')) == 'Darwin' else [] %}
 {% for extra in (alloy_extra_log_files + platform_extra_log_files) %}
+{% set extra_label = extra.name | regex_replace('[^A-Za-z0-9_]', '_') | regex_replace('^(?=[0-9])', '_') %}
 
-loki.source.file "{{ extra.name }}" {
+{# Sanitize the block label into an identifier; the Loki job value is not. #}
+loki.source.file "{{ extra_label }}" {
   targets = [
     {
       __path__ = "{{ extra.path }}",

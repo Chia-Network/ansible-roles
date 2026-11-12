@@ -390,6 +390,19 @@ healthcheck use. It defaults to `chia_root`. A host can point it at a read-only
 config copy instead. The wrappers still wait for the real database volume
 before starting.
 
+When `CHIA_ROOT` lives on an external volume (for example `~/.chia` symlinked
+onto `/Volumes/<database-volume>`, the `local-external` topology), grant Full
+Disk Access in System Settings -> Privacy & Security -> Full Disk Access to the
+companion binaries themselves as well as the wrapper interpreter. Without that
+grant, launchd-run `chia-exporter` and `chia-healthcheck` can fail with
+`open .../config.yaml: operation not permitted` even after the interpreter has
+Full Disk Access. The binaries live in `chia_darwin_companion_bin_dir` (default
+`~/opt/bin/chia-exporter` and `~/opt/bin/chia-healthcheck` under the service
+user). The sibling PPPC/MDM profile only grants the wrapper interpreter, so it
+does not cover the companion binaries; add those by hand in System Settings.
+Ansible and this role cannot grant TCC Full Disk Access; see the
+`FULL-DISK-ACCESS.txt` note the role writes on the Mac.
+
 ## Watchdog
 
 `chia-watchdog` is the macOS equivalent of the Linux monit configuration. It
@@ -476,6 +489,10 @@ If the only practical SSH login is the service account, set
 `chia_darwin_allow_root_capable_service_user: true`. That is a weaker posture
 than the Linux split because the network-facing service account is then
 root-capable. The role refuses that posture by default.
+
+Any `/etc/sudoers.d/` rule for the service account, for example a leftover
+`/etc/sudoers.d/<service-user>-ansible`, trips that guard. Remove it so only
+the separate admin account has sudo. The role does not edit `/etc/sudoers.d`.
 
 The playbook targets `mac_timelords`, not `localhost` with
 `connection: local`. A controller with a checkout of this repository can run:

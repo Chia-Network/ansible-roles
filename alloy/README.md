@@ -129,6 +129,9 @@ These are applied to the Chia log source and are only relevant when
 
 Use `alloy_extra_log_files` to add arbitrary log sources. Each entry creates
 its own `loki.source.file` component forwarding to the default Loki sink.
+`name` is sanitized into an Alloy identifier for the component block label (for
+example `chia-watchdog` becomes `chia_watchdog`); `job` is left unchanged as the
+Loki job value and defaults to `name`.
 
 ```yaml
 - hosts: app_servers
