@@ -67,7 +67,21 @@
     - "{{ smartctl_exporter_darwin_install_dir }}"
     - "{{ smartctl_exporter_darwin_state_dir }}"
     - "{{ smartctl_exporter_darwin_download_dir }}"
-    - "{{ smartctl_exporter_darwin_bin | dirname }}"
+
+- name: Check the smartctl_exporter bin directory
+  ansible.builtin.stat:
+    path: "{{ smartctl_exporter_darwin_bin | dirname }}"
+  register: smartctl_exporter_darwin_bin_dir
+
+- name: Create the smartctl_exporter bin directory when missing
+  become: "{{ smartctl_exporter_darwin_become | bool }}"
+  ansible.builtin.file:
+    path: "{{ smartctl_exporter_darwin_bin | dirname }}"
+    state: directory
+    owner: "{{ smartctl_exporter_darwin_owner }}"
+    group: "{{ smartctl_exporter_darwin_group }}"
+    mode: "0755"
+  when: not smartctl_exporter_darwin_bin_dir.stat.exists
 
 - name: Download smartctl_exporter
   become: "{{ smartctl_exporter_darwin_become | bool }}"

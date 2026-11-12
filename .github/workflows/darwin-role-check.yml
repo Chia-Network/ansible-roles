@@ -52,6 +52,15 @@ jobs:
       - name: Check the Darwin Timelord.app implementation
         run: ansible-playbook .github/ci/darwin-timelord-app.yml
 
+      - name: Install Grafana Alloy for config validation
+        run: |
+          version="1.21.3"
+          archive="$RUNNER_TEMP/alloy-linux-amd64.zip"
+          curl -fsSL "https://github.com/grafana/alloy/releases/download/v${version}/alloy-linux-amd64.zip" -o "$archive"
+          echo "50d23af2d0f98c00beac6ce9a365693e60f87fb76b6cad6fe1d161e80588af6d  $archive" | sha256sum -c -
+          unzip -o "$archive" -d "$RUNNER_TEMP/alloy"
+          sudo install -m 0755 "$RUNNER_TEMP/alloy/alloy-linux-amd64" /usr/local/bin/alloy
+
       - name: Check Darwin fleet roles (SSH, Alloy, smartctl)
         run: ansible-playbook -e render_out="$RUNNER_TEMP/darwin-fleet" .github/ci/darwin-fleet-roles.yml
 

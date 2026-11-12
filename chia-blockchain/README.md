@@ -21,8 +21,9 @@ practical SSH login is the service account, set
 posture. Set `chia_darwin_brew_user` so Homebrew runs as the prefix owner. The
 same inventory entry shape covers additional Macs. See
 [DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#companion-services) for the service table,
-watchdog behavior, binary pins, the approved-sudoers note, Full Disk Access for
-the companion binaries, and leftover service-account sudoers fragments.
+watchdog behavior, binary pins, and Full Disk Access for the companion binaries.
+See [DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#managing-several-macs) for the
+approved-sudoers note and leftover service-account sudoers fragments.
 
 With `chia_darwin_timelord_implementation: chia-blockchain`, the role can also
 run a `vdf-only` topology: only the ASIC `hw-vdf` board jobs are installed. Set `chia_darwin_hw_vdf_ip` to the remote timelord's VDF server.

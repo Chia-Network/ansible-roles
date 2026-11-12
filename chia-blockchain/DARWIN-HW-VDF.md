@@ -398,7 +398,9 @@ grant, launchd-run `chia-exporter` and `chia-healthcheck` can fail with
 `open .../config.yaml: operation not permitted` even after the interpreter has
 Full Disk Access. The binaries live in `chia_darwin_companion_bin_dir` (default
 `~/opt/bin/chia-exporter` and `~/opt/bin/chia-healthcheck` under the service
-user). Ansible and this role cannot grant TCC Full Disk Access; see the
+user). The sibling PPPC/MDM profile only grants the wrapper interpreter, so it
+does not cover the companion binaries; add those by hand in System Settings.
+Ansible and this role cannot grant TCC Full Disk Access; see the
 `FULL-DISK-ACCESS.txt` note the role writes on the Mac.
 
 ## Watchdog
@@ -488,12 +490,9 @@ If the only practical SSH login is the service account, set
 than the Linux split because the network-facing service account is then
 root-capable. The role refuses that posture by default.
 
-A leftover `/etc/sudoers.d/` fragment that grants the service account (`user`,
-often named like the host's service user) `NOPASSWD: ALL` also trips that guard.
-Remove it, or narrow it, so only the separate admin SSH/sudo account has
-passwordless sudo. A leftover automation fragment such as
-`/etc/sudoers.d/<service-user>-ansible` is a common source. The role does not
-edit `/etc/sudoers.d`.
+Any `/etc/sudoers.d/` rule for the service account, for example a leftover
+`/etc/sudoers.d/<service-user>-ansible`, trips that guard. Remove it so only
+the separate admin account has sudo. The role does not edit `/etc/sudoers.d`.
 
 The playbook targets `mac_timelords`, not `localhost` with
 `connection: local`. A controller with a checkout of this repository can run:

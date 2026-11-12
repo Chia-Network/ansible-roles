@@ -148,46 +148,25 @@
           - "'--storage.path=/var/lib/alloy' in plist"
           - "'<key>KeepAlive</key><true/>' in plist"
 
-    - name: The Darwin Alloy block labels are valid identifiers
+    - name: The Darwin Alloy block labels are valid and unique
       ansible.builtin.command:
         argv:
           - python3
-          - -c
-          - |
-            import re
-            import sys
-            from pathlib import Path
-
-            text = Path(sys.argv[1]).read_text()
-            labels = re.findall(r'(?m)^[A-Za-z_][A-Za-z0-9_.]*\s+"([^"]+)"\s*\{', text)
-            bad = [label for label in labels if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', label)]
-            if bad:
-                sys.exit("invalid Alloy block labels: " + ", ".join(bad))
-            if "chia_watchdog" not in labels:
-                sys.exit("missing the chia_watchdog block label")
-            if not re.search(r'job\s*=\s*"chia-watchdog"', text):
-                sys.exit("the chia-watchdog job value was sanitized")
+          - "{{ playbook_dir }}/check_alloy_labels.py"
+          - --require-label
+          - chia_watchdog
+          - --require-job
+          - chia-watchdog
           - "{{ fleet_out }}/config.alloy"
       changed_when: false
 
-    - name: Check for the Alloy formatter
-      ansible.builtin.command:
-        argv:
-          - sh
-          - -c
-          - command -v alloy
-      register: alloy_binary
-      changed_when: false
-      failed_when: false
-
-    - name: The Darwin Alloy config passes alloy fmt
+    - name: The Darwin Alloy config passes alloy validate
       ansible.builtin.command:
         argv:
           - alloy
-          - fmt
+          - validate
           - "{{ fleet_out }}/config.alloy"
       changed_when: false
-      when: alloy_binary.rc == 0
 
 - name: Render the Darwin smartctl_exporter LaunchDaemon
   hosts: localhost
@@ -247,6 +226,13 @@
         ansible_hostname: linux-test
         chia_root: /home/ubuntu/.chia
         alloy_darwin_chia_root: ""
+        alloy_extra_log_files:
+          - name: 9lives
+            path: /var/log/9lives.log
+            job: 9lives
+          - name: app.v2
+            path: /var/log/app.v2.log
+            job: app.v2
 
     - name: Create the Linux render directory
       ansible.builtin.file:
@@ -275,3 +261,27 @@
           - "'/home/ubuntu/.chia/log/debug.log' in config"
           - "'/var/log/chia-watchdog.log' not in config"
           - "'/var/log/system.log' not in config"
+
+    - name: The Linux Alloy block labels are valid and unique
+      ansible.builtin.command:
+        argv:
+          - python3
+          - "{{ playbook_dir }}/check_alloy_labels.py"
+          - --require-label
+          - _9lives
+          - --require-label
+          - app_v2
+          - --require-job
+          - 9lives
+          - --require-job
+          - app.v2
+          - "{{ fleet_out }}/linux/config.alloy"
+      changed_when: false
+
+    - name: The Linux Alloy config passes alloy validate
+      ansible.builtin.command:
+        argv:
+          - alloy
+          - validate
+          - "{{ fleet_out }}/linux/config.alloy"
+      changed_when: false
