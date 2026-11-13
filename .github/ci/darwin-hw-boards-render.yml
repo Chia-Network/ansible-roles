@@ -101,6 +101,48 @@
         dest: "{{ render_out }}/boards/local-external.sh"
         mode: "0755"
 
+    - name: Render the local-external service and companion wrappers
+      ansible.builtin.template:
+        src: "../../chia-blockchain/templates/darwin/{{ item }}.j2"
+        dest: "{{ render_out }}/boards/wrapper-{{ item }}"
+        mode: "0755"
+      vars:
+        chia_darwin_topology: local-external
+      loop:
+        - chia-daemon-run.sh
+        - chia-full-node-run.sh
+        - chia-timelord-run.sh
+        - chia-exporter-run.sh
+        - chia-healthcheck-run.sh
+        - chia-hw-vdf-run.sh
+
+    - name: Read the local-external wrappers
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/boards/wrapper-{{ item }}"
+      loop:
+        - chia-daemon-run.sh
+        - chia-full-node-run.sh
+        - chia-timelord-run.sh
+        - chia-exporter-run.sh
+        - chia-healthcheck-run.sh
+        - chia-hw-vdf-run.sh
+      register: wrapper_scripts
+
+    - name: Only the full-node wrapper waits for the database volume
+      vars:
+        wrappers: "{{ wrapper_scripts.results | map(attribute='content') | map('b64decode') | list }}"
+      ansible.builtin.assert:
+        that:
+          - wrappers[1] is search('(?m)^wait_for_db_volume$')
+          - wrappers[0] is not search('(?m)^wait_for_db_volume$')
+          - wrappers[2] is not search('(?m)^wait_for_db_volume$')
+          - wrappers[3] is not search('(?m)^wait_for_db_volume$')
+          - wrappers[4] is not search('(?m)^wait_for_db_volume$')
+          - wrappers[5] is not search('(?m)^wait_for_db_volume$')
+        fail_msg: >-
+          Only chia-full-node-run.sh may call wait_for_db_volume. Helper
+          wrappers must not touch the external database volume.
+
     - name: Resolve three boards for wrapper text
       ansible.builtin.include_tasks: darwin-hw-boards-reset.yml
     - name: Use the three-board fixture

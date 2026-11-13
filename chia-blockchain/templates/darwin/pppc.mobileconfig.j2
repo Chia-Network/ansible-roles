@@ -13,9 +13,13 @@
 
     The LaunchDaemon wrappers are {{ chia_darwin_interpreter | e }} scripts. TCC
     attributes their file access to that interpreter, so the identifier is the
-    interpreter path, not the script path. Granting Full Disk Access to
-    {{ chia_darwin_interpreter | e }} is broad: other jobs that start via the same
-    interpreter inherit it. That is the deployment that has been running.
+    interpreter path, not the script path. For local-external, this is the
+    expected grant for the full-node wrapper to read the external blockchain DB
+    directory ({{ chia_darwin_volume_db_dir | e }}). CHIA_ROOT and the companion
+    services stay on the internal disk, so companion binaries are not added to
+    this profile. Granting Full Disk Access to {{ chia_darwin_interpreter | e }}
+    is still broad: other jobs that start via the same interpreter inherit it.
+    That is the deployment that has been running.
   -->
   <key>PayloadContent</key>
   <array>
@@ -42,7 +46,7 @@
             <key>CodeRequirement</key>
             <string>{{ chia_darwin_pppc_code_requirement | e }}</string>
             <key>Comment</key>
-            <string>Shebang interpreter for net.chia timelord LaunchDaemons. Required to read an external CHIA_ROOT volume.</string>
+            <string>Shebang interpreter for the full-node LaunchDaemon. Expected to be required to read the external blockchain DB directory.</string>
             <key>Identifier</key>
             <string>{{ chia_darwin_interpreter | e }}</string>
             <key>IdentifierType</key>
@@ -55,7 +59,7 @@
     </dict>
   </array>
   <key>PayloadDescription</key>
-  <string>MDM profile so Chia timelord LaunchDaemons can read an external CHIA_ROOT. Do not install by double-click. Does not modify TCC.db.</string>
+  <string>MDM profile so the Chia full-node LaunchDaemon can read the external blockchain DB directory. Do not install by double-click. Does not modify TCC.db.</string>
   <key>PayloadDisplayName</key>
   <string>Chia timelord Full Disk Access</string>
   <key>PayloadIdentifier</key>

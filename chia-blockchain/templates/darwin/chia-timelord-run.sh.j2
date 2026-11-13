@@ -1,7 +1,6 @@
 #!/bin/zsh
 # Managed by the chia-blockchain Ansible role.
 . {{ chia_darwin_env_script | quote }}
-wait_for_db_volume
 wait_for_listen {{ chia_daemon_port | quote }} # chia daemon
 LAUNCHER_PORT={{ chia_timelord_launcher_port | quote }}
 PEER_HOST={{ chia_timelord_full_node_peer_host | quote }}

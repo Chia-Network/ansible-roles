@@ -1,0 +1,476 @@
+---
+# Local tests for chia-blockchain/tasks/darwin-local-external-root.yml. They
+# use a temporary test root, a fake mount, and a fake unloaded launchctl. No
+# real Mac, external volume, launchd job, or S3 bucket is touched.
+- name: Test the local-external CHIA_ROOT layout without a Mac
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+  tasks:
+    - name: Create a temporary local-external root test directory
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: " darwin local external root"
+      register: darwin_local_external_temp
+
+    - name: Record the local-external root test directory
+      ansible.builtin.set_fact:
+        test_root: "{{ darwin_local_external_temp.path }}"
+
+    - name: Create the shared fixtures and fake tools
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-setup.yml"
+
+    - name: Record the shared external paths
+      ansible.builtin.set_fact:
+        external_chia: "{{ chia_darwin_volume_chia_dir }}"
+        external_db: "{{ chia_darwin_volume_db_dir }}"
+
+    - name: Create the shared on-volume database directory
+      ansible.builtin.file:
+        path: "{{ external_db }}"
+        state: directory
+        mode: "0755"
+
+    - name: Load the production Darwin tasks for the mount preflight test
+      ansible.builtin.set_fact:
+        local_external_darwin_tasks: "{{ lookup('file', playbook_dir ~ '/../../chia-blockchain/tasks/darwin.yml') | from_yaml }}"
+
+    - name: Extract the production mount preflight tasks
+      ansible.builtin.set_fact:
+        local_external_mount_tasks: >-
+          {{ (local_external_darwin_tasks
+             | selectattr('name', 'equalto', 'Manage the chia-blockchain CHIA_ROOT')
+             | first)['block']
+             | selectattr('name', 'in', ['Read mounted filesystems', 'Require the database volume to be mounted now'])
+             | list }}
+
+    - name: Write the production mount preflight tasks to a temporary include
+      ansible.builtin.copy:
+        content: "{{ local_external_mount_tasks | to_nice_yaml }}"
+        dest: "{{ test_root }}/mount-preflight.yml"
+        mode: "0644"
+
+    - name: A fresh host gets a real internal CHIA_ROOT and a db symlink
+      vars:
+        chia_darwin_home: "{{ test_root }}/fresh/home"
+        chia_root: "{{ test_root }}/fresh/home/.chia/{{ network }}"
+      block:
+        - name: Run the local-external root include on a fresh host
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-local-external-root.yml"
+
+        - name: Inspect the fresh local-external layout
+          ansible.builtin.stat:
+            path: "{{ item }}"
+            follow: false
+          loop:
+            - "{{ chia_darwin_home }}/.chia"
+            - "{{ chia_root }}/db"
+            - "{{ external_db }}"
+            - "{{ external_chia }}/{{ network }}/wallet"
+            - "{{ chia_darwin_home }}/.chia.legacy-volume-link"
+            - "{{ chia_darwin_home }}/.chia.migrating"
+          register: fresh_stats
+
+        - name: Require the fresh local-external layout
+          ansible.builtin.assert:
+            that:
+              - fresh_stats.results[0].stat.isdir | default(false)
+              - not (fresh_stats.results[0].stat.islnk | default(false))
+              - fresh_stats.results[1].stat.islnk | default(false)
+              - >-
+                (fresh_stats.results[1].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
+                (external_db | regex_replace('/+$', ''))
+              - fresh_stats.results[2].stat.isdir | default(false)
+              - not (fresh_stats.results[3].stat.exists | default(false))
+              - not (fresh_stats.results[4].stat.exists | default(false))
+              - not (fresh_stats.results[5].stat.exists | default(false))
+            fail_msg: >-
+              A fresh local-external host must get a real internal ~/.chia and
+              CHIA_ROOT, an on-volume DB directory, and only <chia_root>/db as
+              a symlink. Wallet data must stay off the volume.
+
+    - name: Repair a missing db symlink on an existing real ~/.chia
+      vars:
+        chia_darwin_home: "{{ test_root }}/repair/home"
+        chia_root: "{{ test_root }}/repair/home/.chia/{{ network }}"
+      block:
+        - name: Use the repair test paths
+          ansible.builtin.set_fact:
+            chia_darwin_home: "{{ test_root }}/repair/home"
+            chia_root: "{{ test_root }}/repair/home/.chia/{{ network }}"
+          changed_when: false
+
+        - name: Create a real ~/.chia without a CHIA_ROOT
+          ansible.builtin.file:
+            path: "{{ chia_darwin_home }}/.chia"
+            state: directory
+            mode: "0755"
+
+        - name: Run the local-external root include to repair the db symlink
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-local-external-root.yml"
+
+        - name: Inspect the repaired local-external layout
+          ansible.builtin.stat:
+            path: "{{ item }}"
+            follow: false
+          loop:
+            - "{{ chia_root }}"
+            - "{{ chia_root }}/db"
+            - "{{ external_db }}"
+          register: repair_stats
+
+        - name: Require the repaired local-external layout
+          ansible.builtin.assert:
+            that:
+              - repair_stats.results[0].stat.isdir | default(false)
+              - repair_stats.results[1].stat.islnk | default(false)
+              - >-
+                (repair_stats.results[1].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
+                (external_db | regex_replace('/+$', ''))
+              - repair_stats.results[2].stat.isdir | default(false)
+            fail_msg: >-
+              A real ~/.chia with no <chia_root>/db must be repaired by
+              creating the internal CHIA_ROOT and linking db at the volume.
+
+    - name: Prepare a legacy ~/.chia volume symlink with on-volume data
+      vars:
+        legacy_home: "{{ test_root }}/legacy/home"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ legacy_home }}"
+        - "{{ external_chia }}/mainnet/config"
+        - "{{ external_chia }}/mainnet/wallet/db"
+        - "{{ external_chia }}/mainnet/db"
+        - "{{ external_chia }}/testnet11/db"
+
+    - name: Write the legacy on-volume fixtures
+      ansible.builtin.copy:
+        content: "{{ item.content }}"
+        dest: "{{ item.dest }}"
+        mode: "0644"
+      loop:
+        - content: mainnet config fixture
+          dest: "{{ external_chia }}/mainnet/config/config.yaml"
+        - content: wallet db fixture
+          dest: "{{ external_chia }}/mainnet/wallet/db/wallet.sqlite"
+        - content: volume-only blockchain database
+          dest: "{{ external_chia }}/mainnet/db/blockchain_v2_mainnet.sqlite"
+        - content: testnet11 blockchain database
+          dest: "{{ external_chia }}/testnet11/db/blockchain_v2_testnet11.sqlite"
+        - content: leftover non-db file on the volume
+          dest: "{{ external_chia }}/mainnet/leftover.txt"
+
+    - name: Create the legacy ~/.chia volume symlink
+      ansible.builtin.file:
+        src: "{{ external_chia }}"
+        dest: "{{ test_root }}/legacy/home/.chia"
+        state: link
+        force: false
+
+    - name: Record the on-volume database inode before migration
+      ansible.builtin.stat:
+        path: "{{ external_chia }}/mainnet/db/blockchain_v2_mainnet.sqlite"
+      register: legacy_volume_db_before
+
+    - name: Reset the fake launchctl log before the migration
+      ansible.builtin.copy:
+        content: ""
+        dest: "{{ test_root }}/launchctl.log"
+        mode: "0644"
+
+    - name: Migrate the legacy ~/.chia volume symlink
+      vars:
+        chia_darwin_home: "{{ test_root }}/legacy/home"
+        chia_root: "{{ test_root }}/legacy/home/.chia/{{ network }}"
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-local-external-root.yml"
+
+    - name: Inspect the migrated local-external layout
+      ansible.builtin.stat:
+        path: "{{ item }}"
+        follow: false
+      loop:
+        - "{{ test_root }}/legacy/home/.chia"
+        - "{{ test_root }}/legacy/home/.chia/mainnet/db"
+        - "{{ test_root }}/legacy/home/.chia/testnet11/db"
+        - "{{ test_root }}/legacy/home/.chia.legacy-volume-link"
+        - "{{ test_root }}/legacy/home/.chia.migrating"
+        - "{{ external_chia }}/mainnet/db/blockchain_v2_mainnet.sqlite"
+        - "{{ external_chia }}/mainnet/config/config.yaml"
+        - "{{ external_chia }}/mainnet/wallet/db/wallet.sqlite"
+        - "{{ external_chia }}/mainnet/leftover.txt"
+      register: migrated_stats
+
+    - name: Require the migrated local-external layout
+      ansible.builtin.assert:
+        that:
+          - migrated_stats.results[0].stat.isdir | default(false)
+          - not (migrated_stats.results[0].stat.islnk | default(false))
+          - migrated_stats.results[1].stat.islnk | default(false)
+          - >-
+            (migrated_stats.results[1].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
+            (external_db | regex_replace('/+$', ''))
+          - migrated_stats.results[2].stat.islnk | default(false)
+          - >-
+            (migrated_stats.results[2].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
+            ((external_chia ~ '/testnet11/db') | regex_replace('/+$', ''))
+          - migrated_stats.results[3].stat.islnk | default(false)
+          - >-
+            (migrated_stats.results[3].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
+            (external_chia | regex_replace('/+$', ''))
+          - not (migrated_stats.results[4].stat.exists | default(false))
+          - migrated_stats.results[5].stat.isreg | default(false)
+          - migrated_stats.results[5].stat.inode == (legacy_volume_db_before.stat.inode | int)
+          - migrated_stats.results[6].stat.isreg | default(false)
+          - migrated_stats.results[7].stat.isreg | default(false)
+          - migrated_stats.results[8].stat.isreg | default(false)
+          - lookup('file', test_root ~ '/legacy/home/.chia/mainnet/config/config.yaml') == 'mainnet config fixture'
+          - lookup('file', test_root ~ '/legacy/home/.chia/mainnet/wallet/db/wallet.sqlite') == 'wallet db fixture'
+          - chia_darwin_restart_services | bool
+        fail_msg: >-
+          The legacy migration must keep ~/.chia internal and real, copy non-db
+          data, link only <chia_root>/db at the original volume DB, leave the
+          volume database in place, and request a service restart.
+
+    - name: Require the migration to stop only the enabled chia job
+      vars:
+        launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
+      ansible.builtin.assert:
+        that:
+          - launchctl_lines | select('search', 'bootout system/net.chia.roottest.timelord') | list | length == 1
+          - launchctl_lines | select('search', 'net.chia.roottest.disabled') | list | length == 0
+        fail_msg: >-
+          The migration must stop only this role's enabled jobs and must not
+          touch disabled or non-chia jobs.
+
+    - name: Refuse an unexpected ~/.chia symlink target
+      vars:
+        chia_darwin_home: "{{ test_root }}/unexpected/home"
+        chia_root: "{{ test_root }}/unexpected/home/.chia/{{ network }}"
+      block:
+        - name: Use the unexpected test paths
+          ansible.builtin.set_fact:
+            chia_darwin_home: "{{ test_root }}/unexpected/home"
+            chia_root: "{{ test_root }}/unexpected/home/.chia/{{ network }}"
+          changed_when: false
+
+        - name: Prepare an unexpected ~/.chia symlink
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: directory
+            mode: "0755"
+          loop:
+            - "{{ chia_darwin_home }}"
+            - "{{ test_root }}/not-the-volume"
+
+        - name: Point ~/.chia at an unexpected target
+          ansible.builtin.file:
+            src: "{{ test_root }}/not-the-volume"
+            dest: "{{ chia_darwin_home }}/.chia"
+            state: link
+            force: false
+
+        - name: Run the local-external root include with an unexpected symlink
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-local-external-root.yml"
+
+        - name: Fail because the unexpected symlink was accepted
+          ansible.builtin.fail:
+            msg: The unexpected ~/.chia symlink was accepted
+
+      rescue:
+        - name: Require the unexpected symlink refusal
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg | default('') is search('only migrates the historical')
+            fail_msg: >-
+              The unexpected ~/.chia symlink failed with the wrong message:
+              {{ ansible_failed_result.msg | default('no message') }}
+
+    - name: Inspect the refused unexpected symlink
+      ansible.builtin.stat:
+        path: "{{ test_root }}/unexpected/home/.chia"
+        follow: false
+      register: unexpected_stat
+
+    - name: Require the unexpected symlink to be unchanged
+      ansible.builtin.assert:
+        that:
+          - unexpected_stat.stat.islnk | default(false)
+          - >-
+            (unexpected_stat.stat.lnk_target | default('') | regex_replace('/+$', '')) ==
+            ((test_root ~ '/not-the-volume') | regex_replace('/+$', ''))
+
+    - name: Refuse to replace a real local database directory
+      vars:
+        chia_darwin_home: "{{ test_root }}/real-db/home"
+        chia_root: "{{ test_root }}/real-db/home/.chia/{{ network }}"
+      block:
+        - name: Use the real-db test paths
+          ansible.builtin.set_fact:
+            chia_darwin_home: "{{ test_root }}/real-db/home"
+            chia_root: "{{ test_root }}/real-db/home/.chia/{{ network }}"
+          changed_when: false
+
+        - name: Prepare a real local db directory with data
+          ansible.builtin.file:
+            path: "{{ chia_root }}/db"
+            state: directory
+            mode: "0755"
+
+        - name: Write a file inside the real local db directory
+          ansible.builtin.copy:
+            content: keep-me
+            dest: "{{ chia_root }}/db/local.sqlite"
+            mode: "0644"
+
+        - name: Run the local-external root include with a real local db directory
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-local-external-root.yml"
+
+        - name: Fail because the real local db directory was replaced
+          ansible.builtin.fail:
+            msg: The real local db directory was replaced
+
+      rescue:
+        - name: Require the real local db refusal
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg | default('') is search('real directory')
+            fail_msg: >-
+              The real local db directory failed with the wrong message:
+              {{ ansible_failed_result.msg | default('no message') }}
+
+    - name: Inspect the refused real local db directory
+      ansible.builtin.stat:
+        path: "{{ test_root }}/real-db/home/.chia/{{ network }}/db"
+        follow: false
+      register: real_db_stat
+
+    - name: Require the real local db directory and its data to be unchanged
+      ansible.builtin.assert:
+        that:
+          - real_db_stat.stat.isdir | default(false)
+          - not (real_db_stat.stat.islnk | default(false))
+          - lookup('file', test_root ~ '/real-db/home/.chia/' ~ network ~ '/db/local.sqlite') == 'keep-me'
+
+    - name: Refuse a leftover migration staging tree while ~/.chia exists
+      vars:
+        chia_darwin_home: "{{ test_root }}/staging/home"
+        chia_root: "{{ test_root }}/staging/home/.chia/{{ network }}"
+      block:
+        - name: Use the staging test paths
+          ansible.builtin.set_fact:
+            chia_darwin_home: "{{ test_root }}/staging/home"
+            chia_root: "{{ test_root }}/staging/home/.chia/{{ network }}"
+          changed_when: false
+
+        - name: Prepare a real ~/.chia and a leftover staging tree
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: directory
+            mode: "0755"
+          loop:
+            - "{{ chia_darwin_home }}/.chia"
+            - "{{ chia_darwin_home }}/.chia.migrating"
+
+        - name: Write a file in the leftover staging tree
+          ansible.builtin.copy:
+            content: staged-data
+            dest: "{{ chia_darwin_home }}/.chia.migrating/keep.txt"
+            mode: "0644"
+
+        - name: Run the local-external root include with a leftover staging tree
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-local-external-root.yml"
+
+        - name: Fail because the leftover staging tree was accepted
+          ansible.builtin.fail:
+            msg: The leftover staging tree was accepted
+
+      rescue:
+        - name: Require the leftover staging tree refusal
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg | default('') is search('previous migration did not finish')
+            fail_msg: >-
+              The leftover staging tree failed with the wrong message:
+              {{ ansible_failed_result.msg | default('no message') }}
+
+    - name: Inspect the refused leftover staging tree
+      ansible.builtin.stat:
+        path: "{{ item }}"
+        follow: false
+      loop:
+        - "{{ test_root }}/staging/home/.chia"
+        - "{{ test_root }}/staging/home/.chia.migrating/keep.txt"
+      register: staging_stats
+
+    - name: Require the leftover staging tree to be unchanged
+      ansible.builtin.assert:
+        that:
+          - staging_stats.results[0].stat.isdir | default(false)
+          - staging_stats.results[1].stat.isreg | default(false)
+          - lookup('file', test_root ~ '/staging/home/.chia.migrating/keep.txt') == 'staged-data'
+
+    - name: Fail closed when the production mount preflight does not see the volume
+      vars:
+        chia_darwin_home: "{{ test_root }}/unmounted/home"
+        chia_root: "{{ test_root }}/unmounted/home/.chia/{{ network }}"
+      block:
+        - name: Use the unmounted test paths
+          ansible.builtin.set_fact:
+            chia_darwin_home: "{{ test_root }}/unmounted/home"
+            chia_root: "{{ test_root }}/unmounted/home/.chia/{{ network }}"
+          changed_when: false
+
+        - name: Prepare a legacy ~/.chia symlink before the mount preflight
+          ansible.builtin.file:
+            path: "{{ chia_darwin_home }}"
+            state: directory
+            mode: "0755"
+
+        - name: Point ~/.chia at the volume before the mount preflight
+          ansible.builtin.file:
+            src: "{{ external_chia }}"
+            dest: "{{ chia_darwin_home }}/.chia"
+            state: link
+            force: false
+
+        - name: Run the production mount preflight against an unmounted volume
+          ansible.builtin.include_tasks: "{{ test_root }}/mount-preflight.yml"
+          vars:
+            chia_darwin_topology: local-external
+            chia_darwin_mount: "{{ test_root }}/bin/mount-unmounted"
+
+        - name: Fail because the unmounted volume passed the mount preflight
+          ansible.builtin.fail:
+            msg: The unmounted volume passed the mount preflight
+
+      rescue:
+        - name: Require the mount preflight refusal
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result.msg | default('') is search('not mounted')
+            fail_msg: >-
+              The unmounted volume failed with the wrong message:
+              {{ ansible_failed_result.msg | default('no message') }}
+
+    - name: Inspect ~/.chia after the refused mount preflight
+      ansible.builtin.stat:
+        path: "{{ test_root }}/unmounted/home/.chia"
+        follow: false
+      register: unmounted_stat
+
+    - name: Require the mount preflight to leave ~/.chia untouched
+      ansible.builtin.assert:
+        that:
+          - unmounted_stat.stat.islnk | default(false)
+          - >-
+            (unmounted_stat.stat.lnk_target | default('') | regex_replace('/+$', '')) ==
+            (external_chia | regex_replace('/+$', ''))
+
+    - name: Report the temporary local-external root test directory
+      ansible.builtin.debug:
+        msg: "Darwin local-external root tests passed under {{ test_root }}"

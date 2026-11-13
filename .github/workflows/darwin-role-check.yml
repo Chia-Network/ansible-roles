@@ -29,7 +29,7 @@ jobs:
         name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y zsh shellcheck python3-venv
+          sudo apt-get install -y zsh shellcheck python3-venv rsync
           python3 -m pip install --user 'ansible-core${{ matrix.ansible }}'
 
       - name: Syntax check
@@ -38,6 +38,8 @@ jobs:
         run: |
           ansible-playbook --syntax-check .github/ci/darwin-syntax-check.yml
           ansible-playbook --syntax-check .github/ci/darwin-assumptions.yml
+          ansible-playbook --syntax-check .github/ci/darwin-local-external-root-tests.yml
+          ansible-playbook --syntax-check .github/ci/darwin-local-external-root-idempotence.yml
           ansible-playbook --syntax-check .github/ci/darwin-bare-interpreter.yml
           ansible-playbook --syntax-check .github/ci/darwin-hw-boards.yml
           ansible-playbook --syntax-check .github/ci/darwin-fleet-roles.yml
@@ -86,6 +88,21 @@ jobs:
           root="$RUNNER_TEMP/darwin-db-seed-checkmode"
           rm -rf "$root"
           ansible-playbook --check -e "test_root=$root" .github/ci/darwin-db-seed-check-mode.yml
+
+      - name: Run Darwin local-external CHIA_ROOT layout tests
+        env:
+          ANSIBLE_ROLES_PATH: ${{ github.workspace }}
+        run: ansible-playbook .github/ci/darwin-local-external-root-tests.yml
+
+      - name: Check a second Darwin local-external root run is idempotent
+        env:
+          ANSIBLE_ROLES_PATH: ${{ github.workspace }}
+        run: |
+          root="$RUNNER_TEMP/darwin-local-external-root-idempotence"
+          rm -rf "$root"
+          ansible-playbook .github/ci/darwin-local-external-root-idempotence.yml -e "test_root=$root"
+          ansible-playbook .github/ci/darwin-local-external-root-idempotence.yml -e "test_root=$root" | tee "$RUNNER_TEMP/darwin-local-external-root-idempotence-second.log"
+          grep -E 'changed=0.*failed=0' "$RUNNER_TEMP/darwin-local-external-root-idempotence-second.log"
 
       - name: Prove virtualenv pip works without packaging on the module interpreter
         run: |

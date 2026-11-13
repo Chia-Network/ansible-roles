@@ -26,7 +26,9 @@ for it, still outside the admin group. That weaker posture is off by default and
 the role does not edit `/etc/sudoers.d`. Set `chia_darwin_brew_user` so Homebrew
 runs as the prefix owner. The same inventory entry shape covers additional Macs.
 See [DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#companion-services) for the service table,
-watchdog behavior, binary pins, and Full Disk Access for the companion binaries.
+watchdog behavior, binary pins, and Full Disk Access guidance. For the
+`local-external` layout, Full Disk Access is expected to be needed only for the
+full-node process, not the companion binaries.
 See [DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#managing-several-macs) for the
 approved-sudoers note and leftover service-account sudoers fragments.
 
@@ -41,7 +43,7 @@ connection count through `chia_darwin_hw_vdf_port`.
 | Topology         | What runs                                                                        |
 | ---------------- | -------------------------------------------------------------------------------- |
 | `local-internal` | Role-managed daemon/full node plus the app and its ASIC clients.                 |
-| `local-external` | Same, with `~/.chia` on `chia_darwin_db_volume`; Full Disk Access still applies. |
+| `local-external` | Same, with only the blockchain DB directory on `chia_darwin_db_volume`; CHIA_ROOT stays internal. Expected Full Disk Access is for the full-node process only. |
 | `remote-node`    | The app only. No Python, chia-blockchain, daemon, full node, or local CHIA_ROOT. |
 | `vdf-only`       | Refused with `timelord-app`; use `chia-blockchain` for ASIC-only Macs.           |
 

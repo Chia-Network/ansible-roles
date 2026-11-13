@@ -119,7 +119,7 @@
           - darwin_db_seed_internal_second.stat.size == (first_run_size | int)
           - darwin_db_seed_internal_second.stat.mtime == (first_run_mtime | float)
 
-    - name: Seed an absent local-external testnet11 database through the symlink
+    - name: Seed an absent local-external testnet11 database through the db symlink
       ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
       vars:
         case:

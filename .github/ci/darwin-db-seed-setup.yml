@@ -35,12 +35,24 @@
     - "{{ external_root }}/mainnet/db"
     - "{{ external_root }}/testnet11/db"
 
-- name: Link the external test CHIA_ROOT
+- name: Create the local test CHIA_ROOT network directories
   ansible.builtin.file:
-    src: "{{ external_root }}"
-    dest: "{{ test_root }}/home ext/.chia"
+    path: "{{ test_root }}/home ext/.chia/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - mainnet
+    - testnet11
+
+- name: Link each local test CHIA_ROOT database at the external volume
+  ansible.builtin.file:
+    src: "{{ external_root }}/{{ item }}/db"
+    dest: "{{ test_root }}/home ext/.chia/{{ item }}/db"
     state: link
-    force: true
+    force: false
+  loop:
+    - mainnet
+    - testnet11
 
 - name: Write the mainnet and testnet11 snapshot fixtures
   ansible.builtin.copy:

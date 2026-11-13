@@ -256,11 +256,13 @@ Topology behavior:
 
 - `local-internal` and `local-external` keep the role-managed daemon and full
   node. The app reads the timelord peer identity from CHIA_ROOT with
-  `timelord-service local-node`. `local-external` still needs Full Disk Access
-  for the wrapper interpreter and the app process to read the volume. The app
-  config references the identities on that volume, so the node connection can
-  fail and retry until the volume is mounted; mount it before relying on
-  unattended proof production after a reboot.
+  `timelord-service local-node`. For `local-external`, identities and config
+  live on the internal CHIA_ROOT; only the blockchain DB directory is on the
+  volume. The app process is expected not to need Full Disk Access to read those
+  internal identities. The full-node process is expected to need it for the
+  volume DB directory (unverified on hardware). The volume still must be
+  mounted for the full node, so mount it before relying on unattended proof
+  production after a reboot.
 - `remote-node` installs no Homebrew Python, virtualenv, chia-blockchain, daemon,
   or full node. The app imports a connection bundle with
   `timelord-service import-node`. Set `chia_darwin_timelord_app_bundle_path` for
@@ -387,21 +389,23 @@ with `chia_darwin_companion_rotpipe_max_bytes` and
 
 `chia_darwin_companion_chia_root` is the `CHIA_ROOT` the exporter and
 healthcheck use. It defaults to `chia_root`. A host can point it at a read-only
-config copy instead. The wrappers still wait for the real database volume
-before starting.
+config copy instead. Companions no longer wait for the database volume because
+`local-external` keeps CHIA_ROOT on the internal disk and only `<chia_root>/db`
+on the volume.
 
-When `CHIA_ROOT` lives on an external volume (for example `~/.chia` symlinked
-onto `/Volumes/<database-volume>`, the `local-external` topology), grant Full
-Disk Access in System Settings -> Privacy & Security -> Full Disk Access to the
-companion binaries themselves as well as the wrapper interpreter. Without that
-grant, launchd-run `chia-exporter` and `chia-healthcheck` can fail with
-`open .../config.yaml: operation not permitted` even after the interpreter has
-Full Disk Access. The binaries live in `chia_darwin_companion_bin_dir` (default
-`~/opt/bin/chia-exporter` and `~/opt/bin/chia-healthcheck` under the service
-user). The sibling PPPC/MDM profile only grants the wrapper interpreter, so it
-does not cover the companion binaries; add those by hand in System Settings.
-Ansible and this role cannot grant TCC Full Disk Access; see the
-`FULL-DISK-ACCESS.txt` note the role writes on the Mac.
+When `CHIA_ROOT` is internal (the `local-external` layout this role now
+enforces), the companion binaries should not need Full Disk Access and should
+not need to wait for the database volume. That is expected, not yet proven on
+hardware. If a companion is pointed at a read-only config copy on the volume,
+it would need its own grant, but do not add companion binaries to the profile
+for the default internal-CHIA_ROOT layout. Ansible and this role cannot grant
+TCC Full Disk Access; see the `FULL-DISK-ACCESS.txt` note the role writes on
+the Mac.
+
+Operator note: on a Mac full-node timelord, keep `~/.chia` on the internal disk
+and put only the blockchain DB directory on the external drive. Otherwise many
+helper binaries need GUI Full Disk Access grants. This is the `local-external`
+layout the role now enforces.
 
 ## Watchdog
 

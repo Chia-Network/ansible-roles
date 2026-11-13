@@ -3,7 +3,6 @@
 # Mirrors the Linux chia-exporter unit: CHIA_ROOT and the daemon dependency.
 . {{ chia_darwin_env_script | quote }}
 export CHIA_ROOT={{ chia_darwin_companion_chia_root | quote }}
-wait_for_db_volume
 wait_for_listen {{ chia_daemon_port | quote }}
 LOG={{ chia_darwin_log_dir | quote }}/chia-exporter.log
 log "starting chia-exporter (CHIA_ROOT=$CHIA_ROOT)" >>"$LOG"

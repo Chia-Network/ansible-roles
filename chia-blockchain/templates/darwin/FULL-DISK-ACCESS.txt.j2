@@ -1,27 +1,37 @@
 Chia timelord on macOS — Full Disk Access
 ==========================================
 
-Required only for topology local-external (CHIA_ROOT on {{ chia_darwin_db_volume }}).
-local-internal and remote-node keep CHIA_ROOT on the internal disk ({{ chia_root }})
-and do not need this grant.
+Relevant only for topology local-external. CHIA_ROOT ({{ chia_root }}) and
+~/.chia stay on the internal disk. Only the blockchain database directory
+({{ chia_darwin_volume_db_dir }}) lives on {{ chia_darwin_db_volume }}.
+local-internal and remote-node keep everything on the internal disk and do not
+need this grant.
 
 Why
 ---
 LaunchDaemons run outside a user GUI session and have no Transparency, Consent,
 and Control (TCC) grants of their own. A job whose program is a script is
 attributed to its shebang interpreter. These wrappers use {{ chia_darwin_interpreter }}.
-Until that interpreter has Full Disk Access, the job can see that {{ chia_darwin_db_volume }}
-is mounted and still fail to read {{ chia_darwin_db_marker }}. The wrapper then
-loops on "waiting for {{ chia_darwin_db_volume }}" and the log's ls= line is
-"Operation not permitted". An interactive SSH session can read the same path
-while launchd cannot. That mismatch is TCC, not a missing mount.
+Until that interpreter has Full Disk Access, the full-node job can see that
+{{ chia_darwin_db_volume }} is mounted and still fail to read
+{{ chia_darwin_volume_db_dir }}. The wrapper then loops on "waiting for
+{{ chia_darwin_db_volume }}" and the log's ls= line is "Operation not permitted".
+An interactive SSH session can read the same path while launchd cannot. That
+mismatch is TCC, not a missing mount.
+
+This narrowing is expected, not yet proven on hardware. Only the full-node
+process is expected to need this grant: the interpreter running chia_full_node,
+because TCC attributes the script job to its shebang interpreter. Companion
+binaries and tailscaled should not need it now that config and wallet data are
+on the internal disk.
 
 How to grant it
 ---------------
 1. GUI (this Mac):
    System Settings -> Privacy & Security -> Full Disk Access -> add
    {{ chia_darwin_interpreter }} (Cmd-Shift-G if it is hidden) and enable it.
-   Then restart the LaunchDaemons (launchctl kickstart -k system/<label>).
+   Then restart the full-node LaunchDaemon
+   (launchctl kickstart -k system/<full-node label>).
 
 2. MDM: install the sibling profile
    {{ chia_darwin_pppc_dest }}
@@ -43,12 +53,11 @@ custom Mach-O stub.
 
 Companion binaries
 ------------------
-For local-external, also add the launchd-run chia-exporter and chia-healthcheck
-binaries to Full Disk Access. They live in {{ chia_darwin_companion_bin_dir }}.
-The sibling MDM profile does not cover these companion binaries; add them by
-hand in System Settings. The interpreter grant alone can still leave them
-failing with "open .../config.yaml: operation not permitted".
-This role cannot grant TCC Full Disk Access.
+chia-exporter, chia-healthcheck, and the other companion jobs keep their
+CHIA_ROOT on the internal disk and no longer wait for the database volume.
+Do not add {{ chia_darwin_companion_bin_dir }} binaries to Full Disk Access for
+this layout. tailscaled does not need this grant for Chia config either, because
+config is internal now.
 
-This role only writes this note and the profile template. It never runs
-`profiles`, `tccutil`, or SQL against TCC.db.
+This role cannot grant TCC Full Disk Access. It only writes this note and the
+profile template. It never runs `profiles`, `tccutil`, or SQL against TCC.db.

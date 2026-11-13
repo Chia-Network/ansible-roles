@@ -1,0 +1,77 @@
+---
+# Shared identity, fixtures, and fake tools for the local-external CHIA_ROOT
+# layout tests. These tasks never touch a real Mac, launchd, S3, or /Volumes.
+- name: Set the local-external root test identity and paths
+  ansible.builtin.set_fact:
+    test_user: "{{ lookup('env', 'USER') }}"
+    test_group: "{{ lookup('pipe', 'id -gn') }}"
+    user: "{{ lookup('env', 'USER') }}"
+    chia_darwin_group: "{{ lookup('pipe', 'id -gn') }}"
+    chia_darwin_home: "{{ test_root }}/home"
+    chia_darwin_db_volume: "{{ test_root }}/Volumes/Chia DB"
+    chia_darwin_mount: "{{ test_root }}/bin/mount"
+    chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-unloaded"
+    chia_darwin_launchd_prefix: net.chia.roottest
+    chia_darwin_launchd_become: false
+    chia_darwin_restart_services: false
+    chia_darwin_launchd_jobs:
+      - name: timelord
+        label: net.chia.roottest.timelord
+        enabled: true
+        exit_timeout: 1
+      - name: disabled
+        label: net.chia.roottest.disabled
+        enabled: false
+        exit_timeout: 1
+
+- name: Create the local-external root test directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ test_root }}/bin"
+    - "{{ chia_darwin_home }}"
+    - "{{ chia_darwin_db_volume }}"
+
+- name: Write the fake mounted filesystem list
+  ansible.builtin.copy:
+    content: |
+      #!/bin/sh
+      printf '%s\n' 'fake on {{ chia_darwin_db_volume }} (apfs, local)'
+    dest: "{{ test_root }}/bin/mount"
+    mode: "0755"
+
+- name: Write the fake unmounted filesystem list
+  ansible.builtin.copy:
+    content: |
+      #!/bin/sh
+      printf '%s\n' '/dev/disk1 on / (apfs, local)'
+    dest: "{{ test_root }}/bin/mount-unmounted"
+    mode: "0755"
+
+- name: Write the fake unloaded launchctl executable
+  ansible.builtin.copy:
+    content: |
+      #!/bin/sh
+      printf '%s\n' "$*" >> '{{ test_root }}/launchctl.log'
+      if [ "${1:-}" = "print" ]; then
+        exit 1
+      fi
+      exit 0
+    dest: "{{ test_root }}/bin/launchctl-unloaded"
+    mode: "0755"
+
+- name: Create an empty fake launchctl log without truncating it on reruns
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ test_root }}/launchctl.log"
+    force: false
+    mode: "0644"
+
+- name: Create an empty fake mount log without truncating it on reruns
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ test_root }}/mount.log"
+    force: false
+    mode: "0644"
