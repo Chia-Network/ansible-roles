@@ -53,8 +53,8 @@
       {%- if not (chia_darwin_local_external_root_db_stat.exists | default(false)) -%}absent{%- elif chia_darwin_local_external_root_db_stat.islnk | default(false) -%}{%- if (chia_darwin_local_external_root_db_stat.lnk_target | default('') | regex_replace('/+$', '')) == chia_darwin_local_external_volume_db_dir_norm -%}correct-symlink{%- else -%}wrong-symlink{%- endif -%}{%- elif chia_darwin_local_external_root_db_stat.isdir | default(false) -%}real-directory{%- else -%}file{%- endif -%}
     chia_darwin_local_external_fresh: >-
       {{ (not (chia_darwin_local_external_dot_chia_stat.exists | default(false))) and
-         (not (chia_darwin_local_external_migrating_stat.exists | default(false))) and
-         (not (chia_darwin_local_external_legacy_stat.exists | default(false))) }}
+      (not (chia_darwin_local_external_migrating_stat.exists | default(false))) and
+      (not (chia_darwin_local_external_legacy_stat.exists | default(false))) }}
   changed_when: false
 
 - name: Read mounted filesystems before changing the local-external CHIA_ROOT

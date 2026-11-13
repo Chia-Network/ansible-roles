@@ -41,15 +41,30 @@
       ansible.builtin.set_fact:
         local_external_mount_tasks: >-
           {{ (local_external_darwin_tasks
-             | selectattr('name', 'equalto', 'Manage the chia-blockchain CHIA_ROOT')
-             | first)['block']
-             | selectattr('name', 'in', ['Read mounted filesystems', 'Require the database volume to be mounted now'])
-             | list }}
+          | selectattr('name', 'equalto', 'Manage the chia-blockchain CHIA_ROOT')
+          | first)['block']
+          | selectattr('name', 'in', ['Read mounted filesystems', 'Require the database volume to be mounted now'])
+          | list }}
 
     - name: Write the production mount preflight tasks to a temporary include
       ansible.builtin.copy:
         content: "{{ local_external_mount_tasks | to_nice_yaml }}"
         dest: "{{ test_root }}/mount-preflight.yml"
+        mode: "0644"
+
+    - name: Extract the production CHIA_ROOT directory tasks
+      ansible.builtin.set_fact:
+        local_external_root_dir_tasks: >-
+          {{ (local_external_darwin_tasks
+          | selectattr('name', 'equalto', 'Install chia-blockchain into the virtualenv')
+          | first)['block']
+          | selectattr('name', 'in', ['Ensure the CHIA_ROOT config directory exists', 'Ensure the CHIA_ROOT db directory exists for internal topologies', 'Inspect the local-external CHIA_ROOT db symlink', 'Require the local-external CHIA_ROOT db symlink to be unchanged'])
+          | list }}
+
+    - name: Write the production CHIA_ROOT directory tasks to a temporary include
+      ansible.builtin.copy:
+        content: "{{ local_external_root_dir_tasks | to_nice_yaml }}"
+        dest: "{{ test_root }}/chia-root-dirs.yml"
         mode: "0644"
 
     - name: A fresh host gets a real internal CHIA_ROOT and a db symlink
@@ -90,6 +105,47 @@
               A fresh local-external host must get a real internal ~/.chia and
               CHIA_ROOT, an on-volume DB directory, and only <chia_root>/db as
               a symlink. Wallet data must stay off the volume.
+
+        - name: Write the fresh on-volume database fixture
+          ansible.builtin.copy:
+            content: fresh database
+            dest: "{{ external_db }}/blockchain_v2_mainnet.sqlite"
+            mode: "0644"
+
+        - name: Record the fresh on-volume database before the directory tasks
+          ansible.builtin.stat:
+            path: "{{ external_db }}/blockchain_v2_mainnet.sqlite"
+          register: fresh_db_before
+
+        - name: Run the production CHIA_ROOT directory tasks on the fresh layout
+          ansible.builtin.include_tasks: "{{ test_root }}/chia-root-dirs.yml"
+
+        - name: Inspect the fresh layout after the directory tasks
+          ansible.builtin.stat:
+            path: "{{ item }}"
+            follow: false
+          loop:
+            - "{{ chia_root }}/config"
+            - "{{ chia_root }}/db"
+            - "{{ external_db }}/blockchain_v2_mainnet.sqlite"
+          register: fresh_after_dirs
+
+        - name: Require the fresh directory tasks to preserve the db symlink and database
+          ansible.builtin.assert:
+            that:
+              - fresh_after_dirs.results[0].stat.isdir | default(false)
+              - not (fresh_after_dirs.results[0].stat.islnk | default(false))
+              - fresh_after_dirs.results[1].stat.islnk | default(false)
+              - >-
+                (fresh_after_dirs.results[1].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
+                (external_db | regex_replace('/+$', ''))
+              - fresh_after_dirs.results[2].stat.isreg | default(false)
+              - fresh_after_dirs.results[2].stat.inode == (fresh_db_before.stat.inode | int)
+              - fresh_after_dirs.results[2].stat.path == external_db ~ '/blockchain_v2_mainnet.sqlite'
+            fail_msg: >-
+              The later CHIA_ROOT directory tasks must create config as a real
+              directory without touching the local-external db symlink or the
+              on-volume database file.
 
     - name: Repair a missing db symlink on an existing real ~/.chia
       vars:
@@ -235,6 +291,43 @@
           The legacy migration must keep ~/.chia internal and real, copy non-db
           data, link only <chia_root>/db at the original volume DB, leave the
           volume database in place, and request a service restart.
+
+    - name: Record the migrated on-volume database before the directory tasks
+      ansible.builtin.stat:
+        path: "{{ external_chia }}/mainnet/db/blockchain_v2_mainnet.sqlite"
+      register: migrated_db_before_dirs
+
+    - name: Run the production CHIA_ROOT directory tasks on the migrated layout
+      vars:
+        chia_darwin_home: "{{ test_root }}/legacy/home"
+        chia_root: "{{ test_root }}/legacy/home/.chia/{{ network }}"
+      ansible.builtin.include_tasks: "{{ test_root }}/chia-root-dirs.yml"
+
+    - name: Inspect the migrated layout after the directory tasks
+      ansible.builtin.stat:
+        path: "{{ item }}"
+        follow: false
+      loop:
+        - "{{ test_root }}/legacy/home/.chia/mainnet/config"
+        - "{{ test_root }}/legacy/home/.chia/mainnet/db"
+        - "{{ external_chia }}/mainnet/db/blockchain_v2_mainnet.sqlite"
+      register: migrated_after_dirs
+
+    - name: Require the migrated directory tasks to preserve the db symlink and database
+      ansible.builtin.assert:
+        that:
+          - migrated_after_dirs.results[0].stat.isdir | default(false)
+          - not (migrated_after_dirs.results[0].stat.islnk | default(false))
+          - migrated_after_dirs.results[1].stat.islnk | default(false)
+          - >-
+            (migrated_after_dirs.results[1].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
+            (external_db | regex_replace('/+$', ''))
+          - migrated_after_dirs.results[2].stat.isreg | default(false)
+          - migrated_after_dirs.results[2].stat.inode == (migrated_db_before_dirs.stat.inode | int)
+          - migrated_after_dirs.results[2].stat.path == external_chia ~ '/mainnet/db/blockchain_v2_mainnet.sqlite'
+        fail_msg: >-
+          The later CHIA_ROOT directory tasks must leave the migrated db
+          symlink and the on-volume database file in place.
 
     - name: Require the migration to stop only the enabled chia job
       vars:

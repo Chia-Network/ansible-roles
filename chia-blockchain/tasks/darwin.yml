@@ -427,16 +427,42 @@
       register: chia_darwin_pip_pinned
       changed_when: "'Successfully installed' in chia_darwin_pip_pinned.stdout"
 
-    - name: Ensure CHIA_ROOT config and db directories exist
+    - name: Ensure the CHIA_ROOT config directory exists
       become: true
       become_user: "{{ user }}"
       ansible.builtin.file:
-        path: "{{ chia_root }}/{{ item }}"
+        path: "{{ chia_root }}/config"
         state: directory
         mode: "0755"
-      loop:
-        - config
-        - db
+
+    - name: Ensure the CHIA_ROOT db directory exists for internal topologies
+      become: true
+      become_user: "{{ user }}"
+      ansible.builtin.file:
+        path: "{{ chia_root }}/db"
+        state: directory
+        mode: "0755"
+      when: chia_darwin_topology != "local-external"
+
+    - name: Inspect the local-external CHIA_ROOT db symlink
+      ansible.builtin.stat:
+        path: "{{ chia_root }}/db"
+        follow: false
+      register: chia_darwin_local_external_db_check
+      when: chia_darwin_topology == "local-external"
+
+    - name: Require the local-external CHIA_ROOT db symlink to be unchanged
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_local_external_db_check.stat.islnk | default(false)
+          - >-
+            (chia_darwin_local_external_db_check.stat.lnk_target | default('') | regex_replace('/+$', '')) ==
+            (chia_darwin_volume_db_dir | regex_replace('/+$', ''))
+        fail_msg: >-
+          {{ chia_root }}/db must remain a symlink to
+          {{ chia_darwin_volume_db_dir }} for local-external. The role did not
+          replace or retarget it.
+      when: chia_darwin_topology == "local-external"
 
     - name: Check for an existing chia config
       ansible.builtin.stat:

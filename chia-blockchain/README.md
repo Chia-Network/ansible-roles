@@ -40,12 +40,15 @@ connection count through `chia_darwin_hw_vdf_port`.
 
 ## Timelord.app (optional implementation)
 
-| Topology         | What runs                                                                        |
-| ---------------- | -------------------------------------------------------------------------------- |
-| `local-internal` | Role-managed daemon/full node plus the app and its ASIC clients.                 |
-| `local-external` | Same, with only the blockchain DB directory on `chia_darwin_db_volume`; CHIA_ROOT stays internal. Expected Full Disk Access is for the full-node process only. |
-| `remote-node`    | The app only. No Python, chia-blockchain, daemon, full node, or local CHIA_ROOT. |
-| `vdf-only`       | Refused with `timelord-app`; use `chia-blockchain` for ASIC-only Macs.           |
+| Topology         | What runs                                                                               |
+| ---------------- | --------------------------------------------------------------------------------------- |
+| `local-internal` | Role-managed daemon/full node plus the app and its ASIC clients.                        |
+| `local-external` | Same, with only the blockchain DB on `chia_darwin_db_volume`; CHIA_ROOT stays internal. |
+| `remote-node`    | The app only. No Python, chia-blockchain, daemon, full node, or local CHIA_ROOT.        |
+| `vdf-only`       | Refused with `timelord-app`; use `chia-blockchain` for ASIC-only Macs.                  |
+
+For `local-external`, Full Disk Access is expected, not proven, to be needed
+only for the full-node process, not the companion binaries.
 
 Remote-node deployments require a connection bundle created on the full-node host:
 
