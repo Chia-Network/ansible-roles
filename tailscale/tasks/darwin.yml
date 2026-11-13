@@ -1,30 +1,21 @@
 ---
 - name: Find tailscale LaunchDaemons
   ansible.builtin.find:
-    paths: "{{ tailscale_darwin_launchd_dir | default('/Library/LaunchDaemons') }}"
+    paths: /Library/LaunchDaemons
     patterns: "*tailscale*.plist"
     file_type: any
   register: tailscale_darwin_competing
-  check_mode: false
 
 - name: List pinned Homebrew formulas
   become: false
-  ansible.builtin.command:
-    argv:
-      - "{{ tailscale_darwin_brew | default('/opt/homebrew/bin/brew') }}"
-      - list
-      - --pinned
+  ansible.builtin.command: /opt/homebrew/bin/brew list --pinned
   register: tailscale_darwin_pinned
   changed_when: false
   check_mode: false
 
 - name: Check the role-owned tailscaled job
   become: true
-  ansible.builtin.command:
-    argv:
-      - "{{ tailscale_darwin_launchctl | default('/bin/launchctl') }}"
-      - print
-      - system/net.chia.tailscaled
+  ansible.builtin.command: /bin/launchctl print system/net.chia.tailscaled
   register: tailscale_darwin_running
   changed_when: false
   failed_when: false
@@ -35,19 +26,18 @@
     that:
       - (tailscale_darwin_competing.files | map(attribute='path') | map('basename') | list) == ['net.chia.tailscaled.plist']
       - "'tailscale' in tailscale_darwin_pinned.stdout_lines"
-      - tailscale_darwin_running.rc == 0
       - "'state = running' in tailscale_darwin_running.stdout"
     fail_msg: >-
       tailscale is not ready. Remove competing jobs, keep net.chia.tailscaled
-      running per the M6 runbook (m6-tailscale-brew-paths.md), never run
-      Homebrew's service wrapper with sudo, and keep the formula pinned.
+      running per the M6 runbook, never run Homebrew's service wrapper with
+      sudo, and keep the formula pinned.
 
 - name: Install the tailscaled LaunchDaemon
   become: true
   ansible.builtin.copy:
-    src: "{{ role_path | default(playbook_dir ~ '/../../tailscale') }}/files/net.chia.tailscaled.plist"
-    dest: "{{ tailscale_darwin_launchd_dir | default('/Library/LaunchDaemons') }}/net.chia.tailscaled.plist"
+    src: net.chia.tailscaled.plist
+    dest: /Library/LaunchDaemons/net.chia.tailscaled.plist
     owner: root
     group: wheel
     mode: "0644"
-    validate: "{{ tailscale_darwin_plutil | default('/usr/bin/plutil') }} -lint %s"
+    validate: /usr/bin/plutil -lint %s

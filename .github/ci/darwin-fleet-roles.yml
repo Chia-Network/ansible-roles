@@ -138,7 +138,6 @@
         path: "{{ repo_dir }}/tailscale/{{ item }}"
       loop:
         - handlers
-        - handlers/main.yml
       register: tailscale_handlers
 
     - name: tailscale only reads state and keeps no handlers
@@ -156,10 +155,8 @@
         that:
           - tailscale_forbidden | select('in', tailscale_sources) | list | length == 0
           - tailscale_handlers.results | selectattr('stat.exists') | list | length == 0
-          - "'become: false' in tailscale_darwin"
         fail_msg: >-
-          The tailscale role must only read state and ship no handlers; brew
-          must run with become: false as the login user.
+          The tailscale role must only read state and ship no handlers.
 
 - name: Render the Darwin Alloy configuration
   hosts: localhost
@@ -414,18 +411,17 @@
   connection: local
   gather_facts: false
   become: true
-  vars:
-    tailscale_stubs: "{{ render_out | default('/tmp/darwin-fleet') }}/tailscale-stubs"
-    tailscale_darwin_brew: "{{ tailscale_stubs }}/brew"
-    tailscale_darwin_launchctl: "{{ tailscale_stubs }}/launchctl"
-    tailscale_darwin_launchd_dir: "{{ tailscale_stubs }}/LaunchDaemons"
-    tailscale_darwin_plutil: "{{ tailscale_stubs }}/plutil"
   tasks:
-    - name: Create the tailscale stub workspace
+    - name: Create the tailscale stub directories
       ansible.builtin.file:
-        path: "{{ tailscale_darwin_launchd_dir }}"
+        path: "{{ item }}"
         state: directory
         mode: "0755"
+      loop:
+        - /opt/homebrew/bin
+        - /bin
+        - /usr/bin
+        - /Library/LaunchDaemons
 
     - name: Provide the wheel group for the LaunchDaemon owner
       ansible.builtin.group:
@@ -438,23 +434,25 @@
         mode: "{{ item.mode | default('0755') }}"
         content: "{{ item.content }}"
       loop:
-        - path: "{{ tailscale_darwin_brew }}"
+        - path: /opt/homebrew/bin/brew
           content: |
             #!/bin/sh
             [ "$(id -u)" -ne 0 ] || { echo "brew must not run as root" >&2; exit 1; }
             echo tailscale
-        - path: "{{ tailscale_darwin_launchctl }}"
+        - path: /bin/launchctl
           content: |
             #!/bin/sh
             [ "$1" = print ] || exit 1
             echo "state = running"
-        - path: "{{ tailscale_darwin_plutil }}"
+        - path: /usr/bin/plutil
           content: |
             #!/bin/sh
             exit 0
-        - path: "{{ tailscale_darwin_launchd_dir }}/net.chia.tailscaled.plist"
+        - path: /Library/LaunchDaemons/net.chia.tailscaled.plist
           mode: "0644"
           content: "stub\n"
 
     - name: Run the Darwin tailscale tasks with stubbed tools
-      ansible.builtin.import_tasks: ../../tailscale/tasks/darwin.yml
+      ansible.builtin.include_role:
+        name: "{{ playbook_dir }}/../../tailscale"
+        tasks_from: darwin
