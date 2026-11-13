@@ -1,0 +1,7 @@
+---
+# Linux is a no-op. On Darwin this role owns only the LaunchDaemon file; it
+# never manages the daemon lifecycle because CI reaches the host over
+# Tailscale SSH.
+- name: Manage the tailscaled LaunchDaemon on Darwin
+  ansible.builtin.include_tasks: darwin.yml
+  when: ansible_os_family == "Darwin"

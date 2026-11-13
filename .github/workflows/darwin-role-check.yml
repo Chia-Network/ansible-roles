@@ -41,6 +41,7 @@ jobs:
           ansible-playbook --syntax-check .github/ci/darwin-bare-interpreter.yml
           ansible-playbook --syntax-check .github/ci/darwin-hw-boards.yml
           ansible-playbook --syntax-check .github/ci/darwin-fleet-roles.yml
+          ansible-playbook --syntax-check .github/ci/darwin-tailscale.yml
           ansible-playbook --syntax-check .github/ci/darwin-timelord-app.yml
 
       - name: Check Darwin restart and pip assumptions
@@ -63,6 +64,9 @@ jobs:
 
       - name: Check Darwin fleet roles (SSH, Alloy, smartctl)
         run: ansible-playbook -e render_out="$RUNNER_TEMP/darwin-fleet" .github/ci/darwin-fleet-roles.yml
+
+      - name: Check the Darwin tailscale role
+        run: ansible-playbook -e render_out="$RUNNER_TEMP/darwin-tailscale" .github/ci/darwin-tailscale.yml
 
       - name: Run Darwin database seed tests
         env:

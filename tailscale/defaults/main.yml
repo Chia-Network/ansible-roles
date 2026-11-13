@@ -1,0 +1,20 @@
+---
+tailscale_darwin_homebrew_prefix: /opt/homebrew
+tailscale_darwin_brew: "{{ tailscale_darwin_homebrew_prefix }}/bin/brew"
+tailscale_darwin_formula: tailscale
+tailscale_darwin_binary: "{{ tailscale_darwin_homebrew_prefix }}/opt/tailscale/bin/tailscaled"
+tailscale_darwin_launchd_dir: /Library/LaunchDaemons
+tailscale_darwin_launchd_label: net.chia.tailscaled
+tailscale_darwin_launchctl: /bin/launchctl
+tailscale_darwin_socket: /var/run/tailscaled.socket
+tailscale_darwin_log_dir: /var/log
+tailscale_darwin_stdout_log: "{{ tailscale_darwin_log_dir }}/tailscaled.out.log"
+tailscale_darwin_stderr_log: "{{ tailscale_darwin_log_dir }}/tailscaled.err.log"
+tailscale_darwin_path: "{{ tailscale_darwin_homebrew_prefix }}/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+tailscale_darwin_become: true
+tailscale_darwin_owner: root
+tailscale_darwin_group: wheel
+# Rendered when a competing tailscale job is present.
+tailscale_darwin_brew_services_warning: >-
+  Do not use sudo brew services; it chowns keg paths to root:admin and
+  competes with this job. This role will not start or restart tailscaled.

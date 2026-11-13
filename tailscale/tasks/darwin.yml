@@ -1,0 +1,103 @@
+---
+# Tailscale on macOS. Homebrew owns the binary; this role owns only a root
+# LaunchDaemon file and never manages the daemon lifecycle because CI reaches
+# the host over Tailscale SSH.
+- name: Require Homebrew for Tailscale
+  ansible.builtin.stat:
+    path: "{{ tailscale_darwin_brew }}"
+  register: tailscale_darwin_brew_stat
+
+- name: Fail when Homebrew is not installed
+  ansible.builtin.assert:
+    that:
+      - tailscale_darwin_brew_stat.stat.exists | default(false)
+      - tailscale_darwin_brew_stat.stat.executable | default(false)
+    fail_msg: >-
+      Homebrew was not found at {{ tailscale_darwin_brew }}. Install it as the
+      Homebrew prefix owner before applying this role.
+
+- name: Check whether the tailscale formula is installed
+  ansible.builtin.command: "{{ tailscale_darwin_brew }} list --versions {{ tailscale_darwin_formula }}"
+  register: tailscale_darwin_formula_list
+  changed_when: false
+  failed_when: false
+
+- name: Install the tailscale formula with Homebrew
+  ansible.builtin.command: "{{ tailscale_darwin_brew }} install {{ tailscale_darwin_formula }}"
+  when: tailscale_darwin_formula_list.rc != 0
+  changed_when: true
+
+- name: List pinned Homebrew formulas
+  ansible.builtin.command: "{{ tailscale_darwin_brew }} list --pinned"
+  register: tailscale_darwin_pinned
+  changed_when: false
+
+- name: Require the tailscale formula to be pinned
+  ansible.builtin.assert:
+    that: tailscale_darwin_formula in tailscale_darwin_pinned.stdout_lines
+    fail_msg: >-
+      The {{ tailscale_darwin_formula }} formula is not pinned. Run
+      `brew pin tailscale` as the Homebrew prefix owner before applying this
+      role. An unpinned upgrade would replace the binary and drop its Full Disk
+      Access grant.
+
+- name: Require the tailscaled binary
+  ansible.builtin.stat:
+    path: "{{ tailscale_darwin_binary }}"
+  register: tailscale_darwin_binary_stat
+
+- name: Fail when the tailscaled binary is missing
+  ansible.builtin.assert:
+    that:
+      - tailscale_darwin_binary_stat.stat.exists | default(false)
+      - tailscale_darwin_binary_stat.stat.executable | default(false)
+    fail_msg: "{{ tailscale_darwin_binary }} is missing or not executable."
+
+- name: Install the tailscaled LaunchDaemon
+  become: "{{ tailscale_darwin_become | bool }}"
+  ansible.builtin.template:
+    src: tailscaled.plist.j2
+    dest: "{{ tailscale_darwin_launchd_dir }}/{{ tailscale_darwin_launchd_label }}.plist"
+    owner: "{{ tailscale_darwin_owner }}"
+    group: "{{ tailscale_darwin_group }}"
+    mode: "0644"
+    validate: /usr/bin/plutil -lint %s
+
+- name: Check for competing tailscale LaunchDaemons
+  become: "{{ tailscale_darwin_become | bool }}"
+  ansible.builtin.command: "{{ tailscale_darwin_launchctl }} print system/{{ item }}"
+  loop:
+    - sh.brew.tailscale
+    - homebrew.mxcl.tailscale
+    - com.tailscale.tailscaled
+  register: tailscale_darwin_competing
+  changed_when: false
+  failed_when: false
+
+- name: Require no competing tailscale jobs
+  ansible.builtin.assert:
+    that: tailscale_darwin_competing.results | selectattr('rc', 'eq', 0) | list | length == 0
+    fail_msg: >-
+      Boot out any present sh.brew.tailscale, homebrew.mxcl.tailscale, and
+      com.tailscale.tailscaled jobs, then leave net.chia.tailscaled running.
+      {{ tailscale_darwin_brew_services_warning }}
+      This role only verifies the job and does not manage the daemon lifecycle.
+
+- name: Check the role-owned tailscaled LaunchDaemon
+  become: "{{ tailscale_darwin_become | bool }}"
+  ansible.builtin.command: "{{ tailscale_darwin_launchctl }} print system/{{ tailscale_darwin_launchd_label }}"
+  register: tailscale_darwin_running
+  changed_when: false
+  failed_when: false
+
+- name: Require the role-owned tailscaled LaunchDaemon to be running
+  ansible.builtin.assert:
+    that:
+      - tailscale_darwin_running.rc == 0
+      - >-
+        ('pid =' in tailscale_darwin_running.stdout) or
+        ('state = running' in tailscale_darwin_running.stdout)
+    fail_msg: >-
+      {{ tailscale_darwin_launchd_label }} is not running. Follow the M6
+      tailscale runbook (m6-tailscale-brew-paths.md). This role only verifies
+      the job.

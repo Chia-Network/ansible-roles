@@ -1,0 +1,113 @@
+---
+# Static and render checks for the Darwin-only tailscale role.
+# These run on Linux CI; they never install Homebrew packages or call launchd.
+- name: Check the Darwin tailscale role sources and template
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../tailscale/defaults/main.yml
+  vars:
+    repo_dir: "{{ playbook_dir }}/../.."
+    tailscale_out: "{{ render_out | default('/tmp/darwin-tailscale') }}"
+  tasks:
+    - name: Read the tailscale role sources
+      ansible.builtin.set_fact:
+        tailscale_main_src: "{{ lookup('file', repo_dir ~ '/tailscale/tasks/main.yml') }}"
+        tailscale_darwin_src: "{{ lookup('file', repo_dir ~ '/tailscale/tasks/darwin.yml') }}"
+
+    - name: tailscale includes Darwin tasks only on Darwin
+      ansible.builtin.assert:
+        that:
+          - "'darwin.yml' in tailscale_main_src"
+          - '''ansible_os_family == "Darwin"'' in tailscale_main_src'
+        fail_msg: >-
+          tailscale must include darwin.yml only when ansible_os_family is
+          Darwin.
+
+    - name: Check for tailscale handler files
+      ansible.builtin.stat:
+        path: "{{ repo_dir }}/tailscale/{{ item }}"
+      loop:
+        - handlers
+        - handlers/main.yml
+      register: tailscale_handlers
+
+    - name: tailscale must not ship handlers
+      ansible.builtin.assert:
+        that:
+          - tailscale_handlers.results | selectattr('stat.exists') | list | length == 0
+        fail_msg: >-
+          The tailscale role must not have a handlers file or directory.
+
+    - name: tailscale never calls the package manager service wrapper
+      vars:
+        darwin_lower: "{{ tailscale_darwin_src | lower }}"
+      ansible.builtin.assert:
+        that:
+          - "'brew services' not in darwin_lower"
+          - "'become_user' not in darwin_lower"
+          - "'bootstrap' not in darwin_lower"
+          - "'kickstart' not in darwin_lower"
+          - "'launchctl load' not in darwin_lower"
+          - "'launchctl start' not in darwin_lower"
+          - "'launchctl stop' not in darwin_lower"
+          - "'launchctl bootout' not in darwin_lower"
+          - "'restart_on_change' not in darwin_lower"
+          - "'manage_ssh' not in darwin_lower"
+          - "'extra_args' not in darwin_lower"
+          - "'start_now' not in darwin_lower"
+          - "'start_on_boot' not in darwin_lower"
+        fail_msg: >-
+          The tailscale role must only read state: no brew services, no
+          become_user, and no bootstrap, kickstart, load, start, stop, or
+          bootout of net.chia.tailscaled.
+
+    - name: tailscale checks the pinned formula and competing jobs
+      ansible.builtin.assert:
+        that:
+          - "'--versions' in tailscale_darwin_src"
+          - "'list --pinned' in tailscale_darwin_src"
+          - "'tailscale_darwin_pinned.stdout_lines' in tailscale_darwin_src"
+          - "'sh.brew.tailscale' in tailscale_darwin_src"
+          - "'homebrew.mxcl.tailscale' in tailscale_darwin_src"
+          - "'com.tailscale.tailscaled' in tailscale_darwin_src"
+          - "'net.chia.tailscaled' in tailscale_darwin_src"
+          - "'system/' in tailscale_darwin_src"
+          - "'tailscale_darwin_launchd_label' in tailscale_darwin_src"
+        fail_msg: >-
+          The tailscale role must verify the pinned formula, reject the three
+          competing labels, and check the role-owned net.chia.tailscaled job.
+
+    - name: Create the tailscale render directory
+      ansible.builtin.file:
+        path: "{{ tailscale_out }}"
+        state: directory
+        mode: "0755"
+
+    - name: Render the tailscaled LaunchDaemon
+      ansible.builtin.template:
+        src: ../../tailscale/templates/tailscaled.plist.j2
+        dest: "{{ tailscale_out }}/net.chia.tailscaled.plist"
+        mode: "0644"
+
+    - name: Read the rendered tailscaled LaunchDaemon
+      ansible.builtin.slurp:
+        src: "{{ tailscale_out }}/net.chia.tailscaled.plist"
+      register: tailscale_rendered
+
+    - name: The rendered LaunchDaemon uses the pinned Homebrew binary
+      vars:
+        text: "{{ tailscale_rendered.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - "'/opt/homebrew/opt/tailscale/bin/tailscaled' in text"
+          - "'--socket=/var/run/tailscaled.socket' in text"
+          - "'net.chia.tailscaled' in text"
+          - "'<key>KeepAlive</key><true/>' in text"
+          - "'Cellar/tailscale/' not in text"
+          - "'--state' not in text"
+        fail_msg: >-
+          The rendered tailscaled LaunchDaemon must use the stable Homebrew
+          opt path and socket, keep the job alive, and avoid the Cellar path
+          and --state.

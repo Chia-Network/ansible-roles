@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>{{ tailscale_darwin_launchd_label | e }}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{{ tailscale_darwin_binary | e }}</string>
+    <string>--socket={{ tailscale_darwin_socket | e }}</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>{{ tailscale_darwin_path | e }}</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>15</integer>
+  <key>StandardOutPath</key><string>{{ tailscale_darwin_stdout_log | e }}</string>
+  <key>StandardErrorPath</key><string>{{ tailscale_darwin_stderr_log | e }}</string>
+</dict>
+</plist>
