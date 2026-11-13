@@ -1,0 +1,43 @@
+---
+- name: Find tailscale LaunchDaemons
+  ansible.builtin.find:
+    paths: /Library/LaunchDaemons
+    patterns: "*tailscale*.plist"
+    file_type: any
+  register: tailscale_darwin_competing
+
+- name: List pinned Homebrew formulas
+  become: false
+  ansible.builtin.command: /opt/homebrew/bin/brew list --pinned
+  register: tailscale_darwin_pinned
+  changed_when: false
+  check_mode: false
+
+- name: Check the role-owned tailscaled job
+  become: true
+  ansible.builtin.command: /bin/launchctl print system/net.chia.tailscaled
+  register: tailscale_darwin_running
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Require only the pinned formula and the running tailscaled job
+  ansible.builtin.assert:
+    that:
+      - (tailscale_darwin_competing.files | map(attribute='path') | map('basename') | list) == ['net.chia.tailscaled.plist']
+      - "'tailscale' in tailscale_darwin_pinned.stdout_lines"
+      - "'state = running' in tailscale_darwin_running.stdout"
+    fail_msg: >-
+      tailscale is not ready. Remove competing jobs, keep net.chia.tailscaled
+      running per the M6 runbook, never run Homebrew's service wrapper with
+      sudo, and keep the formula pinned.
+
+- name: Install the tailscaled LaunchDaemon
+  become: true
+  ansible.builtin.copy:
+    src: net.chia.tailscaled.plist
+    dest: /Library/LaunchDaemons/net.chia.tailscaled.plist
+    owner: root
+    group: wheel
+    mode: "0644"
+    validate: /usr/bin/plutil -lint %s
