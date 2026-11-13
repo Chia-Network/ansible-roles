@@ -16,13 +16,13 @@
       - "'may run the following commands' not in (chia_darwin_service_user_sudo.stdout | default('')) or (chia_darwin_allow_root_capable_service_user | bool)"
     fail_msg: >-
       {{ user }} has sudo rights. A root-capable service account is a weaker
-      posture than the Linux split. Keep the SSH/sudo account separate, or set
-      chia_darwin_allow_root_capable_service_user to true to accept it.
+      posture than the Linux split. Keep the SSH/CI login account separate, or
+      set chia_darwin_allow_root_capable_service_user to true to accept it.
 
 - name: Warn about the weaker service-account posture
   ansible.builtin.debug:
     msg: >-
-      {{ user }} is the SSH/automation login and has sudo rights. This is a
+      {{ user }} is the SSH/CI/automation login and has sudo rights. This is a
       weaker posture than the Linux split; the network-facing service account
       is root-capable.
   when:

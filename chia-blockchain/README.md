@@ -18,9 +18,14 @@ with passwordless sudo; do not install a self-hosted runner on the timelord.
 Keep that SSH/sudo account separate from the service account. If the only
 practical SSH login is the service account, set
 `chia_darwin_allow_root_capable_service_user: true` and accept the weaker
-posture. Set `chia_darwin_brew_user` so Homebrew runs as the prefix owner. The
-same inventory entry shape covers additional Macs. See
-[DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#companion-services) for the service table,
+posture. By default, remove any `/etc/sudoers.d/` rule for the service account
+so only the separate admin account has sudo. Exception: when the service account
+is also the CI or SSH automation login and
+`chia_darwin_allow_root_capable_service_user: true`, keep a NOPASSWD fragment
+for it, still outside the admin group. That weaker posture is off by default and
+the role does not edit `/etc/sudoers.d`. Set `chia_darwin_brew_user` so Homebrew
+runs as the prefix owner. The same inventory entry shape covers additional Macs.
+See [DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#companion-services) for the service table,
 watchdog behavior, binary pins, and Full Disk Access for the companion binaries.
 See [DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#managing-several-macs) for the
 approved-sudoers note and leftover service-account sudoers fragments.

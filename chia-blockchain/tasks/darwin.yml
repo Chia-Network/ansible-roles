@@ -121,7 +121,9 @@
     fail_msg: >-
       dseditgroup did not confirm that {{ user }} is outside the admin group
       (output: {{ chia_darwin_admin_check.stdout | default('') | trim }}). The
-      ASIC timelord account must be a dedicated non-admin local user.
+      ASIC timelord account must be a dedicated non-admin local user. The
+      root-capable opt-in allows sudo for a CI/SSH login, never admin-group
+      membership.
 
 - name: Read the service user's sudo policy
   become: true

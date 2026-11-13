@@ -228,6 +228,8 @@
           {{ companion_templates.results | rejectattr('stat.exists') | map(attribute='item') | list | join(', ') }}
 
 - name: Check the Darwin sudo policy guard
+  # The same opt-in also allows the service user to be the CI/SSH login with
+  # passwordless sudo; the admin-group refusal stays in place.
   hosts: localhost
   connection: local
   gather_facts: false

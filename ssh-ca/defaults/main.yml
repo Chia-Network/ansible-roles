@@ -1,3 +1,7 @@
 ---
+# Keep the Linux paths by default. Darwin uses the same sshd_config path; the
+# variables let a host or a test point them elsewhere.
+ssh_ca_sshd_config: /etc/ssh/sshd_config
+ssh_ca_trusted_user_ca_keys: /etc/ssh/trusted-user-ca-keys.pem
 ca_url: ""
 ca_content: ""
