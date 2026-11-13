@@ -1,7 +1,10 @@
 ---
 # Static and render checks for the fleet roles that the Darwin timelord adds:
 # base-setup (SSH), alloy (central logs), and smartctl-exporter (SMART metrics).
-# These run on Linux CI; they never install Homebrew packages or call launchd.
+# The source and render plays only read files and render to a temp directory.
+# The tailscale exercise play overwrites system paths (brew, launchctl, plutil,
+# and the tailscale LaunchDaemon), so it must run only on a throwaway
+# GitHub-hosted runner.
 - name: Check the Darwin fleet role sources
   hosts: localhost
   connection: local
@@ -412,6 +415,14 @@
   gather_facts: false
   become: true
   tasks:
+    - name: Refuse to overwrite system paths outside a GitHub-hosted runner
+      ansible.builtin.assert:
+        that:
+          - lookup('ansible.builtin.env', 'RUNNER_ENVIRONMENT') == 'github-hosted'
+        fail_msg: >-
+          This play overwrites brew, launchctl, plutil, and the tailscale
+          LaunchDaemon. Run it only on a throwaway GitHub-hosted runner.
+
     - name: Create the tailscale stub directories
       ansible.builtin.file:
         path: "{{ item }}"
