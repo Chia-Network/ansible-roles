@@ -7,6 +7,7 @@
   register: systemd_action
   retries: 10
   until: systemd_action is success
+  when: ansible_os_family != "Darwin"
 
 - name: restart-ssh-darwin
   become: true

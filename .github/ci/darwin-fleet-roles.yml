@@ -45,6 +45,7 @@
           - "'/usr/sbin/sshd, -t, -f' not in base_darwin"
           - "'restart-ssh-darwin' in base_darwin"
           - "'launchctl, kickstart, -k, system/com.openssh.sshd' in base_handlers"
+          - '''when: ansible_os_family != "Darwin"'' in base_handlers'
           - "'PasswordAuthentication no' in base_linux"
           - '''when: ansible_os_family != "Darwin"'' in base_meta'
         fail_msg: >-
@@ -63,7 +64,7 @@
           - >-
             'when' not in (base_meta_yaml.dependencies
             | selectattr('role', 'eq', 'ssh-ca') | list | first)
-          - "'when: ansible_os_family != \"Darwin\"' in base_meta"
+          - '''when: ansible_os_family != "Darwin"'' in base_meta'
           - "'ssh_ca_sshd_config' in ssh_ca_defaults"
           - "'ssh_ca_trusted_user_ca_keys' in ssh_ca_defaults"
           - "'/etc/ssh/sshd_config' in ssh_ca_defaults"
@@ -72,13 +73,20 @@
           - "'ssh_ca_trusted_user_ca_keys' in ssh_ca_main"
           - "'dest: /etc/ssh/trusted-user-ca-keys.pem' not in ssh_ca_main"
           - "'path: /etc/ssh/sshd_config' not in ssh_ca_main"
-          - "'line: \"TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem\"' not in ssh_ca_main"
+          - '''line: "TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem"'' not in ssh_ca_main'
           - "'TrustedUserCAKeys' in ssh_ca_main"
-          - "'notify: restart-ssh' in ssh_ca_main"
+          - "'notify: ssh-ca-restart-ssh' in ssh_ca_main"
+          - "'notify: restart-ssh' not in ssh_ca_main"
+          - "'name: ssh-ca-restart-ssh-linux' in ssh_ca_handlers"
+          - "'name: ssh-ca-restart-ssh-darwin' in ssh_ca_handlers"
+          - "'listen: ssh-ca-restart-ssh' in ssh_ca_handlers"
+          - "'listen: restart-ssh' not in ssh_ca_handlers"
+          - "'name: restart-ssh' not in ssh_ca_handlers"
+          - "'name: restart-ssh-darwin' not in ssh_ca_handlers"
           - "'ansible.builtin.service' in ssh_ca_handlers"
           - "'name: ssh' in ssh_ca_handlers"
-          - "'ansible_os_family != \"Darwin\"' in ssh_ca_handlers"
-          - "'ansible_os_family == \"Darwin\"' in ssh_ca_handlers"
+          - '''ansible_os_family != "Darwin"'' in ssh_ca_handlers'
+          - '''ansible_os_family == "Darwin"'' in ssh_ca_handlers'
           - "'/bin/launchctl, kickstart, -k, system/com.openssh.sshd' in ssh_ca_handlers"
         fail_msg: >-
           ssh-ca must work on Darwin: its dependency is not skipped there, the
