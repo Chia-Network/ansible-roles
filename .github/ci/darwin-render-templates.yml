@@ -6,6 +6,7 @@
   gather_facts: false
   vars_files:
     - ../../chia-blockchain/defaults/main.yml
+    - darwin-local-external-wrapper-names.yml
   vars:
     render_out: /tmp/darwin
     topologies:
@@ -117,13 +118,7 @@
     - name: Read the rendered local-external wrappers
       ansible.builtin.slurp:
         src: "{{ render_out }}/local-external/{{ item }}"
-      loop:
-        - chia-daemon-run.sh
-        - chia-full-node-run.sh
-        - chia-timelord-run.sh
-        - chia-exporter-run.sh
-        - chia-healthcheck-run.sh
-        - chia-hw-vdf-run.sh
+      loop: "{{ darwin_local_external_wrapper_names }}"
       register: local_external_wrappers
 
     - name: Only the local-external full-node wrapper waits for the database volume
