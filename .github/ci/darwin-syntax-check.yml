@@ -40,8 +40,6 @@
       ansible.builtin.import_tasks: ../../alloy/tasks/darwin.yml
     - name: Import the Darwin smartctl_exporter tasks
       ansible.builtin.import_tasks: ../../smartctl-exporter/tasks/darwin.yml
-    - name: Import the Darwin tailscale tasks
-      ansible.builtin.import_tasks: ../../tailscale/tasks/darwin.yml
 
 - name: Syntax check the chia-blockchain role on Darwin
   hosts: localhost
