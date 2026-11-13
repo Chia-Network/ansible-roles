@@ -492,7 +492,12 @@ root-capable. The role refuses that posture by default.
 
 Any `/etc/sudoers.d/` rule for the service account, for example a leftover
 `/etc/sudoers.d/<service-user>-ansible`, trips that guard. Remove it so only
-the separate admin account has sudo. The role does not edit `/etc/sudoers.d`.
+the separate admin account has sudo. Exception: when the service account is
+also the CI or SSH automation login and
+`chia_darwin_allow_root_capable_service_user: true`, keep a NOPASSWD
+`/etc/sudoers.d/` fragment for that service user, still outside the admin group.
+That is a weaker posture than the Linux split and is off by default. The role
+does not edit `/etc/sudoers.d`.
 
 The playbook targets `mac_timelords`, not `localhost` with
 `connection: local`. A controller with a checkout of this repository can run:

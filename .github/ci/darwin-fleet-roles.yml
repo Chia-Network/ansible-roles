@@ -16,6 +16,9 @@
         base_linux: "{{ lookup('file', repo_dir ~ '/base-setup/tasks/linux.yml') }}"
         base_handlers: "{{ lookup('file', repo_dir ~ '/base-setup/handlers/main.yml') }}"
         base_meta: "{{ lookup('file', repo_dir ~ '/base-setup/meta/main.yml') }}"
+        ssh_ca_main: "{{ lookup('file', repo_dir ~ '/ssh-ca/tasks/main.yml') }}"
+        ssh_ca_defaults: "{{ lookup('file', repo_dir ~ '/ssh-ca/defaults/main.yml') }}"
+        ssh_ca_handlers: "{{ lookup('file', repo_dir ~ '/ssh-ca/handlers/main.yml') }}"
         alloy_main: "{{ lookup('file', repo_dir ~ '/alloy/tasks/main.yml') }}"
         alloy_darwin: "{{ lookup('file', repo_dir ~ '/alloy/tasks/darwin.yml') }}"
         alloy_defaults: "{{ lookup('file', repo_dir ~ '/alloy/defaults/main.yml') }}"
@@ -42,12 +45,53 @@
           - "'/usr/sbin/sshd, -t, -f' not in base_darwin"
           - "'restart-ssh-darwin' in base_darwin"
           - "'launchctl, kickstart, -k, system/com.openssh.sshd' in base_handlers"
+          - '''when: ansible_os_family != "Darwin"'' in base_handlers'
           - "'PasswordAuthentication no' in base_linux"
           - '''when: ansible_os_family != "Darwin"'' in base_meta'
         fail_msg: >-
           base-setup must keep the Linux sshd tasks and add a Darwin path that
           proves key auth before disabling passwords, validates sshd, and
           restarts launchd's com.openssh.sshd.
+
+    - name: ssh-ca is not gated off Darwin and restarts sshd per OS
+      vars:
+        base_meta_yaml: "{{ base_meta | from_yaml }}"
+      ansible.builtin.assert:
+        that:
+          - >-
+            base_meta_yaml.dependencies | selectattr('role', 'eq', 'ssh-ca')
+            | list | length == 1
+          - >-
+            'when' not in (base_meta_yaml.dependencies
+            | selectattr('role', 'eq', 'ssh-ca') | list | first)
+          - '''when: ansible_os_family != "Darwin"'' in base_meta'
+          - "'ssh_ca_sshd_config' in ssh_ca_defaults"
+          - "'ssh_ca_trusted_user_ca_keys' in ssh_ca_defaults"
+          - "'/etc/ssh/sshd_config' in ssh_ca_defaults"
+          - "'/etc/ssh/trusted-user-ca-keys.pem' in ssh_ca_defaults"
+          - "'ssh_ca_sshd_config' in ssh_ca_main"
+          - "'ssh_ca_trusted_user_ca_keys' in ssh_ca_main"
+          - "'dest: /etc/ssh/trusted-user-ca-keys.pem' not in ssh_ca_main"
+          - "'path: /etc/ssh/sshd_config' not in ssh_ca_main"
+          - '''line: "TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem"'' not in ssh_ca_main'
+          - "'TrustedUserCAKeys' in ssh_ca_main"
+          - "'notify: ssh-ca-restart-ssh' in ssh_ca_main"
+          - "'notify: restart-ssh' not in ssh_ca_main"
+          - "'name: ssh-ca-restart-ssh-linux' in ssh_ca_handlers"
+          - "'name: ssh-ca-restart-ssh-darwin' in ssh_ca_handlers"
+          - "'listen: ssh-ca-restart-ssh' in ssh_ca_handlers"
+          - "'listen: restart-ssh' not in ssh_ca_handlers"
+          - "'name: restart-ssh' not in ssh_ca_handlers"
+          - "'name: restart-ssh-darwin' not in ssh_ca_handlers"
+          - "'ansible.builtin.service' in ssh_ca_handlers"
+          - "'name: ssh' in ssh_ca_handlers"
+          - '''ansible_os_family != "Darwin"'' in ssh_ca_handlers'
+          - '''ansible_os_family == "Darwin"'' in ssh_ca_handlers'
+          - "'/bin/launchctl, kickstart, -k, system/com.openssh.sshd' in ssh_ca_handlers"
+        fail_msg: >-
+          ssh-ca must work on Darwin: its dependency is not skipped there, the
+          tasks use configurable paths, and the handler restarts launchd's
+          com.openssh.sshd on Darwin while keeping systemd ssh on Linux.
 
     - name: alloy routes Darwin and Linux and keeps a Darwin config path
       ansible.builtin.assert:
@@ -285,3 +329,52 @@
           - validate
           - "{{ fleet_out }}/linux/config.alloy"
       changed_when: false
+
+- name: Render the Darwin ssh-ca sshd_config
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../ssh-ca/defaults/main.yml
+  vars:
+    ansible_os_family: Darwin
+    fleet_out: "{{ render_out | default('/tmp/darwin-fleet') }}"
+    # Test-only path so the role defaults loaded from vars_files cannot point
+    # this render at /etc/ssh.
+    ssh_ca_render_dest: "{{ fleet_out }}/sshd_config"
+  tasks:
+    - name: Create the ssh-ca render directory
+      ansible.builtin.file:
+        path: "{{ fleet_out }}"
+        state: directory
+        mode: "0755"
+
+    - name: Write a sample macOS sshd_config
+      ansible.builtin.copy:
+        content: |
+          # Sample macOS sshd_config fixture
+          PasswordAuthentication no
+          Subsystem sftp /usr/libexec/sftp-server
+        dest: "{{ ssh_ca_render_dest }}"
+        mode: "0644"
+
+    # Match the lineinfile in ssh-ca/tasks/main.yml, but do not notify the
+    # handler: CI must not restart sshd or call launchctl.
+    - name: Apply the ssh-ca trusted CA line
+      ansible.builtin.lineinfile:
+        path: "{{ ssh_ca_render_dest }}"
+        regexp: "^TrustedUserCAKeys"
+        line: "TrustedUserCAKeys {{ ssh_ca_trusted_user_ca_keys }}"
+
+    - name: Read the rendered sshd_config
+      ansible.builtin.slurp:
+        src: "{{ ssh_ca_render_dest }}"
+      register: ssh_ca_rendered
+
+    - name: The rendered sshd_config trusts the CA key
+      vars:
+        text: "{{ ssh_ca_rendered.content | b64decode }}"
+      ansible.builtin.assert:
+        that:
+          - "'TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem' in text"
+          - "'PasswordAuthentication no' in text"

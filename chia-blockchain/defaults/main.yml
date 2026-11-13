@@ -394,8 +394,10 @@ chia_darwin_timelord_implementation: chia-blockchain
 chia_darwin_timelord_app_enabled: "{{ chia_darwin_timelord_implementation == 'timelord-app' }}"
 chia_darwin_enable_hw_vdf: "{{ chia_darwin_timelord_implementation == 'chia-blockchain' }}"
 # The service account normally has no sudo. A deployment that uses the
-# service account as the SSH/automation login must explicitly accept the
-# weaker posture of a root-capable network-facing account.
+# service account as the SSH/CI/automation login must explicitly accept the
+# weaker posture of a root-capable network-facing account. The service user
+# stays out of the admin group even with the opt-in; passwordless sudo comes
+# from sudoers.
 chia_darwin_allow_root_capable_service_user: false
 chia_darwin_group: staff
 chia_darwin_home: "/Users/{{ user }}"
