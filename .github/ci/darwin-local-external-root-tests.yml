@@ -1,7 +1,7 @@
 ---
 # Local tests for chia-blockchain/tasks/darwin-local-external-root.yml. They
-# use a temporary test root, a fake mount, and a logging fake launchctl. No
-# real Mac, external volume, launchd job, or S3 bucket is touched.
+# use a temporary test root and a fake mount. No real Mac, external volume,
+# launchd job, or S3 bucket is touched.
 - name: Test the local-external CHIA_ROOT layout without a Mac
   hosts: localhost
   connection: local
@@ -151,6 +151,50 @@
               directory without touching the local-external db symlink or the
               on-volume database file.
 
+    - name: A fresh host creates the missing on-volume database directory
+      vars:
+        chia_darwin_home: "{{ test_root }}/fresh-no-db/home"
+        chia_root: "{{ test_root }}/fresh-no-db/home/.chia/{{ network }}"
+        chia_darwin_db_volume: "{{ test_root }}/Volumes/Fresh DB"
+        chia_darwin_volume_db_dir: "{{ test_root }}/Volumes/Fresh DB/dot-chia/{{ network }}/db"
+      block:
+        - name: Run the local-external root include without an on-volume db directory
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+        - name: Require the fresh run without an on-volume db directory to succeed
+          ansible.builtin.assert:
+            that:
+              - not (local_external_case_failed | bool)
+            fail_msg: "The fresh run failed: {{ local_external_case_message }}"
+
+        - name: Inspect the fresh layout with a newly created db directory
+          ansible.builtin.stat:
+            path: "{{ item }}"
+            follow: false
+          loop:
+            - "{{ chia_darwin_home }}/.chia"
+            - "{{ chia_root }}"
+            - "{{ chia_darwin_volume_db_dir }}"
+            - "{{ chia_root }}/db"
+          register: fresh_no_db_stats
+
+        - name: Require the fresh layout to create real directories and one link
+          ansible.builtin.assert:
+            that:
+              - fresh_no_db_stats.results[0].stat.isdir | default(false)
+              - not (fresh_no_db_stats.results[0].stat.islnk | default(false))
+              - fresh_no_db_stats.results[1].stat.isdir | default(false)
+              - not (fresh_no_db_stats.results[1].stat.islnk | default(false))
+              - fresh_no_db_stats.results[2].stat.isdir | default(false)
+              - not (fresh_no_db_stats.results[2].stat.islnk | default(false))
+              - fresh_no_db_stats.results[3].stat.islnk | default(false)
+              - >-
+                (fresh_no_db_stats.results[3].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
+                (chia_darwin_volume_db_dir | regex_replace('/+$', ''))
+            fail_msg: >-
+              A fresh host without an on-volume db directory must not refuse;
+              the role creates the directory and the internal layout.
+
     - name: Repair a missing db symlink on an existing real ~/.chia
       vars:
         chia_darwin_home: "{{ test_root }}/repair/home"
@@ -194,13 +238,12 @@
               A real ~/.chia with no <chia_root>/db must be repaired by
               creating the internal CHIA_ROOT and linking db at the volume.
 
-    - name: Leave a converged host unchanged next to a backup link and leftover
+    - name: Keep a correct trailing-slash db symlink unchanged
       vars:
-        chia_darwin_home: "{{ test_root }}/converged/home"
-        chia_root: "{{ test_root }}/converged/home/.chia/{{ network }}"
-        converged_leftover: "{{ test_root }}/converged/home/.chia.migrating.leftover-20000101T000000Z"
+        chia_darwin_home: "{{ test_root }}/trailing-slash/home"
+        chia_root: "{{ test_root }}/trailing-slash/home/.chia/{{ network }}"
       block:
-        - name: Prepare the converged internal layout
+        - name: Create a real ~/.chia and CHIA_ROOT for the trailing-slash case
           ansible.builtin.file:
             path: "{{ item }}"
             state: directory
@@ -208,74 +251,37 @@
           loop:
             - "{{ chia_darwin_home }}/.chia"
             - "{{ chia_root }}"
-            - "{{ converged_leftover }}"
 
-        - name: Link the converged database at the volume
+        - name: Create the correct db symlink with a trailing slash
           ansible.builtin.file:
-            src: "{{ external_db }}"
+            src: "{{ external_db }}/"
             dest: "{{ chia_root }}/db"
             state: link
             force: false
 
-        - name: Create the converged legacy backup link
-          ansible.builtin.file:
-            src: "{{ external_chia }}"
-            dest: "{{ chia_darwin_home }}/.chia.legacy-volume-link"
-            state: link
-            force: false
-
-        - name: Write a marker in the leftover tree
-          ansible.builtin.copy:
-            content: keep-leftover
-            dest: "{{ converged_leftover }}/keep.txt"
-            mode: "0644"
-
-        - name: Reset the fake launchctl log before the converged run
-          ansible.builtin.copy:
-            content: ""
-            dest: "{{ test_root }}/launchctl.log"
-            mode: "0644"
-
-        - name: Run the local-external root include on the converged host
+        - name: Run the local-external root include with the trailing-slash link
           ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
 
-        - name: Require the converged run to succeed
+        - name: Require the trailing-slash db symlink run to succeed
           ansible.builtin.assert:
             that:
               - not (local_external_case_failed | bool)
-            fail_msg: "The converged run failed: {{ local_external_case_message }}"
+            fail_msg: "The trailing-slash run failed: {{ local_external_case_message }}"
 
-        - name: Inspect the converged layout after the run
+        - name: Inspect the trailing-slash db symlink
           ansible.builtin.stat:
-            path: "{{ item }}"
+            path: "{{ chia_root }}/db"
             follow: false
-          loop:
-            - "{{ chia_darwin_home }}/.chia"
-            - "{{ chia_root }}/db"
-            - "{{ chia_darwin_home }}/.chia.legacy-volume-link"
-            - "{{ converged_leftover }}/keep.txt"
-          register: converged_stats
+          register: trailing_slash_db
 
-        - name: Require the converged layout and leftovers to be unchanged
-          vars:
-            launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
+        - name: Require the trailing-slash db symlink to stay unchanged
           ansible.builtin.assert:
             that:
-              - converged_stats.results[0].stat.isdir | default(false)
-              - not (converged_stats.results[0].stat.islnk | default(false))
-              - converged_stats.results[1].stat.islnk | default(false)
-              - >-
-                (converged_stats.results[1].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
-                (external_db | regex_replace('/+$', ''))
-              - converged_stats.results[2].stat.islnk | default(false)
-              - >-
-                (converged_stats.results[2].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
-                (external_chia | regex_replace('/+$', ''))
-              - lookup('file', converged_leftover ~ '/keep.txt') == 'keep-leftover'
-              - launchctl_lines | select('search', 'bootout') | list | length == 0
+              - trailing_slash_db.stat.islnk | default(false)
+              - trailing_slash_db.stat.lnk_target == (external_db ~ '/')
             fail_msg: >-
-              A converged host with a legacy backup link and a leftover tree must
-              succeed without refusal, keep both paths, and stop no jobs.
+              A correct db symlink whose target ends in a slash must be accepted
+              without retargeting or normalizing the stored link.
 
     - name: Refuse a legacy ~/.chia volume symlink without changing it
       vars:
@@ -294,12 +300,6 @@
             dest: "{{ chia_darwin_home }}/.chia"
             state: link
             force: false
-
-        - name: Reset the fake launchctl log before the legacy refusal
-          ansible.builtin.copy:
-            content: ""
-            dest: "{{ test_root }}/launchctl.log"
-            mode: "0644"
 
         - name: Run the local-external root include with the legacy volume symlink
           ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
@@ -324,9 +324,7 @@
             - "{{ chia_darwin_home }}/.chia.migrating"
           register: legacy_refused_stats
 
-        - name: Require the legacy symlink and jobs to be untouched
-          vars:
-            launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
+        - name: Require the legacy symlink to be untouched
           ansible.builtin.assert:
             that:
               - legacy_refused_stats.results[0].stat.islnk | default(false)
@@ -335,43 +333,32 @@
                 (external_chia | regex_replace('/+$', ''))
               - not (legacy_refused_stats.results[1].stat.exists | default(false))
               - not (legacy_refused_stats.results[2].stat.exists | default(false))
-              - launchctl_lines | select('search', 'bootout') | list | length == 0
             fail_msg: >-
               A legacy ~/.chia volume symlink must be refused unchanged with no
-              bootout and no rename. Log: {{ launchctl_lines }}
+              rename.
 
     - name: Run the local-external refusal and guard cases
       ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-refusals.yml"
 
-    - name: Fail closed when the production mount preflight does not see the volume
+    - name: Prepare a real internal ~/.chia before the mount preflight cases
+      ansible.builtin.file:
+        path: "{{ test_root }}/unmounted/home/.chia"
+        state: directory
+        mode: "0755"
+
+    - name: Run the production mount preflight cases
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-mount-case.yml"
       vars:
         chia_darwin_home: "{{ test_root }}/unmounted/home"
         chia_root: "{{ test_root }}/unmounted/home/.chia/{{ network }}"
-      block:
-        - name: Prepare a real internal ~/.chia before the mount preflight
-          ansible.builtin.file:
-            path: "{{ chia_darwin_home }}/.chia"
-            state: directory
-            mode: "0755"
-
-        - name: Run the production mount preflight against an unmounted volume
-          ansible.builtin.include_tasks: "{{ test_root }}/mount-preflight.yml"
-          vars:
-            chia_darwin_topology: local-external
-            chia_darwin_mount: "{{ test_root }}/bin/mount-unmounted"
-
-        - name: Fail because the unmounted volume passed the mount preflight
-          ansible.builtin.fail:
-            msg: The unmounted volume passed the mount preflight
-
-      rescue:
-        - name: Require the mount preflight refusal
-          ansible.builtin.assert:
-            that:
-              - ansible_failed_result.msg | default('') is search('not mounted')
-            fail_msg: >-
-              The unmounted volume failed with the wrong message:
-              {{ ansible_failed_result.msg | default('no message') }}
+      loop:
+        - name: an unmounted volume
+          mount: mount-unmounted
+        - name: a similarly named volume
+          mount: mount-prefixed
+      loop_control:
+        loop_var: mount_case
+        label: "{{ mount_case.name }}"
 
     - name: Inspect ~/.chia after the refused mount preflight
       ansible.builtin.stat:

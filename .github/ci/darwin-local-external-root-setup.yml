@@ -9,7 +9,6 @@
     chia_darwin_group: "{{ lookup('pipe', 'id -gn') }}"
     chia_darwin_db_volume: "{{ test_root }}/Volumes/Chia DB"
     chia_darwin_mount: "{{ test_root }}/bin/mount"
-    chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-logging"
     chia_darwin_launchd_become: false
 
 - name: Create the local-external root test directories
@@ -37,18 +36,10 @@
     dest: "{{ test_root }}/bin/mount-unmounted"
     mode: "0755"
 
-- name: Write the logging fake launchctl executable
+- name: Write a fake mount list with a similarly named volume
   ansible.builtin.copy:
     content: |
       #!/bin/sh
-      printf '%s\n' "$*" >> '{{ test_root }}/launchctl.log'
-      exit 0
-    dest: "{{ test_root }}/bin/launchctl-logging"
+      printf '%s\n' 'fake on {{ chia_darwin_db_volume }} 1 (apfs, local)'
+    dest: "{{ test_root }}/bin/mount-prefixed"
     mode: "0755"
-
-- name: Create an empty fake launchctl log without truncating it on reruns
-  ansible.builtin.copy:
-    content: ""
-    dest: "{{ test_root }}/launchctl.log"
-    force: false
-    mode: "0644"

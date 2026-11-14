@@ -42,14 +42,14 @@
 
     - name: Link the converged database at the volume
       ansible.builtin.file:
-        src: "{{ external_db }}"
+        src: "{{ external_db }}/"
         dest: "{{ converged_home }}/.chia/{{ network }}/db"
         state: link
         force: false
 
     - name: Create the converged legacy backup link
       ansible.builtin.file:
-        src: "{{ external_chia }}"
+        src: "{{ external_chia }}/"
         dest: "{{ converged_home }}/.chia.legacy-volume-link"
         state: link
         force: false

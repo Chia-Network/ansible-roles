@@ -54,6 +54,8 @@
       ansible.builtin.set_fact:
         user: timelord
         chia_root: /Users/timelord/.chia
+        chia_darwin_fda_python: >-
+          /opt/homebrew/Cellar/python@3.13/3.13.9/Frameworks/Python.framework/Versions/3.13/bin/python3.13
         chia_darwin_hw_vdf_expected_serial: "FT'TEST 01"
         chia_timelord_full_node_peer_host: 10.0.0.5
         chia_periodic_connect_peers:

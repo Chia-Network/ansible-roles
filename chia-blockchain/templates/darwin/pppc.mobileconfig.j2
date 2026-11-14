@@ -13,12 +13,14 @@
 
     The LaunchDaemon wrappers are {{ chia_darwin_interpreter | e }} scripts. TCC
     attributes their file access to that interpreter, so the identifier is the
-    interpreter path, not the script path. For local-external, Full Disk Access
-    is needed only for this shared shebang interpreter and the full node's
-    Python interpreter. The Python path is the real Homebrew Cellar binary the
-    venv resolves to; it is printed in the sibling FULL-DISK-ACCESS.txt note.
-    Do not add a second identifier for that versioned Cellar path here because a
-    Homebrew Python upgrade changes it. CHIA_ROOT and the companion services stay
+    interpreter path, not the script path. This profile grants only
+    {{ chia_darwin_interpreter | e }}. For local-external, Full Disk Access is
+    also needed for the full node's Python interpreter. The Python path is the
+    real Homebrew Cellar binary the venv resolves to; it is printed in the
+    sibling FULL-DISK-ACCESS.txt note and must be added by hand in System
+    Settings, and again after every Homebrew Python upgrade. Do not add a
+    second identifier for that versioned Cellar path here because a Homebrew
+    Python upgrade changes it. CHIA_ROOT and the companion services stay
     on the internal disk, so companion binaries, tailscaled, hw-vdf, the
     watchdog, Bash, and healthcheck are not added to this profile. Granting Full
     Disk Access to {{ chia_darwin_interpreter | e }} is still broad: other jobs

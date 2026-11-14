@@ -479,9 +479,6 @@ chia_darwin_restart_unload_margin: 30
 # spawning CPU clients next to the ASIC.
 chia_darwin_process_count: 0
 chia_darwin_interpreter: /bin/zsh
-# The role replaces this with os.path.realpath of the venv python3.13 before
-# writing the Full Disk Access note. It is a fallback for rendering only.
-chia_darwin_fda_python: "{{ chia_darwin_python }}"
 chia_darwin_sudo: /usr/bin/sudo
 # hw_vdf_client argv. Linux does not use these.
 # Frequency and voltage apply to every board. They are the role defaults
@@ -577,9 +574,10 @@ chia_darwin_node_exporter_sha256: "35b246a34af55a8f0c3f11067f17aecf9836cfd4689bd
 chia_darwin_node_exporter_port: 9100
 # CHIA_ROOT used by chia-exporter and chia-healthcheck. The Linux units use
 # the real chia root. A host may point this at a read-only config copy without
-# changing CHIA_ROOT for the daemons. Companions no longer wait for the
-# database volume or chia_darwin_db_marker: local-external keeps CHIA_ROOT
-# internal by default, so their CHIA_ROOT is on the internal disk.
+# changing CHIA_ROOT for the daemons. Companions do not wait for the database
+# volume. local-external keeps CHIA_ROOT, including the wallet database, on the
+# internal disk; only the full-node wrapper waits, because it lists the
+# on-volume DB directory.
 chia_darwin_companion_chia_root: "{{ chia_root }}"
 chia_darwin_companion_rotpipe_max_bytes: 20971520
 chia_darwin_companion_rotpipe_backups: 3

@@ -1,0 +1,23 @@
+---
+# Run the production mount preflight for one fake mount list and require the
+# expected refusal when the volume is not mounted under its exact name.
+- name: Run the production mount preflight for {{ mount_case.name }}
+  block:
+    - name: Include the production mount preflight tasks
+      ansible.builtin.include_tasks: "{{ test_root }}/mount-preflight.yml"
+      vars:
+        chia_darwin_topology: local-external
+        chia_darwin_mount: "{{ test_root }}/bin/{{ mount_case.mount }}"
+
+    - name: Fail because {{ mount_case.name }} passed the mount preflight
+      ansible.builtin.fail:
+        msg: "{{ mount_case.name }} passed the mount preflight"
+
+  rescue:
+    - name: Require the mount preflight refusal for {{ mount_case.name }}
+      ansible.builtin.assert:
+        that:
+          - ansible_failed_result.msg | default('') is search('not mounted')
+        fail_msg: >-
+          {{ mount_case.name }} failed with the wrong message:
+          {{ ansible_failed_result.msg | default('no message') }}

@@ -1,352 +1,286 @@
 ---
-# Refusal and guard cases for chia-blockchain/tasks/darwin-local-external-root.yml.
-# Included by darwin-local-external-root-tests.yml after the success paths.
-- name: Refuse an unexpected ~/.chia symlink target
+# Data-driven refusal and guard cases for
+# chia-blockchain/tasks/darwin-local-external-root.yml. Included by
+# darwin-local-external-root-tests.yml after the success paths.
+- name: Define the local-external refusal cases
   vars:
-    chia_darwin_home: "{{ test_root }}/unexpected/home"
-    chia_root: "{{ test_root }}/unexpected/home/.chia/{{ network }}"
-  block:
-    - name: Prepare an unexpected ~/.chia symlink
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: directory
-        mode: "0755"
-      loop:
-        - "{{ chia_darwin_home }}"
-        - "{{ test_root }}/not-the-volume"
+    default_volume: "{{ chia_darwin_db_volume }}"
+  ansible.builtin.set_fact:
+    local_external_refusal_cases:
+      - name: unexpected ~/.chia symlink target
+        home: "{{ test_root }}/unexpected/home"
+        volume: "{{ default_volume }}"
+        dirs:
+          - "{{ test_root }}/not-the-volume"
+        links:
+          - src: "{{ test_root }}/not-the-volume"
+            dest: "{{ test_root }}/unexpected/home/.chia"
+        files: []
+        expect: Move it aside manually
+        expect_path: "{{ test_root }}/unexpected/home/.chia"
+        unchanged:
+          - path: "{{ test_root }}/unexpected/home/.chia"
+            kind: symlink
+            target: "{{ test_root }}/not-the-volume"
+      - name: unexpected ~/.chia path type
+        home: "{{ test_root }}/unexpected-type/home"
+        volume: "{{ default_volume }}"
+        dirs: []
+        links: []
+        files:
+          - dest: "{{ test_root }}/unexpected-type/home/.chia"
+            content: not-a-directory
+        expect: neither a directory nor a symlink
+        expect_path: "{{ test_root }}/unexpected-type/home/.chia"
+        unchanged:
+          - path: "{{ test_root }}/unexpected-type/home/.chia"
+            kind: file
+            content: not-a-directory
+      - name: real local database directory
+        home: "{{ test_root }}/real-db/home"
+        volume: "{{ default_volume }}"
+        dirs:
+          - "{{ test_root }}/real-db/home/.chia/{{ network }}/db"
+        links: []
+        files:
+          - dest: "{{ test_root }}/real-db/home/.chia/{{ network }}/db/local.sqlite"
+            content: keep-me
+        expect: real directory
+        expect_path: "{{ test_root }}/real-db/home/.chia/{{ network }}/db"
+        unchanged:
+          - path: "{{ test_root }}/real-db/home/.chia/{{ network }}/db"
+            kind: directory
+          - path: "{{ test_root }}/real-db/home/.chia/{{ network }}/db/local.sqlite"
+            kind: file
+            content: keep-me
+      - name: wrong database symlink
+        home: "{{ test_root }}/wrong-link/home"
+        volume: "{{ default_volume }}"
+        dirs:
+          - "{{ test_root }}/wrong-link/home/.chia/{{ network }}"
+          - "{{ test_root }}/wrong-target"
+        links:
+          - src: "{{ test_root }}/wrong-target"
+            dest: "{{ test_root }}/wrong-link/home/.chia/{{ network }}/db"
+        files: []
+        expect: will not retarget
+        expect_path: "{{ test_root }}/wrong-link/home/.chia/{{ network }}/db"
+        unchanged:
+          - path: "{{ test_root }}/wrong-link/home/.chia/{{ network }}/db"
+            kind: symlink
+            target: "{{ test_root }}/wrong-target"
+      - name: regular file at the database path
+        home: "{{ test_root }}/file-db/home"
+        volume: "{{ default_volume }}"
+        dirs:
+          - "{{ test_root }}/file-db/home/.chia/{{ network }}"
+        links: []
+        files:
+          - dest: "{{ test_root }}/file-db/home/.chia/{{ network }}/db"
+            content: not-a-database
+        expect: regular file
+        expect_path: "{{ test_root }}/file-db/home/.chia/{{ network }}/db"
+        unchanged:
+          - path: "{{ test_root }}/file-db/home/.chia/{{ network }}/db"
+            kind: file
+            content: not-a-database
+      - name: missing ~/.chia next to a finished backup
+        home: "{{ test_root }}/finished/home"
+        volume: "{{ default_volume }}"
+        dirs: []
+        links:
+          - src: "{{ external_chia }}"
+            dest: "{{ test_root }}/finished/home/.chia.legacy-volume-link"
+        files: []
+        expect: finished migration's backup
+        expect_path: "{{ test_root }}/finished/home/.chia"
+        unchanged:
+          - path: "{{ test_root }}/finished/home/.chia"
+            kind: absent
+          - path: "{{ test_root }}/finished/home/.chia.legacy-volume-link"
+            kind: symlink
+            target: "{{ external_chia }}"
+      - name: missing ~/.chia next to a live staging tree
+        home: "{{ test_root }}/staging-only/home"
+        volume: "{{ default_volume }}"
+        dirs:
+          - "{{ test_root }}/staging-only/home/.chia.migrating/{{ network }}"
+        links: []
+        files:
+          - dest: "{{ test_root }}/staging-only/home/.chia.migrating/{{ network }}/keep.txt"
+            content: keep-staging
+        expect: Inspect that staging tree
+        expect_path: "{{ test_root }}/staging-only/home/.chia.migrating"
+        unchanged:
+          - path: "{{ test_root }}/staging-only/home/.chia"
+            kind: absent
+          - path: "{{ test_root }}/staging-only/home/.chia.migrating/{{ network }}/keep.txt"
+            kind: file
+            content: keep-staging
+      - name: live staging tree beside a valid internal ~/.chia
+        home: "{{ test_root }}/live-staging/home"
+        volume: "{{ default_volume }}"
+        dirs:
+          - "{{ test_root }}/live-staging/home/.chia"
+          - "{{ test_root }}/live-staging/home/.chia.migrating/{{ network }}"
+        links: []
+        files:
+          - dest: "{{ test_root }}/live-staging/home/.chia.migrating/{{ network }}/keep.txt"
+            content: keep-staging
+        expect: still exists
+        expect_path: "{{ test_root }}/live-staging/home/.chia.migrating"
+        unchanged:
+          - path: "{{ test_root }}/live-staging/home/.chia"
+            kind: directory
+          - path: "{{ test_root }}/live-staging/home/.chia.migrating/{{ network }}/keep.txt"
+            kind: file
+            content: keep-staging
+      - name: legacy volume symlink with a trailing slash
+        home: "{{ test_root }}/legacy-trailing/home"
+        volume: "{{ default_volume }}"
+        dirs: []
+        links:
+          - src: "{{ external_chia }}/"
+            dest: "{{ test_root }}/legacy-trailing/home/.chia"
+        files: []
+        expect: does not migrate a legacy volume symlink
+        expect_path: "{{ test_root }}/legacy-trailing/home/.chia"
+        unchanged:
+          - path: "{{ test_root }}/legacy-trailing/home/.chia"
+            kind: symlink
+            target: "{{ external_chia }}"
+      - name: CHIA_ROOT symlink
+        home: "{{ test_root }}/root-symlink/home"
+        volume: "{{ default_volume }}"
+        dirs:
+          - "{{ test_root }}/root-symlink/home/.chia"
+          - "{{ test_root }}/volume-root"
+        links:
+          - src: "{{ test_root }}/volume-root"
+            dest: "{{ test_root }}/root-symlink/home/.chia/{{ network }}"
+        files: []
+        expect: A local-external CHIA_ROOT must be a real directory
+        expect_path: "{{ test_root }}/root-symlink/home/.chia/{{ network }}"
+        unchanged:
+          - path: "{{ test_root }}/root-symlink/home/.chia/{{ network }}"
+            kind: symlink
+            target: "{{ test_root }}/volume-root"
+      - name: on-volume database path is a symlink
+        home: "{{ test_root }}/volume-db-link/home"
+        volume: "{{ test_root }}/Volumes/Bad DB"
+        dirs:
+          - "{{ test_root }}/volume-db-link/home/.chia/{{ network }}"
+          - "{{ test_root }}/Volumes/Bad DB/dot-chia/{{ network }}"
+          - "{{ test_root }}/volume-db-target"
+        links:
+          - src: "{{ test_root }}/volume-db-target"
+            dest: "{{ test_root }}/Volumes/Bad DB/dot-chia/{{ network }}/db"
+        files: []
+        expect: is not a real directory
+        expect_path: "{{ test_root }}/Volumes/Bad DB/dot-chia/{{ network }}/db"
+        unchanged:
+          - path: "{{ test_root }}/Volumes/Bad DB/dot-chia/{{ network }}/db"
+            kind: symlink
+            target: "{{ test_root }}/volume-db-target"
+          - path: "{{ test_root }}/volume-db-link/home/.chia/{{ network }}/db"
+            kind: absent
+      - name: on-volume database path is a file
+        home: "{{ test_root }}/volume-db-file/home"
+        volume: "{{ test_root }}/Volumes/File DB"
+        dirs:
+          - "{{ test_root }}/volume-db-file/home/.chia/{{ network }}"
+          - "{{ test_root }}/Volumes/File DB/dot-chia/{{ network }}"
+        links: []
+        files:
+          - dest: "{{ test_root }}/Volumes/File DB/dot-chia/{{ network }}/db"
+            content: not-a-database-directory
+        expect: is not a real directory
+        expect_path: "{{ test_root }}/Volumes/File DB/dot-chia/{{ network }}/db"
+        unchanged:
+          - path: "{{ test_root }}/Volumes/File DB/dot-chia/{{ network }}/db"
+            kind: file
+            content: not-a-database-directory
+          - path: "{{ test_root }}/volume-db-file/home/.chia/{{ network }}/db"
+            kind: absent
+  changed_when: false
 
-    - name: Point ~/.chia at an unexpected target
-      ansible.builtin.file:
-        src: "{{ test_root }}/not-the-volume"
-        dest: "{{ chia_darwin_home }}/.chia"
-        state: link
-        force: false
+- name: Create each refusal case home directory
+  ansible.builtin.file:
+    path: "{{ item.home }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ local_external_refusal_cases }}"
+  loop_control:
+    label: "{{ item.name }}"
 
-    - name: Run the local-external root include with an unexpected symlink
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+- name: Create each refusal case directory
+  ansible.builtin.file:
+    path: "{{ item.1 }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ local_external_refusal_cases | subelements('dirs') }}"
+  loop_control:
+    label: "{{ item.0.name }}: {{ item.1 }}"
 
-    - name: Require the unexpected symlink refusal
-      ansible.builtin.assert:
-        that:
-          - local_external_case_failed | bool
-          - local_external_case_message is search('Move it aside manually')
-          - local_external_case_message is search((chia_darwin_home ~ '/.chia') | regex_escape)
-        fail_msg: >-
-          The unexpected ~/.chia symlink failed with the wrong result:
-          {{ local_external_case_message }}
+- name: Create each refusal case symlink
+  ansible.builtin.file:
+    src: "{{ item.1.src }}"
+    dest: "{{ item.1.dest }}"
+    state: link
+    force: false
+  loop: "{{ local_external_refusal_cases | subelements('links') }}"
+  loop_control:
+    label: "{{ item.0.name }}: {{ item.1.dest }}"
 
-- name: Inspect the refused unexpected symlink
+- name: Write each refusal case file
+  ansible.builtin.copy:
+    content: "{{ item.1.content }}"
+    dest: "{{ item.1.dest }}"
+    mode: "0644"
+  loop: "{{ local_external_refusal_cases | subelements('files') }}"
+  loop_control:
+    label: "{{ item.0.name }}: {{ item.1.dest }}"
+
+- name: Run each local-external refusal case
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-refusal-case.yml"
+  vars:
+    chia_darwin_home: "{{ case.home }}"
+    chia_root: "{{ case.home }}/.chia/{{ network }}"
+    chia_darwin_db_volume: "{{ case.volume }}"
+  loop: "{{ local_external_refusal_cases }}"
+  loop_control:
+    loop_var: case
+    label: "{{ case.name }}"
+
+- name: Inspect each unchanged refusal path
   ansible.builtin.stat:
-    path: "{{ test_root }}/unexpected/home/.chia"
+    path: "{{ item.1.path }}"
     follow: false
-  register: unexpected_stat
+  loop: "{{ local_external_refusal_cases | subelements('unchanged') }}"
+  loop_control:
+    label: "{{ item.0.name }}: {{ item.1.path }}"
+  register: local_external_unchanged_stats
 
-- name: Require the unexpected symlink to be unchanged
+- name: Require each refused path to be unchanged
+  vars:
+    entry: "{{ item.item[1] }}"
+    st: "{{ item.stat }}"
   ansible.builtin.assert:
     that:
-      - unexpected_stat.stat.islnk | default(false)
       - >-
-        (unexpected_stat.stat.lnk_target | default('') | regex_replace('/+$', '')) ==
-        ((test_root ~ '/not-the-volume') | regex_replace('/+$', ''))
-
-- name: Refuse an unexpected ~/.chia path type
-  vars:
-    chia_darwin_home: "{{ test_root }}/unexpected-type/home"
-    chia_root: "{{ test_root }}/unexpected-type/home/.chia/{{ network }}"
-  block:
-    - name: Prepare a home directory for the unexpected path type
-      ansible.builtin.file:
-        path: "{{ chia_darwin_home }}"
-        state: directory
-        mode: "0755"
-
-    - name: Write a regular file at ~/.chia
-      ansible.builtin.copy:
-        content: not-a-directory
-        dest: "{{ chia_darwin_home }}/.chia"
-        mode: "0644"
-
-    - name: Run the local-external root include with a file at ~/.chia
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
-
-    - name: Require the unexpected path type refusal
-      ansible.builtin.assert:
-        that:
-          - local_external_case_failed | bool
-          - local_external_case_message is search('neither a directory nor a symlink')
-          - local_external_case_message is search((chia_darwin_home ~ '/.chia') | regex_escape)
-        fail_msg: >-
-          The unexpected ~/.chia path type failed with the wrong result:
-          {{ local_external_case_message }}
-
-- name: Inspect the refused unexpected path type
-  ansible.builtin.stat:
-    path: "{{ test_root }}/unexpected-type/home/.chia"
-    follow: false
-  register: unexpected_type_stat
-
-- name: Require the unexpected path type to be unchanged
-  ansible.builtin.assert:
-    that:
-      - unexpected_type_stat.stat.isreg | default(false)
-      - lookup('file', test_root ~ '/unexpected-type/home/.chia') == 'not-a-directory'
-
-- name: Refuse to replace a real local database directory
-  vars:
-    chia_darwin_home: "{{ test_root }}/real-db/home"
-    chia_root: "{{ test_root }}/real-db/home/.chia/{{ network }}"
-  block:
-    - name: Prepare a real local db directory with data
-      ansible.builtin.file:
-        path: "{{ chia_root }}/db"
-        state: directory
-        mode: "0755"
-
-    - name: Write a file inside the real local db directory
-      ansible.builtin.copy:
-        content: keep-me
-        dest: "{{ chia_root }}/db/local.sqlite"
-        mode: "0644"
-
-    - name: Run the local-external root include with a real local db directory
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
-
-    - name: Require the real local db refusal
-      ansible.builtin.assert:
-        that:
-          - local_external_case_failed | bool
-          - local_external_case_message is search('real directory')
-          - local_external_case_message is search((chia_root ~ '/db') | regex_escape)
-        fail_msg: >-
-          The real local db directory failed with the wrong result:
-          {{ local_external_case_message }}
-
-- name: Inspect the refused real local db directory
-  ansible.builtin.stat:
-    path: "{{ test_root }}/real-db/home/.chia/{{ network }}/db"
-    follow: false
-  register: real_db_stat
-
-- name: Require the real local db directory and its data to be unchanged
-  ansible.builtin.assert:
-    that:
-      - real_db_stat.stat.isdir | default(false)
-      - not (real_db_stat.stat.islnk | default(false))
-      - lookup('file', test_root ~ '/real-db/home/.chia/' ~ network ~ '/db/local.sqlite') == 'keep-me'
-
-- name: Refuse to retarget a wrong db symlink
-  vars:
-    chia_darwin_home: "{{ test_root }}/wrong-link/home"
-    chia_root: "{{ test_root }}/wrong-link/home/.chia/{{ network }}"
-  block:
-    - name: Prepare a real ~/.chia and a wrong db symlink
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: directory
-        mode: "0755"
-      loop:
-        - "{{ chia_root }}"
-        - "{{ test_root }}/wrong-target"
-
-    - name: Point the db path at the wrong target
-      ansible.builtin.file:
-        src: "{{ test_root }}/wrong-target"
-        dest: "{{ chia_root }}/db"
-        state: link
-        force: false
-
-    - name: Run the local-external root include with a wrong db symlink
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
-
-    - name: Require the wrong db symlink refusal
-      ansible.builtin.assert:
-        that:
-          - local_external_case_failed | bool
-          - local_external_case_message is search('will not retarget')
-          - local_external_case_message is search((chia_root ~ '/db') | regex_escape)
-        fail_msg: >-
-          The wrong db symlink failed with the wrong result:
-          {{ local_external_case_message }}
-
-- name: Inspect the refused wrong db symlink
-  ansible.builtin.stat:
-    path: "{{ test_root }}/wrong-link/home/.chia/{{ network }}/db"
-    follow: false
-  register: wrong_link_stat
-
-- name: Require the wrong db symlink to be unchanged
-  ansible.builtin.assert:
-    that:
-      - wrong_link_stat.stat.islnk | default(false)
+        (entry.kind != 'symlink') or
+        ((st.islnk | default(false)) and
+        ((st.lnk_target | default('') | regex_replace('/+$', '')) ==
+        (entry.target | regex_replace('/+$', ''))))
       - >-
-        (wrong_link_stat.stat.lnk_target | default('') | regex_replace('/+$', '')) ==
-        ((test_root ~ '/wrong-target') | regex_replace('/+$', ''))
-
-- name: Refuse to replace a file at the db path
-  vars:
-    chia_darwin_home: "{{ test_root }}/file-db/home"
-    chia_root: "{{ test_root }}/file-db/home/.chia/{{ network }}"
-  block:
-    - name: Prepare a real ~/.chia and a file at the db path
-      ansible.builtin.file:
-        path: "{{ chia_root }}"
-        state: directory
-        mode: "0755"
-
-    - name: Write a file at the db path
-      ansible.builtin.copy:
-        content: not-a-database
-        dest: "{{ chia_root }}/db"
-        mode: "0644"
-
-    - name: Run the local-external root include with a file at the db path
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
-
-    - name: Require the file db refusal
-      ansible.builtin.assert:
-        that:
-          - local_external_case_failed | bool
-          - local_external_case_message is search('regular file')
-          - local_external_case_message is search((chia_root ~ '/db') | regex_escape)
-        fail_msg: >-
-          The file at the db path failed with the wrong result:
-          {{ local_external_case_message }}
-
-- name: Refuse a missing ~/.chia next to a finished migration backup
-  vars:
-    chia_darwin_home: "{{ test_root }}/finished/home"
-    chia_root: "{{ test_root }}/finished/home/.chia/{{ network }}"
-  block:
-    - name: Prepare a home directory and a finished legacy backup link
-      ansible.builtin.file:
-        path: "{{ chia_darwin_home }}"
-        state: directory
-        mode: "0755"
-
-    - name: Create the finished migration legacy backup link
-      ansible.builtin.file:
-        src: "{{ external_chia }}"
-        dest: "{{ chia_darwin_home }}/.chia.legacy-volume-link"
-        state: link
-        force: false
-
-    - name: Run the local-external root include with a missing ~/.chia
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
-
-    - name: Require the finished migration backup refusal
-      ansible.builtin.assert:
-        that:
-          - local_external_case_failed | bool
-          - local_external_case_message is search("finished migration's backup")
-          - local_external_case_message is search((chia_darwin_home ~ '/.chia') | regex_escape)
-        fail_msg: >-
-          The finished migration backup failed with the wrong result:
-          {{ local_external_case_message }}
-
-- name: Inspect ~/.chia after the finished migration refusal
-  ansible.builtin.stat:
-    path: "{{ test_root }}/finished/home/.chia"
-    follow: false
-  register: finished_dot
-
-- name: Require the finished migration refusal not to recreate ~/.chia
-  ansible.builtin.assert:
-    that:
-      - not (finished_dot.stat.exists | default(false))
-
-- name: Refuse a missing ~/.chia next to a live staging tree
-  vars:
-    chia_darwin_home: "{{ test_root }}/staging-only/home"
-    chia_root: "{{ test_root }}/staging-only/home/.chia/{{ network }}"
-  block:
-    - name: Prepare a home directory and a live staging tree
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: directory
-        mode: "0755"
-      loop:
-        - "{{ chia_darwin_home }}"
-        - "{{ chia_darwin_home }}/.chia.migrating/{{ network }}"
-
-    - name: Write a marker in the live staging tree
-      ansible.builtin.copy:
-        content: keep-staging
-        dest: "{{ chia_darwin_home }}/.chia.migrating/{{ network }}/keep.txt"
-        mode: "0644"
-
-    - name: Run the local-external root include with a missing ~/.chia
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
-
-    - name: Require the live staging refusal
-      ansible.builtin.assert:
-        that:
-          - local_external_case_failed | bool
-          - local_external_case_message is search('Inspect that staging tree')
-          - local_external_case_message is search((chia_darwin_home ~ '/.chia.migrating') | regex_escape)
-        fail_msg: >-
-          The missing ~/.chia next to a live staging tree failed with the wrong
-          result: {{ local_external_case_message }}
-
-    - name: Inspect the refused staging layout
-      ansible.builtin.stat:
-        path: "{{ item }}"
-        follow: false
-      loop:
-        - "{{ chia_darwin_home }}/.chia"
-        - "{{ chia_darwin_home }}/.chia.migrating/{{ network }}/keep.txt"
-      register: staging_only_stats
-
-    - name: Require the live staging refusal to leave both paths unchanged
-      ansible.builtin.assert:
-        that:
-          - not (staging_only_stats.results[0].stat.exists | default(false))
-          - lookup('file', chia_darwin_home ~ '/.chia.migrating/' ~ network ~ '/keep.txt') == 'keep-staging'
-
-- name: Refuse a live staging tree next to a valid internal ~/.chia
-  vars:
-    chia_darwin_home: "{{ test_root }}/live-staging/home"
-    chia_root: "{{ test_root }}/live-staging/home/.chia/{{ network }}"
-  block:
-    - name: Prepare a valid internal ~/.chia and a live staging tree
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: directory
-        mode: "0755"
-      loop:
-        - "{{ chia_darwin_home }}/.chia"
-        - "{{ chia_darwin_home }}/.chia.migrating/{{ network }}"
-
-    - name: Write a marker in the live staging tree beside ~/.chia
-      ansible.builtin.copy:
-        content: keep-staging
-        dest: "{{ chia_darwin_home }}/.chia.migrating/{{ network }}/keep.txt"
-        mode: "0644"
-
-    - name: Run the local-external root include with live staging beside ~/.chia
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
-
-    - name: Require the live staging beside ~/.chia refusal
-      ansible.builtin.assert:
-        that:
-          - local_external_case_failed | bool
-          - local_external_case_message is search('still exists')
-          - local_external_case_message is search((chia_darwin_home ~ '/.chia.migrating') | regex_escape)
-        fail_msg: >-
-          A live staging tree beside a valid ~/.chia failed with the wrong
-          result: {{ local_external_case_message }}
-
-    - name: Inspect the live staging layout after the refusal
-      ansible.builtin.stat:
-        path: "{{ item }}"
-        follow: false
-      loop:
-        - "{{ chia_darwin_home }}/.chia"
-        - "{{ chia_darwin_home }}/.chia.migrating/{{ network }}/keep.txt"
-      register: live_staging_stats
-
-    - name: Require the live staging refusal to leave both paths unchanged
-      ansible.builtin.assert:
-        that:
-          - live_staging_stats.results[0].stat.isdir | default(false)
-          - not (live_staging_stats.results[0].stat.islnk | default(false))
-          - lookup('file', chia_darwin_home ~ '/.chia.migrating/' ~ network ~ '/keep.txt') == 'keep-staging'
+        (entry.kind != 'directory') or
+        ((st.isdir | default(false)) and not (st.islnk | default(false)))
+      - >-
+        (entry.kind != 'file') or
+        ((st.isreg | default(false)) and lookup('file', entry.path) == entry.content)
+      - (entry.kind != 'absent') or not (st.exists | default(false))
+    fail_msg: >-
+      {{ item.item[0].name }}: {{ entry.path }} was changed by the refusal.
+  loop: "{{ local_external_unchanged_stats.results }}"
+  loop_control:
+    label: "{{ item.item[0].name }}: {{ item.item[1].path }}"

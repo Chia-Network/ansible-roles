@@ -1,0 +1,16 @@
+---
+# Run one data-driven local-external refusal case and assert its message.
+- name: Run the local-external root include for {{ case.name }}
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+- name: Require the expected refusal message for {{ case.name }}
+  ansible.builtin.assert:
+    that:
+      - local_external_case_failed | bool
+      - local_external_case_message is search(case.expect)
+      - >-
+        local_external_case_message is search(
+        (case.expect_path | default('')) | regex_escape)
+    fail_msg: >-
+      {{ case.name }} failed with the wrong result:
+      {{ local_external_case_message }}

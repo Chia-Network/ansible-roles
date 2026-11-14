@@ -14,16 +14,13 @@
     chia_darwin_local_external_root_db: "{{ chia_root }}/db"
     chia_darwin_local_external_volume_chia_dir_norm: "{{ chia_darwin_volume_chia_dir | regex_replace('/+$', '') }}"
     chia_darwin_local_external_volume_db_dir_norm: "{{ chia_darwin_volume_db_dir | regex_replace('/+$', '') }}"
-  changed_when: false
-
-- name: Map the local-external CHIA_ROOT paths
-  ansible.builtin.set_fact:
     chia_darwin_local_external_paths:
-      dot: "{{ chia_darwin_local_external_dot_chia }}"
-      root_db: "{{ chia_darwin_local_external_root_db }}"
+      dot: "{{ chia_darwin_home }}/.chia"
+      chia_root: "{{ chia_root }}"
+      root_db: "{{ chia_root }}/db"
       volume_db: "{{ chia_darwin_volume_db_dir }}"
-      legacy: "{{ chia_darwin_local_external_dot_chia_legacy }}"
-      migrating: "{{ chia_darwin_local_external_dot_chia_migrating }}"
+      legacy: "{{ chia_darwin_home }}/.chia.legacy-volume-link"
+      migrating: "{{ chia_darwin_home }}/.chia.migrating"
   changed_when: false
 
 - name: Inspect the local-external CHIA_ROOT and volume paths
@@ -44,7 +41,9 @@
 - name: Classify the local-external CHIA_ROOT layout
   vars:
     dot: "{{ chia_darwin_local_external_stats.dot }}"
+    root: "{{ chia_darwin_local_external_stats.chia_root }}"
     root_db: "{{ chia_darwin_local_external_stats.root_db }}"
+    volume_db: "{{ chia_darwin_local_external_stats.volume_db }}"
     volume_chia_norm: "{{ chia_darwin_local_external_volume_chia_dir_norm }}"
     volume_db_norm: "{{ chia_darwin_local_external_volume_db_dir_norm }}"
   ansible.builtin.set_fact:
@@ -55,6 +54,10 @@
       ((dot.lnk_target | default('') | regex_replace('/+$', '')) == volume_chia_norm)
       else ('unexpected-symlink' if dot.islnk | default(false)
       else ('real-directory' if dot.isdir | default(false) else 'unexpected'))) }}
+    chia_darwin_local_external_chia_root_kind: >-
+      {{ 'absent' if not (root.exists | default(false))
+      else ('symlink' if root.islnk | default(false)
+      else ('real-directory' if root.isdir | default(false) else 'unexpected')) }}
     chia_darwin_local_external_root_db_kind: >-
       {{ 'absent' if not (root_db.exists | default(false))
       else ('correct-symlink'
@@ -62,24 +65,20 @@
       ((root_db.lnk_target | default('') | regex_replace('/+$', '')) == volume_db_norm)
       else ('wrong-symlink' if root_db.islnk | default(false)
       else ('real-directory' if root_db.isdir | default(false) else 'file'))) }}
+    chia_darwin_local_external_volume_db_kind: >-
+      {{ 'absent' if not (volume_db.exists | default(false))
+      else ('real-directory'
+      if (volume_db.isdir | default(false)) and not (volume_db.islnk | default(false))
+      else 'other') }}
   changed_when: false
 
-- name: Decide whether the local-external layout can be ensured
-  ansible.builtin.set_fact:
-    chia_darwin_local_external_ensure_layout: >-
-      {{ chia_darwin_local_external_dot_kind in ['real-directory', 'absent'] }}
-  changed_when: false
-
-- name: Refuse an unsafe or unfinished local-external layout
+- name: Refuse an unsafe or unfinished ~/.chia layout
   vars:
     stats: "{{ chia_darwin_local_external_stats }}"
     dot: "{{ chia_darwin_local_external_dot_chia }}"
-    root_db: "{{ chia_darwin_local_external_root_db }}"
     migrating: "{{ chia_darwin_local_external_dot_chia_migrating }}"
     legacy: "{{ chia_darwin_local_external_dot_chia_legacy }}"
     volume_chia: "{{ chia_darwin_volume_chia_dir }}"
-    volume_db: "{{ chia_darwin_volume_db_dir }}"
-    ensure_layout: "{{ chia_darwin_local_external_ensure_layout | bool }}"
     staging: "{{ stats.migrating.exists | default(false) }}"
     legacy_exists: "{{ stats.legacy.exists | default(false) }}"
   ansible.builtin.fail:
@@ -114,16 +113,44 @@
         {{ dot }} is a valid internal directory but {{ migrating }} still exists.
         Inspect the staging tree manually; this role will not rename or delete
         it. Nothing was changed.
-    - refuse: "{{ ensure_layout and chia_darwin_local_external_root_db_kind == 'real-directory' }}"
+  loop_control:
+    label: "{{ item.msg | truncate(40) }}"
+
+- name: Refuse an unsafe local-external database layout
+  vars:
+    stats: "{{ chia_darwin_local_external_stats }}"
+    root: "{{ chia_root }}"
+    root_db: "{{ chia_darwin_local_external_root_db }}"
+    volume_db: "{{ chia_darwin_volume_db_dir }}"
+  ansible.builtin.fail:
+    msg: "{{ item.msg }}"
+  when: item.refuse | bool
+  loop:
+    - refuse: "{{ chia_darwin_local_external_chia_root_kind == 'symlink' }}"
+      msg: >-
+        {{ root }} is a symlink to {{ stats.chia_root.lnk_target | default('') }}.
+        A local-external CHIA_ROOT must be a real directory on the internal
+        disk. Move the symlink aside manually; nothing was changed.
+    - refuse: "{{ chia_darwin_local_external_chia_root_kind == 'unexpected' }}"
+      msg: >-
+        {{ root }} exists but is neither a directory nor a symlink. Move it
+        aside before using local-external. This role does not delete data.
+        Nothing was changed.
+    - refuse: "{{ chia_darwin_local_external_volume_db_kind == 'other' }}"
+      msg: >-
+        {{ volume_db }} is not a real directory. This role will not replace the
+        on-volume database path with a symlink or a file. Move it aside
+        manually; nothing was changed.
+    - refuse: "{{ chia_darwin_local_external_root_db_kind == 'real-directory' }}"
       msg: >-
         {{ root_db }} is a real directory. The data may already be local. This
         role will not replace it with a symlink. Move it aside manually if the
         on-volume database should be used.
-    - refuse: "{{ ensure_layout and chia_darwin_local_external_root_db_kind == 'wrong-symlink' }}"
+    - refuse: "{{ chia_darwin_local_external_root_db_kind == 'wrong-symlink' }}"
       msg: >-
         {{ root_db }} is a symlink to {{ stats.root_db.lnk_target | default('') }},
         not {{ volume_db }}. This role will not retarget it.
-    - refuse: "{{ ensure_layout and chia_darwin_local_external_root_db_kind == 'file' }}"
+    - refuse: "{{ chia_darwin_local_external_root_db_kind == 'file' }}"
       msg: >-
         {{ root_db }} is a regular file. This role will not replace it with a
         symlink. Move it aside manually.
@@ -143,11 +170,9 @@
     {{ ([chia_darwin_local_external_dot_chia]
     if chia_darwin_local_external_dot_kind == 'absent' else []) +
     ([chia_root]
-    if chia_darwin_local_external_root_db_kind == 'absent' else []) +
+    if chia_darwin_local_external_chia_root_kind == 'absent' else []) +
     ([chia_darwin_volume_db_dir]
-    if not (chia_darwin_local_external_stats.volume_db.exists | default(false))
-    else []) }}
-  when: chia_darwin_local_external_ensure_layout | bool
+    if chia_darwin_local_external_volume_db_kind == 'absent' else []) }}
 
 - name: Link the local-external database path at the on-volume database
   become: "{{ chia_darwin_launchd_become | bool }}"
@@ -157,9 +182,4 @@
     dest: "{{ chia_darwin_local_external_root_db }}"
     state: link
     force: false
-  when:
-    - chia_darwin_local_external_ensure_layout | bool
-    - chia_darwin_local_external_root_db_kind == "absent"
-
-- name: Verify the local-external CHIA_ROOT layout
-  ansible.builtin.include_tasks: darwin-local-external-verify.yml
+  when: chia_darwin_local_external_root_db_kind == "absent"

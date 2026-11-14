@@ -192,12 +192,13 @@
     argv: ["{{ chia_darwin_mount }}"]
   register: chia_darwin_mounts
   changed_when: false
+  check_mode: false
   when: chia_darwin_topology == "local-external"
 
 - name: Require the database volume to be mounted now
   ansible.builtin.assert:
     that:
-      - chia_darwin_mounts.stdout is search(' on ' ~ (chia_darwin_db_volume | regex_escape) ~ ' ')
+      - chia_darwin_mounts.stdout is search(' on ' ~ (chia_darwin_db_volume | regex_escape) ~ ' \(')
     fail_msg: >-
       {{ chia_darwin_db_volume }} is not mounted. Mount it before running
       local-external. The role does not format or mount disks.
@@ -464,6 +465,23 @@
           replace or retarget it.
       when: chia_darwin_topology == "local-external"
 
+    - name: Inspect the local-external CHIA_ROOT directory
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_home }}/.chia"
+        follow: false
+      register: chia_darwin_local_external_dot_check
+      when: chia_darwin_topology == "local-external"
+
+    - name: Require the local-external CHIA_ROOT directory to be internal
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_local_external_dot_check.stat.isdir | default(false)
+          - not (chia_darwin_local_external_dot_check.stat.islnk | default(false))
+        fail_msg: >-
+          {{ chia_darwin_home }}/.chia must remain a real directory on the
+          internal disk for local-external. The role did not replace it.
+      when: chia_darwin_topology == "local-external"
+
     - name: Check for an existing chia config
       ansible.builtin.stat:
         path: "{{ chia_root }}/config/config.yaml"
@@ -689,16 +707,12 @@
           - "import os, sys; print(os.path.realpath(sys.executable))"
       register: chia_darwin_fda_python_real
       changed_when: false
-      failed_when: false
+      check_mode: false
 
     - name: Record the resolved full-node Python interpreter
       when: chia_darwin_emit_pppc | bool
       ansible.builtin.set_fact:
-        chia_darwin_fda_python: >-
-          {{ chia_darwin_fda_python_real.stdout | trim
-          if ((chia_darwin_fda_python_real.rc | default(1) | int) == 0 and
-          (chia_darwin_fda_python_real.stdout | default('') | trim | length > 0))
-          else chia_darwin_fda_python }}
+        chia_darwin_fda_python: "{{ chia_darwin_fda_python_real.stdout | trim }}"
       changed_when: false
 
     - name: Write the Full Disk Access note
@@ -738,8 +752,10 @@
           Disk Access is needed only for /bin/zsh (the launchd shebang
           interpreter for every job wrapper) and the full node's Python
           interpreter ({{ chia_darwin_fda_python }}). Grant them in System
-          Settings if the full node cannot read {{ chia_darwin_volume_db_dir }},
-          or install {{ chia_darwin_pppc_dest }} with MDM. See
+          Settings if the full node cannot read {{ chia_darwin_volume_db_dir }}.
+          Installing {{ chia_darwin_pppc_dest }} with MDM grants /bin/zsh only,
+          so the printed Python path must still be added by hand in System
+          Settings, and again after every Homebrew Python upgrade. See
           {{ chia_darwin_fda_note_dest }}. Do not add companion binaries,
           tailscaled, hw-vdf, the watchdog, or healthcheck for this layout.
           This role does not edit TCC.db. An SSH session being able to read the

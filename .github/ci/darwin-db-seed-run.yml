@@ -11,4 +11,3 @@
     blockchain_backup_bucket: "{{ case.bucket | default('test-bucket') }}"
     chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-{{ case.launchctl | default('notloaded') }}"
     chia_darwin_db_volume: "{{ case.volume | default(external_volume) }}"
-    chia_darwin_restart_services: "{{ case.restart_services | default(false) }}"
