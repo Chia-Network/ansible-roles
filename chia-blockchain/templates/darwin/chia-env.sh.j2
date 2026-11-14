@@ -23,6 +23,9 @@ CHIA_DB_MARKER={{ chia_darwin_db_marker | quote }}
 # failure. This is expected for the full-node process only (the interpreter
 # {{ chia_darwin_interpreter }} running chia_full_node); it is not yet proven on
 # hardware. This role cannot grant TCC access.
+# CHIA_DB_MARKER is now the volume DB directory, not a file. Reading a
+# directory here is expected to fail under a TCC denial, but that is not proven
+# on hardware; the wait log includes the /bin/ls failure.
 wait_for_db_volume() {
 	local n=0
 	until /sbin/mount | /usr/bin/grep -q " on ${CHIA_DB_VOLUME} " && [ -r "$CHIA_DB_MARKER" ]; do

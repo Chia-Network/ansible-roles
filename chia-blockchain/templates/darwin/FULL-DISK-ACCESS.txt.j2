@@ -22,8 +22,14 @@ mismatch is TCC, not a missing mount.
 This narrowing is expected, not yet proven on hardware. Only the full-node
 process is expected to need this grant: the interpreter running chia_full_node,
 because TCC attributes the script job to its shebang interpreter. Companion
-binaries and tailscaled should not need it now that config and wallet data are
-on the internal disk.
+binaries should not need it now that config and wallet data are on the internal
+disk.
+
+The wrapper waits on {{ chia_darwin_db_marker }}, which is now the on-volume
+database directory rather than a config file. That wait tests whether the
+directory is readable. Whether a TCC denial is visible through that test the
+same way it was for the old config.yaml file marker is expected, not proven on
+hardware. The wait log also includes the failure from /bin/ls.
 
 How to grant it
 ---------------
@@ -56,8 +62,7 @@ Companion binaries
 chia-exporter, chia-healthcheck, and the other companion jobs keep their
 CHIA_ROOT on the internal disk and no longer wait for the database volume.
 Do not add {{ chia_darwin_companion_bin_dir }} binaries to Full Disk Access for
-this layout. tailscaled does not need this grant for Chia config either, because
-config is internal now.
+this layout. config and wallet data are internal now.
 
 This role cannot grant TCC Full Disk Access. It only writes this note and the
 profile template. It never runs `profiles`, `tccutil`, or SQL against TCC.db.

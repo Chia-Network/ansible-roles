@@ -7,13 +7,23 @@
     test_group: "{{ lookup('pipe', 'id -gn') }}"
     user: "{{ lookup('env', 'USER') }}"
     chia_darwin_group: "{{ lookup('pipe', 'id -gn') }}"
-    chia_darwin_home: "{{ test_root }}/home"
     chia_darwin_db_volume: "{{ test_root }}/Volumes/Chia DB"
     chia_darwin_mount: "{{ test_root }}/bin/mount"
     chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-unloaded"
     chia_darwin_launchd_prefix: net.chia.roottest
     chia_darwin_launchd_become: false
     chia_darwin_restart_services: false
+    chia_darwin_restart_companions: false
+    chia_darwin_enable_watchdog: false
+    chia_darwin_hw_vdf_jobs: []
+    chia_darwin_companion_jobs: []
+    chia_darwin_hw_vdf_changed_labels: []
+    chia_darwin_start_now: true
+    chia_darwin_service_jobs:
+      - name: timelord
+        label: net.chia.roottest.timelord
+        enabled: true
+        exit_timeout: 1
     chia_darwin_launchd_jobs:
       - name: timelord
         label: net.chia.roottest.timelord
@@ -31,7 +41,6 @@
     mode: "0755"
   loop:
     - "{{ test_root }}/bin"
-    - "{{ chia_darwin_home }}"
     - "{{ chia_darwin_db_volume }}"
 
 - name: Write the fake mounted filesystem list
