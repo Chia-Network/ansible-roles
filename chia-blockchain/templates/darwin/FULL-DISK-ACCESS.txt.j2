@@ -27,10 +27,10 @@ mismatch is TCC, not a missing mount.
 Full Disk Access is needed only for:
 1. {{ chia_darwin_interpreter }} — launchd uses it as the shebang interpreter for
    every job wrapper, so this grant is shared by every wrapped job;
-2. the full node's Python interpreter — the real Homebrew binary that the venv
+2. the full node's Python interpreter{% if chia_darwin_fda_python is defined %} — the real Homebrew binary that the venv
    python3.13 resolves to:
 
-   {{ chia_darwin_fda_python }}
+   {{ chia_darwin_fda_python }}{% endif %}{{ '' }}
 
 That Python grant is tied to the Cellar version path. A Homebrew Python upgrade
 changes the path, and the node loses DB access until the grant is added for the
@@ -45,7 +45,7 @@ How to grant it
 ---------------
 1. GUI (this Mac):
    System Settings -> Privacy & Security -> Full Disk Access -> add
-   {{ chia_darwin_interpreter }} and {{ chia_darwin_fda_python }}
+   {{ chia_darwin_interpreter }}{% if chia_darwin_fda_python is defined %} and {{ chia_darwin_fda_python }}{% endif %}{{ '' }}
    (Cmd-Shift-G if either is hidden) and enable both.
    Then restart the full-node LaunchDaemon
    (launchctl kickstart -k system/<full-node label>).
@@ -54,8 +54,8 @@ How to grant it
    {{ chia_darwin_pppc_dest }}
    through user-approved MDM or Automated Device Enrollment.
    The profile grants only {{ chia_darwin_interpreter }}. It does not grant the
-   full node's Python interpreter. Add {{ chia_darwin_fda_python }} by hand in
-   System Settings (step 1), and again after every Homebrew Python upgrade.
+   full node's Python interpreter.{% if chia_darwin_fda_python is defined %} Add {{ chia_darwin_fda_python }} by hand in
+   System Settings (step 1), and again after every Homebrew Python upgrade.{% endif %}{{ '' }}
    Opening the .mobileconfig locally does not grant SystemPolicyAllFiles
    on modern macOS.
 
