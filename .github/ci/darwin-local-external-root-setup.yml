@@ -139,7 +139,7 @@
     dest: "{{ test_root }}/bin/rsync-logging"
     mode: "0755"
 
-- name: Write the fake mv that fails the staging swap
+- name: Write the fake mv wrappers that fail the selected swaps
   ansible.builtin.copy:
     content: |
       #!/bin/sh
@@ -155,33 +155,22 @@
           exit 1
           ;;
       esac
-      exec /bin/mv "$@"
-    dest: "{{ test_root }}/bin/mv-fail-swap"
-    mode: "0755"
-
-- name: Write the fake mv that fails the staging swap and the legacy restore
-  ansible.builtin.copy:
-    content: |
-      #!/bin/sh
-      dest=
-      prev=
-      for arg in "$@"; do
-        prev=$dest
-        dest=$arg
-      done
-      case "$prev:$dest" in
-        */.chia.migrating:*/.chia)
-          echo "fake mv: refusing the staging swap" >&2
-          exit 1
-          ;;
-        */.chia.legacy-volume-link:*/.chia)
-          echo "fake mv: refusing the legacy restore" >&2
-          exit 1
+      case "${0##*/}" in
+        mv-fail-swap-and-restore)
+          case "$prev:$dest" in
+            */.chia.legacy-volume-link:*/.chia)
+              echo "fake mv: refusing the legacy restore" >&2
+              exit 1
+              ;;
+          esac
           ;;
       esac
       exec /bin/mv "$@"
-    dest: "{{ test_root }}/bin/mv-fail-swap-and-restore"
+    dest: "{{ test_root }}/bin/{{ item }}"
     mode: "0755"
+  loop:
+    - mv-fail-swap
+    - mv-fail-swap-and-restore
 
 - name: Create an empty fake launchctl log without truncating it on reruns
   ansible.builtin.copy:

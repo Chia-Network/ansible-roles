@@ -1,0 +1,15 @@
+---
+# Shared seed invocation for darwin-db-seed-run-case.yml. Both the expected
+# failure and success paths pass the same case-derived variables.
+- name: Run the seed scenario for {{ case.name }}
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
+  vars:
+    chia_darwin_topology: "{{ case.topology | default('local-internal') }}"
+    chia_root: "{{ case.root }}"
+    network: "{{ case.network | default('mainnet') }}"
+    download_blockchain_db: "{{ case.download | default(true) }}"
+    blockchain_backup_bucket: "{{ case.bucket | default('test-bucket') }}"
+    chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-{{ case.launchctl | default('notloaded') }}"
+    chia_darwin_db_volume: "{{ case.volume | default(external_volume) }}"
+    chia_darwin_restart_services: "{{ case.restart_services | default(false) }}"
+    chia_darwin_local_external_restarted: "{{ case.local_external_restarted | default(false) }}"
