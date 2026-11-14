@@ -33,7 +33,6 @@ SERIAL={{ chia_hw_board.expected_serial | quote }}
 # vdf-only has no local timelord: connect to the remote VDF server and do not
 # block on a local listener that will never appear.
 {% else %}
-wait_for_db_volume
 wait_for_listen "$PORT" # timelord vdf_server must be up (hw_vdf_client exits if it can't connect)
 {% endif %}
 sleep {{ chia_darwin_hw_vdf_settle_seconds | int }}

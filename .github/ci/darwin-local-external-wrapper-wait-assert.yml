@@ -1,0 +1,17 @@
+---
+# Caller sets wrapper_wait_register to the slurp register for the six rendered
+# local-external wrappers. Only the full-node wrapper may wait for the volume.
+- name: Only the full-node wrapper waits for the database volume
+  vars:
+    wrappers: "{{ wrapper_wait_register.results | map(attribute='content') | map('b64decode') | list }}"
+  ansible.builtin.assert:
+    that:
+      - wrappers[1] is search('(?m)^wait_for_db_volume$')
+      - wrappers[0] is not search('(?m)^wait_for_db_volume$')
+      - wrappers[2] is not search('(?m)^wait_for_db_volume$')
+      - wrappers[3] is not search('(?m)^wait_for_db_volume$')
+      - wrappers[4] is not search('(?m)^wait_for_db_volume$')
+      - wrappers[5] is not search('(?m)^wait_for_db_volume$')
+    fail_msg: >-
+      Only chia-full-node-run.sh may call wait_for_db_volume. Helper
+      wrappers must not touch the external database volume.

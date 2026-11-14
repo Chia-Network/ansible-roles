@@ -6,6 +6,7 @@
   vars_files:
     - ../../chia-blockchain/defaults/main.yml
     - darwin-hw-boards-fixture.yml
+    - darwin-local-external-wrapper-names.yml
   vars:
     render_out: "{{ lookup('env', 'RUNNER_TEMP') | default('/tmp', true) }}/chia-darwin-hw-render"
   tasks:
@@ -100,6 +101,26 @@
         src: ../../chia-blockchain/templates/darwin/chia-env.sh.j2
         dest: "{{ render_out }}/boards/local-external.sh"
         mode: "0755"
+
+    - name: Render the local-external service and companion wrappers
+      ansible.builtin.template:
+        src: "../../chia-blockchain/templates/darwin/{{ item }}.j2"
+        dest: "{{ render_out }}/boards/wrapper-{{ item }}"
+        mode: "0755"
+      vars:
+        chia_darwin_topology: local-external
+      loop: "{{ darwin_local_external_wrapper_names }}"
+
+    - name: Read the local-external wrappers
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/boards/wrapper-{{ item }}"
+      loop: "{{ darwin_local_external_wrapper_names }}"
+      register: wrapper_scripts
+
+    - name: Only the full-node wrapper waits for the database volume
+      ansible.builtin.include_tasks: darwin-local-external-wrapper-wait-assert.yml
+      vars:
+        wrapper_wait_register: "{{ wrapper_scripts }}"
 
     - name: Resolve three boards for wrapper text
       ansible.builtin.include_tasks: darwin-hw-boards-reset.yml

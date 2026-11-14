@@ -1,0 +1,23 @@
+---
+# Run the local-external include for one fixture and record whether it failed,
+# so each test case can assert either outcome without repeating block/rescue.
+- name: Reset the local-external case outcome
+  ansible.builtin.set_fact:
+    local_external_case_failed: false
+    local_external_case_message: ""
+  changed_when: false
+
+- name: Run the local-external root include
+  block:
+    - name: Include the local-external root tasks
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-local-external-root.yml"
+  rescue:
+    - name: Record the local-external case failure
+      ansible.builtin.set_fact:
+        local_external_case_failed: true
+        local_external_case_message: >-
+          {{ (ansible_failed_result.results | default([])
+          | selectattr('failed', 'defined') | selectattr('failed')
+          | map(attribute='item.msg') | first)
+          | default(ansible_failed_result.msg | default('no message'), true) }}
+      changed_when: false

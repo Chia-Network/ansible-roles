@@ -12,6 +12,11 @@
     chia_darwin_brew: "{{ test_root }}/bin/brew"
     chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
     chia_darwin_launchd_prefix: net.chia.seedtest
+    chia_darwin_service_jobs:
+      - name: full-node
+        label: net.chia.seedtest.full-node
+        enabled: true
+        exit_timeout: 1
     chia_darwin_db_volume: "{{ test_root }}/Volumes/Chia DB"
     chia_darwin_launchd_become: false
     chia_darwin_db_seed_stub_bytes: 10240
@@ -35,12 +40,24 @@
     - "{{ external_root }}/mainnet/db"
     - "{{ external_root }}/testnet11/db"
 
-- name: Link the external test CHIA_ROOT
+- name: Create the local test CHIA_ROOT network directories
   ansible.builtin.file:
-    src: "{{ external_root }}"
-    dest: "{{ test_root }}/home ext/.chia"
+    path: "{{ test_root }}/home ext/.chia/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - mainnet
+    - testnet11
+
+- name: Link each local test CHIA_ROOT database at the external volume
+  ansible.builtin.file:
+    src: "{{ external_root }}/{{ item }}/db"
+    dest: "{{ test_root }}/home ext/.chia/{{ item }}/db"
     state: link
-    force: true
+    force: false
+  loop:
+    - mainnet
+    - testnet11
 
 - name: Write the mainnet and testnet11 snapshot fixtures
   ansible.builtin.copy:
@@ -140,6 +157,33 @@
       exit 1
     dest: "{{ test_root }}/bin/launchctl-notloaded"
     mode: "0755"
+
+- name: Write the fake launchctl executable that unloads on bootout
+  ansible.builtin.copy:
+    content: |
+      #!/bin/sh
+      root='{{ test_root }}'
+      printf '%s\n' "$*" >> "$root/launchctl.log"
+      if [ "${1:-}" = "print" ]; then
+        if [ -s "$root/launchctl.booted-out" ]; then
+          exit 1
+        fi
+        echo "loaded"
+        exit 0
+      fi
+      if [ "${1:-}" = "bootout" ]; then
+        printf 'booted out\n' > "$root/launchctl.booted-out"
+      fi
+      exit 0
+    dest: "{{ test_root }}/bin/launchctl-bootout"
+    mode: "0755"
+
+- name: Create an empty fake launchctl bootout marker without truncating it
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ test_root }}/launchctl.booted-out"
+    force: false
+    mode: "0644"
 
 - name: Write the fake sudo executable
   ansible.builtin.copy:

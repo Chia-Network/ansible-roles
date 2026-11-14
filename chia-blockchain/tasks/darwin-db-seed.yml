@@ -58,6 +58,13 @@
 - name: Seed the Darwin full-node database when it is absent or a stub
   when: chia_darwin_db_seed_needed | bool
   block:
+    - name: Decide whether a requested restart may stop the full node for the seed
+      ansible.builtin.set_fact:
+        chia_darwin_db_seed_may_stop_node: >-
+          {{ (chia_darwin_restart_services | default(false) | bool) or
+          (chia_darwin_local_external_migrated | default(false) | bool) }}
+      changed_when: false
+
     - name: Report a Darwin database seed skipped by check mode
       ansible.builtin.debug:
         msg: >-
@@ -99,6 +106,24 @@
       check_mode: false
       become: "{{ chia_darwin_launchd_become | bool }}"
 
+    # A later ordered restart brings the node back, so an already requested
+    # restart, or the migration's own restart, may stop only the loaded full
+    # node instead of refusing to seed.
+    - name: Stop the loaded full node before seeding when a restart is requested
+      when:
+        - chia_darwin_db_seed_node.rc | default(1) | int == 0
+        - chia_darwin_db_seed_may_stop_node | bool
+      vars:
+        chia_job: "{{ chia_darwin_service_jobs | selectattr('name', 'equalto', 'full-node') | first }}"
+      ansible.builtin.include_tasks: darwin-stop-job.yml
+
+    - name: Request a Darwin restart after stopping the full node for the seed
+      when:
+        - chia_darwin_db_seed_node.rc | default(1) | int == 0
+        - chia_darwin_db_seed_may_stop_node | bool
+      ansible.builtin.set_fact:
+        chia_darwin_restart_services: true
+
     - name: Refuse to replace a database under a loaded full node
       ansible.builtin.fail:
         msg: >-
@@ -106,7 +131,9 @@
           Refusing to replace its database while the node may be running. Stop it
           with "sudo launchctl bootout system/{{ chia_darwin_launchd_prefix }}.full-node"
           and rerun. This role never replaces a live node's database.
-      when: chia_darwin_db_seed_node.rc | default(1) == 0
+      when:
+        - chia_darwin_db_seed_node.rc | default(1) | int == 0
+        - not (chia_darwin_db_seed_may_stop_node | bool)
 
     - name: Ensure the AWS CLI is available for the database seed
       when: not ansible_check_mode

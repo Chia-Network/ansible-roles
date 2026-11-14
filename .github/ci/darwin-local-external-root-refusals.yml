@@ -1,0 +1,485 @@
+---
+# Refusal and guard cases for chia-blockchain/tasks/darwin-local-external-root.yml.
+# Included by darwin-local-external-root-tests.yml after the success paths.
+- name: Refuse an unexpected ~/.chia symlink target
+  vars:
+    chia_darwin_home: "{{ test_root }}/unexpected/home"
+    chia_root: "{{ test_root }}/unexpected/home/.chia/{{ network }}"
+  block:
+    - name: Prepare an unexpected ~/.chia symlink
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ chia_darwin_home }}"
+        - "{{ test_root }}/not-the-volume"
+
+    - name: Point ~/.chia at an unexpected target
+      ansible.builtin.file:
+        src: "{{ test_root }}/not-the-volume"
+        dest: "{{ chia_darwin_home }}/.chia"
+        state: link
+        force: false
+
+    - name: Run the local-external root include with an unexpected symlink
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+    - name: Require the unexpected symlink refusal
+      ansible.builtin.assert:
+        that:
+          - local_external_case_failed | bool
+          - local_external_case_message is search('only migrates the historical')
+          - local_external_case_message is search((chia_darwin_home ~ '/.chia') | regex_escape)
+        fail_msg: >-
+          The unexpected ~/.chia symlink failed with the wrong result:
+          {{ local_external_case_message }}
+
+- name: Inspect the refused unexpected symlink
+  ansible.builtin.stat:
+    path: "{{ test_root }}/unexpected/home/.chia"
+    follow: false
+  register: unexpected_stat
+
+- name: Require the unexpected symlink to be unchanged
+  ansible.builtin.assert:
+    that:
+      - unexpected_stat.stat.islnk | default(false)
+      - >-
+        (unexpected_stat.stat.lnk_target | default('') | regex_replace('/+$', '')) ==
+        ((test_root ~ '/not-the-volume') | regex_replace('/+$', ''))
+
+- name: Refuse an unexpected ~/.chia path type
+  vars:
+    chia_darwin_home: "{{ test_root }}/unexpected-type/home"
+    chia_root: "{{ test_root }}/unexpected-type/home/.chia/{{ network }}"
+  block:
+    - name: Prepare a home directory for the unexpected path type
+      ansible.builtin.file:
+        path: "{{ chia_darwin_home }}"
+        state: directory
+        mode: "0755"
+
+    - name: Write a regular file at ~/.chia
+      ansible.builtin.copy:
+        content: not-a-directory
+        dest: "{{ chia_darwin_home }}/.chia"
+        mode: "0644"
+
+    - name: Run the local-external root include with a file at ~/.chia
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+    - name: Require the unexpected path type refusal
+      ansible.builtin.assert:
+        that:
+          - local_external_case_failed | bool
+          - local_external_case_message is search('neither a directory nor a symlink')
+          - local_external_case_message is search((chia_darwin_home ~ '/.chia') | regex_escape)
+        fail_msg: >-
+          The unexpected ~/.chia path type failed with the wrong result:
+          {{ local_external_case_message }}
+
+- name: Inspect the refused unexpected path type
+  ansible.builtin.stat:
+    path: "{{ test_root }}/unexpected-type/home/.chia"
+    follow: false
+  register: unexpected_type_stat
+
+- name: Require the unexpected path type to be unchanged
+  ansible.builtin.assert:
+    that:
+      - unexpected_type_stat.stat.isreg | default(false)
+      - lookup('file', test_root ~ '/unexpected-type/home/.chia') == 'not-a-directory'
+
+- name: Refuse to replace a real local database directory
+  vars:
+    chia_darwin_home: "{{ test_root }}/real-db/home"
+    chia_root: "{{ test_root }}/real-db/home/.chia/{{ network }}"
+  block:
+    - name: Prepare a real local db directory with data
+      ansible.builtin.file:
+        path: "{{ chia_root }}/db"
+        state: directory
+        mode: "0755"
+
+    - name: Write a file inside the real local db directory
+      ansible.builtin.copy:
+        content: keep-me
+        dest: "{{ chia_root }}/db/local.sqlite"
+        mode: "0644"
+
+    - name: Run the local-external root include with a real local db directory
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+    - name: Require the real local db refusal
+      ansible.builtin.assert:
+        that:
+          - local_external_case_failed | bool
+          - local_external_case_message is search('real directory')
+          - local_external_case_message is search((chia_root ~ '/db') | regex_escape)
+        fail_msg: >-
+          The real local db directory failed with the wrong result:
+          {{ local_external_case_message }}
+
+- name: Inspect the refused real local db directory
+  ansible.builtin.stat:
+    path: "{{ test_root }}/real-db/home/.chia/{{ network }}/db"
+    follow: false
+  register: real_db_stat
+
+- name: Require the real local db directory and its data to be unchanged
+  ansible.builtin.assert:
+    that:
+      - real_db_stat.stat.isdir | default(false)
+      - not (real_db_stat.stat.islnk | default(false))
+      - lookup('file', test_root ~ '/real-db/home/.chia/' ~ network ~ '/db/local.sqlite') == 'keep-me'
+
+- name: Refuse to retarget a wrong db symlink
+  vars:
+    chia_darwin_home: "{{ test_root }}/wrong-link/home"
+    chia_root: "{{ test_root }}/wrong-link/home/.chia/{{ network }}"
+  block:
+    - name: Prepare a real ~/.chia and a wrong db symlink
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ chia_root }}"
+        - "{{ test_root }}/wrong-target"
+
+    - name: Point the db path at the wrong target
+      ansible.builtin.file:
+        src: "{{ test_root }}/wrong-target"
+        dest: "{{ chia_root }}/db"
+        state: link
+        force: false
+
+    - name: Run the local-external root include with a wrong db symlink
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+    - name: Require the wrong db symlink refusal
+      ansible.builtin.assert:
+        that:
+          - local_external_case_failed | bool
+          - local_external_case_message is search('will not retarget')
+          - local_external_case_message is search((chia_root ~ '/db') | regex_escape)
+        fail_msg: >-
+          The wrong db symlink failed with the wrong result:
+          {{ local_external_case_message }}
+
+- name: Inspect the refused wrong db symlink
+  ansible.builtin.stat:
+    path: "{{ test_root }}/wrong-link/home/.chia/{{ network }}/db"
+    follow: false
+  register: wrong_link_stat
+
+- name: Require the wrong db symlink to be unchanged
+  ansible.builtin.assert:
+    that:
+      - wrong_link_stat.stat.islnk | default(false)
+      - >-
+        (wrong_link_stat.stat.lnk_target | default('') | regex_replace('/+$', '')) ==
+        ((test_root ~ '/wrong-target') | regex_replace('/+$', ''))
+
+- name: Refuse to replace a file at the db path
+  vars:
+    chia_darwin_home: "{{ test_root }}/file-db/home"
+    chia_root: "{{ test_root }}/file-db/home/.chia/{{ network }}"
+  block:
+    - name: Prepare a real ~/.chia and a file at the db path
+      ansible.builtin.file:
+        path: "{{ chia_root }}"
+        state: directory
+        mode: "0755"
+
+    - name: Write a file at the db path
+      ansible.builtin.copy:
+        content: not-a-database
+        dest: "{{ chia_root }}/db"
+        mode: "0644"
+
+    - name: Run the local-external root include with a file at the db path
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+    - name: Require the file db refusal
+      ansible.builtin.assert:
+        that:
+          - local_external_case_failed | bool
+          - local_external_case_message is search('regular file')
+          - local_external_case_message is search((chia_root ~ '/db') | regex_escape)
+        fail_msg: >-
+          The file at the db path failed with the wrong result:
+          {{ local_external_case_message }}
+
+- name: Refuse a missing ~/.chia next to a finished migration backup
+  vars:
+    chia_darwin_home: "{{ test_root }}/finished/home"
+    chia_root: "{{ test_root }}/finished/home/.chia/{{ network }}"
+  block:
+    - name: Prepare a home directory and a finished legacy backup link
+      ansible.builtin.file:
+        path: "{{ chia_darwin_home }}"
+        state: directory
+        mode: "0755"
+
+    - name: Create the finished migration legacy backup link
+      ansible.builtin.file:
+        src: "{{ external_chia }}"
+        dest: "{{ chia_darwin_home }}/.chia.legacy-volume-link"
+        state: link
+        force: false
+
+    - name: Run the local-external root include with a missing ~/.chia
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+    - name: Require the finished migration backup refusal
+      ansible.builtin.assert:
+        that:
+          - local_external_case_failed | bool
+          - local_external_case_message is search("finished migration's backup")
+          - local_external_case_message is search((chia_darwin_home ~ '/.chia') | regex_escape)
+        fail_msg: >-
+          The finished migration backup failed with the wrong result:
+          {{ local_external_case_message }}
+
+- name: Inspect ~/.chia after the finished migration refusal
+  ansible.builtin.stat:
+    path: "{{ test_root }}/finished/home/.chia"
+    follow: false
+  register: finished_dot
+
+- name: Require the finished migration refusal not to recreate ~/.chia
+  ansible.builtin.assert:
+    that:
+      - not (finished_dot.stat.exists | default(false))
+
+- name: Refuse a legacy migration when the backup path already exists
+  vars:
+    chia_darwin_home: "{{ test_root }}/backup-exists/home"
+    chia_root: "{{ test_root }}/backup-exists/home/.chia/{{ network }}"
+  block:
+    - name: Prepare a home directory for the backup path guard
+      ansible.builtin.file:
+        path: "{{ chia_darwin_home }}"
+        state: directory
+        mode: "0755"
+
+    - name: Create the legacy ~/.chia link and an existing backup
+      ansible.builtin.file:
+        src: "{{ external_chia }}"
+        dest: "{{ item }}"
+        state: link
+        force: false
+      loop:
+        - "{{ chia_darwin_home }}/.chia"
+        - "{{ chia_darwin_home }}/.chia.legacy-volume-link"
+
+    - name: Run the local-external root include with an existing backup path
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+    - name: Require the existing backup path refusal
+      ansible.builtin.assert:
+        that:
+          - local_external_case_failed | bool
+          - local_external_case_message is search('backup path')
+          - local_external_case_message is search((chia_darwin_home ~ '/.chia') | regex_escape)
+        fail_msg: >-
+          The existing backup path failed with the wrong result:
+          {{ local_external_case_message }}
+
+- name: Refuse a legacy migration when the on-volume database is missing
+  vars:
+    chia_darwin_home: "{{ test_root }}/missing-db/home"
+    chia_root: "{{ test_root }}/missing-db/home/.chia/{{ network }}"
+    missing_volume: "{{ test_root }}/missing-db/volume/dot-chia"
+  block:
+    - name: Prepare a volume without a database directory
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ missing_volume }}/{{ network }}"
+        - "{{ chia_darwin_home }}"
+
+    - name: Create the legacy ~/.chia link at the incomplete volume
+      ansible.builtin.file:
+        src: "{{ missing_volume }}"
+        dest: "{{ chia_darwin_home }}/.chia"
+        state: link
+        force: false
+
+    - name: Run the local-external root include with a missing volume database
+      vars:
+        chia_darwin_volume_chia_dir: "{{ missing_volume }}"
+        chia_darwin_volume_db_dir: "{{ missing_volume }}/{{ network }}/db"
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+    - name: Require the missing volume database refusal
+      ansible.builtin.assert:
+        that:
+          - local_external_case_failed | bool
+          - local_external_case_message is search('does not exist or is not a directory')
+        fail_msg: >-
+          The missing volume database failed with the wrong result:
+          {{ local_external_case_message }}
+
+    - name: Inspect the missing database staging tree
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_home }}/.chia.migrating"
+        follow: false
+      register: missing_db_staging
+
+    - name: Require the missing database refusal to happen before staging
+      ansible.builtin.assert:
+        that:
+          - not (missing_db_staging.stat.exists | default(false))
+
+- name: Refuse large non-database files before stopping any job
+  vars:
+    chia_darwin_home: "{{ test_root }}/big-file/home"
+    chia_root: "{{ test_root }}/big-file/home/.chia/{{ network }}"
+    big_volume: "{{ test_root }}/big-file/volume/dot-chia"
+  block:
+    - name: Prepare a volume with a large db.bak file and a large database
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ big_volume }}/{{ network }}/db"
+        - "{{ big_volume }}/{{ network }}/db.bak"
+        - "{{ chia_darwin_home }}"
+
+    - name: Write a large database file that the guard must prune
+      ansible.builtin.copy:
+        content: "{{ 'd' * 1048576 }}"
+        dest: "{{ big_volume }}/{{ network }}/db/blockchain_v2_{{ network }}.sqlite"
+        mode: "0644"
+
+    - name: Write a large db.bak file that the guard must find
+      ansible.builtin.copy:
+        content: "{{ 'x' * 1048576 }}"
+        dest: "{{ big_volume }}/{{ network }}/db.bak/big"
+        mode: "0644"
+
+    - name: Create the legacy ~/.chia link at the large-file volume
+      ansible.builtin.file:
+        src: "{{ big_volume }}"
+        dest: "{{ chia_darwin_home }}/.chia"
+        state: link
+        force: false
+
+    - name: Record the large on-volume database before the guard
+      ansible.builtin.stat:
+        path: "{{ big_volume }}/{{ network }}/db/blockchain_v2_{{ network }}.sqlite"
+      register: big_db_before
+
+    - name: Reset the fake launchctl log before the large-file guard
+      ansible.builtin.copy:
+        content: ""
+        dest: "{{ test_root }}/launchctl.log"
+        mode: "0644"
+
+    - name: Run the local-external root include with a large db.bak file
+      vars:
+        chia_darwin_volume_chia_dir: "{{ big_volume }}"
+        chia_darwin_volume_db_dir: "{{ big_volume }}/{{ network }}/db"
+        chia_darwin_local_external_copy_max_mb: 0
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+    - name: Require the large-file refusal before any job stop
+      vars:
+        launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
+      ansible.builtin.assert:
+        that:
+          - local_external_case_failed | bool
+          - local_external_case_message is search('Move these files off')
+          - local_external_case_message is search('db.bak/big')
+          - local_external_case_message is not search('/db/blockchain')
+          - launchctl_lines | select('search', 'bootout') | list | length == 0
+        fail_msg: >-
+          A large db.bak file must be refused before bootout and only
+          <network>/db may be pruned. Failure:
+          {{ local_external_case_message }} Log: {{ launchctl_lines }}
+
+    - name: Inspect the large on-volume database after the guard
+      ansible.builtin.stat:
+        path: "{{ big_volume }}/{{ network }}/db/blockchain_v2_{{ network }}.sqlite"
+      register: big_db_after
+
+    - name: Require the large-file guard to leave the database untouched
+      ansible.builtin.assert:
+        that:
+          - big_db_after.stat.isreg | default(false)
+          - big_db_after.stat.inode == (big_db_before.stat.inode | int)
+
+- name: Refuse repeated migration failures before stopping any job
+  vars:
+    chia_darwin_home: "{{ test_root }}/repeated/home"
+    chia_root: "{{ test_root }}/repeated/home/.chia/{{ network }}"
+    repeated_leftovers:
+      - "{{ test_root }}/repeated/home/.chia.migrating.leftover-20000101T000000Z"
+      - "{{ test_root }}/repeated/home/.chia.migrating.leftover-20000101T000001Z"
+      - "{{ test_root }}/repeated/home/.chia.migrating.leftover-20000101T000002Z"
+  block:
+    - name: Prepare a legacy ~/.chia link and three leftover trees
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop: "{{ [chia_darwin_home] + repeated_leftovers }}"
+
+    - name: Write a marker into each existing leftover tree
+      ansible.builtin.copy:
+        content: keep-leftover
+        dest: "{{ item }}/keep.txt"
+        mode: "0644"
+      loop: "{{ repeated_leftovers }}"
+
+    - name: Create the legacy ~/.chia link next to the leftovers
+      ansible.builtin.file:
+        src: "{{ external_chia }}"
+        dest: "{{ chia_darwin_home }}/.chia"
+        state: link
+        force: false
+
+    - name: Reset the fake launchctl log before the repeated-failure case
+      ansible.builtin.copy:
+        content: ""
+        dest: "{{ test_root }}/launchctl.log"
+        mode: "0644"
+
+    - name: Run the local-external root include with the leftover cap reached
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+    - name: Require the repeated-failure refusal before any job stop
+      vars:
+        launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
+      ansible.builtin.assert:
+        that:
+          - local_external_case_failed | bool
+          - local_external_case_message is search('Repeated local-external migration failures')
+          - local_external_case_message is search('reaching the cap')
+          - local_external_case_message is search('\\.chia\\.migrating\\.leftover')
+          - local_external_case_message is search('Move them out of')
+          - local_external_case_message is search('raise chia_darwin_local_external_leftover_max')
+          - launchctl_lines | select('search', 'bootout') | list | length == 0
+        fail_msg: >-
+          A legacy ~/.chia with the leftover cap reached must refuse before any
+          bootout and explain how to clear the leftovers. Failure:
+          {{ local_external_case_message }} Log: {{ launchctl_lines }}
+
+    - name: Inspect the existing leftover trees after the refusal
+      ansible.builtin.stat:
+        path: "{{ item }}/keep.txt"
+        follow: false
+      loop: "{{ repeated_leftovers }}"
+      register: repeated_leftover_stats
+
+    - name: Require the repeated-failure refusal to leave every leftover untouched
+      ansible.builtin.assert:
+        that:
+          - repeated_leftover_stats.results | rejectattr('stat.exists') | list | length == 0
+          - repeated_leftover_stats.results | map(attribute='stat.path') | list | length == 3

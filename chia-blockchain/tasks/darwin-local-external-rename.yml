@@ -1,0 +1,30 @@
+---
+# Portable rename used by the local-external migration. GNU mv has -T and BSD
+# mv has -h; both refuse to treat a destination as a directory, so a symlink
+# that appears after inspection is not followed. The caller sets
+# local_external_rename_{src,dest,name} and has already decided the destination
+# must not be overwritten.
+- name: Inspect the {{ local_external_rename_name }} rename destination
+  ansible.builtin.stat:
+    path: "{{ local_external_rename_dest }}"
+    follow: false
+  register: chia_darwin_local_external_rename_dest
+
+- name: Fail when the {{ local_external_rename_name }} rename destination exists
+  ansible.builtin.fail:
+    msg: >-
+      Refusing to rename {{ local_external_rename_src }} to
+      {{ local_external_rename_dest }}: the destination already exists. This
+      role does not overwrite data.
+  when: chia_darwin_local_external_rename_dest.stat.exists | default(false)
+
+- name: Rename {{ local_external_rename_name }} without following a destination symlink
+  become: "{{ chia_darwin_launchd_become | bool }}"
+  become_user: "{{ user }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_mv }}"
+      - "{{ chia_darwin_local_external_rename_flag.stdout }}"
+      - "{{ local_external_rename_src }}"
+      - "{{ local_external_rename_dest }}"
+  changed_when: true

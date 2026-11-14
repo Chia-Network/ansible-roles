@@ -8,6 +8,8 @@
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin.yml
     - name: Import the Darwin database seed tasks
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-db-seed.yml
+    - name: Import the Darwin local-external root tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-local-external-root.yml
     - name: Import the Darwin companion tasks
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-companions.yml
     - name: Import the Darwin job-list tasks

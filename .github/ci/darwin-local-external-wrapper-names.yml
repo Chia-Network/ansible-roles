@@ -1,0 +1,9 @@
+---
+# Order matters: wrappers[1] is the full-node wrapper.
+darwin_local_external_wrapper_names:
+  - chia-daemon-run.sh
+  - chia-full-node-run.sh
+  - chia-timelord-run.sh
+  - chia-exporter-run.sh
+  - chia-healthcheck-run.sh
+  - chia-hw-vdf-run.sh

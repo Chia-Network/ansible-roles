@@ -6,6 +6,7 @@
   gather_facts: false
   vars_files:
     - ../../chia-blockchain/defaults/main.yml
+    - darwin-local-external-wrapper-names.yml
   vars:
     render_out: /tmp/darwin
     topologies:
@@ -113,6 +114,17 @@
       loop: "{{ topologies | product(templates) | list }}"
       loop_control:
         label: "{{ item.0 }}/{{ item.1 }}"
+
+    - name: Read the rendered local-external wrappers
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/local-external/{{ item }}"
+      loop: "{{ darwin_local_external_wrapper_names }}"
+      register: local_external_wrappers
+
+    - name: Only the local-external full-node wrapper waits for the database volume
+      ansible.builtin.include_tasks: darwin-local-external-wrapper-wait-assert.yml
+      vars:
+        wrapper_wait_register: "{{ local_external_wrappers }}"
 
     - name: Create the remote-node watchdog fixture directory
       ansible.builtin.file:
