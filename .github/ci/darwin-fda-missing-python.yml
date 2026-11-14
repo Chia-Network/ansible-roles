@@ -36,18 +36,30 @@
       ansible.builtin.set_fact:
         darwin_fda_missing_tasks_subset: >-
           {{ (darwin_fda_missing_block
-          | selectattr('name', 'equalto', 'Inspect the full-node Python interpreter for the Full Disk Access note')
-          | list)
-          + (darwin_fda_missing_block
-          | selectattr('name', 'equalto', 'Fail when the full-node Python interpreter is missing outside check mode')
-          | list)
-          + (darwin_fda_missing_block
-          | selectattr('name', 'equalto', 'Resolve the full-node Python interpreter for the Full Disk Access note')
-          | list)
-          + (darwin_fda_missing_block
-          | selectattr('name', 'equalto', 'Record the resolved full-node Python interpreter')
+          | selectattr('name', 'in', [
+            'Inspect the full-node Python interpreter for the Full Disk Access note',
+            'Fail when the full-node Python interpreter is missing outside check mode',
+            'Resolve the full-node Python interpreter for the Full Disk Access note',
+            'Record the resolved full-node Python interpreter',
+          ])
           | list) }}
       changed_when: false
+
+    - name: Assert the interpreter tasks keep production order
+      ansible.builtin.assert:
+        that:
+          - >-
+            (darwin_fda_missing_tasks_subset | map(attribute='name') | list)
+            == darwin_fda_missing_expected_names
+        fail_msg: >-
+          Expected the Full Disk Access interpreter tasks in production order,
+          got {{ darwin_fda_missing_tasks_subset | map(attribute='name') | list }}
+      vars:
+        darwin_fda_missing_expected_names:
+          - Inspect the full-node Python interpreter for the Full Disk Access note
+          - Fail when the full-node Python interpreter is missing outside check mode
+          - Resolve the full-node Python interpreter for the Full Disk Access note
+          - Record the resolved full-node Python interpreter
 
     - name: Write the production tasks to a temporary include
       ansible.builtin.copy:
