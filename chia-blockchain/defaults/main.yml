@@ -340,13 +340,14 @@ chia_wallet_connect_to_unknown_peers: true
 #                    <chia_root>/db is a symlink onto the volume at
 #                    <chia_darwin_volume_chia_dir>/<network>/db (for example,
 #                    /Volumes/Chia-DB/dot-chia/mainnet/db). Reusing that path
-#                    keeps an existing on-volume database in place. Wrappers
-#                    that open the blockchain database wait until the volume
-#                    is mounted and that DB directory is readable (not for
-#                    config.yaml on the volume). Expected Full Disk Access:
-#                    only the full-node process (the wrapper interpreter
-#                    running chia_full_node), not companion binaries or
-#                    tailscaled. See the note this role writes under the
+#                    keeps an existing on-volume database in place while the
+#                    wallet database stays under the internal CHIA_ROOT. Only
+#                    the full-node wrapper waits for the volume; it lists the
+#                    on-volume DB directory with /bin/ls. Full Disk Access is
+#                    needed only for /bin/zsh (the launchd shebang interpreter
+#                    shared by every wrapper) and the full node's Python
+#                    interpreter, the real Homebrew Cellar binary the venv
+#                    resolves to. See the note this role writes under the
 #                    service user's etc directory. This role does not edit
 #                    TCC.db and does not install the profile.
 #   remote-node      No local full node (Apple internal storage is the wrong
@@ -447,20 +448,8 @@ chia_darwin_db_volume: /Volumes/Chia-DB
 chia_darwin_volume_chia_dir: "{{ chia_darwin_db_volume }}/dot-chia"
 chia_darwin_volume_db_dir: "{{ chia_darwin_volume_chia_dir }}/{{ network }}/db"
 chia_darwin_db_marker: "{{ chia_darwin_volume_db_dir }}"
-# Refuse a legacy migration when a non-database file on the volume is larger
-# than this many MiB. Only <network>/db is pruned; wallet/db and db.bak are not.
-chia_darwin_local_external_copy_max_mb: 512
-# Refuse another automatic retry once this many failed-migration leftover trees
-# already exist next to a legacy ~/.chia volume symlink. The role never deletes
-# them; an operator inspects them and fixes the cause.
-chia_darwin_local_external_leftover_max: 3
 # Overridable so CI can stub the mount binary. Production uses /sbin/mount.
 chia_darwin_mount: /sbin/mount
-# Overridable so CI can force a mid-migration failure. Production uses the
-# system rsync (openrsync on current macOS).
-chia_darwin_rsync: /usr/bin/rsync
-# Overridable so CI can force a rename failure. Production uses /bin/mv.
-chia_darwin_mv: /bin/mv
 chia_darwin_wait_interval: 5
 chia_darwin_wait_log_every: 12
 chia_darwin_launchd_prefix: net.chia.timelord
@@ -585,9 +574,10 @@ chia_darwin_node_exporter_sha256: "35b246a34af55a8f0c3f11067f17aecf9836cfd4689bd
 chia_darwin_node_exporter_port: 9100
 # CHIA_ROOT used by chia-exporter and chia-healthcheck. The Linux units use
 # the real chia root. A host may point this at a read-only config copy without
-# changing CHIA_ROOT for the daemons. Companions no longer wait for the
-# database volume or chia_darwin_db_marker: local-external keeps CHIA_ROOT
-# internal by default, so their CHIA_ROOT is on the internal disk.
+# changing CHIA_ROOT for the daemons. Companions do not wait for the database
+# volume. local-external keeps CHIA_ROOT, including the wallet database, on the
+# internal disk; only the full-node wrapper waits, because it lists the
+# on-volume DB directory.
 chia_darwin_companion_chia_root: "{{ chia_root }}"
 chia_darwin_companion_rotpipe_max_bytes: 20971520
 chia_darwin_companion_rotpipe_backups: 3

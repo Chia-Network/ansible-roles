@@ -9,69 +9,7 @@
     chia_darwin_group: "{{ lookup('pipe', 'id -gn') }}"
     chia_darwin_db_volume: "{{ test_root }}/Volumes/Chia DB"
     chia_darwin_mount: "{{ test_root }}/bin/mount"
-    chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-stateful"
-    chia_darwin_launchd_dir: "{{ test_root }}/LaunchDaemons"
-    chia_darwin_launchd_prefix: net.chia.roottest
     chia_darwin_launchd_become: false
-    chia_darwin_restart_services: false
-    chia_darwin_restart_companions: false
-    chia_darwin_enable_watchdog: true
-    chia_darwin_hw_vdf_changed_labels: []
-    chia_darwin_start_now: true
-    chia_darwin_rsync: "{{ test_root }}/bin/rsync-logging"
-    chia_darwin_mv: /bin/mv
-    chia_darwin_service_jobs:
-      - name: timelord
-        label: net.chia.roottest.timelord
-        enabled: true
-        exit_timeout: 1
-    chia_darwin_companion_jobs:
-      - name: chia-exporter
-        label: net.chia.roottest.chia-exporter
-        enabled: true
-        exit_timeout: 1
-      - name: watchdog
-        label: net.chia.roottest.watchdog
-        enabled: true
-        exit_timeout: 1
-    chia_darwin_watchdog_job:
-      name: watchdog
-      label: net.chia.roottest.watchdog
-      enabled: true
-      exit_timeout: 1
-    chia_darwin_hw_vdf_jobs:
-      - name: hw-vdf-0
-        label: net.chia.roottest.hw-vdf-0
-        enabled: true
-        exit_timeout: 1
-      - name: hw-vdf-1
-        label: net.chia.roottest.hw-vdf-1
-        enabled: true
-        exit_timeout: 1
-
-- name: Assemble the local-external fixture launchd jobs
-  ansible.builtin.set_fact:
-    chia_darwin_launchd_jobs: >-
-      {{ chia_darwin_service_jobs + chia_darwin_companion_jobs +
-      chia_darwin_hw_vdf_jobs + [{'name': 'disabled', 'label':
-      'net.chia.roottest.disabled', 'enabled': false, 'exit_timeout': 1}] }}
-  changed_when: false
-
-- name: Create the stateful fake launchd state directory
-  ansible.builtin.file:
-    path: "{{ test_root }}/launchd-state/loaded"
-    state: directory
-    mode: "0755"
-
-- name: Start the default fixture jobs loaded
-  ansible.builtin.copy:
-    content: ""
-    dest: "{{ test_root }}/launchd-state/loaded/{{ item.label }}"
-    force: false
-    mode: "0644"
-  loop: "{{ chia_darwin_launchd_jobs | selectattr('enabled', 'truthy') | list }}"
-  loop_control:
-    label: "{{ item.label }}"
 
 - name: Create the local-external root test directories
   ansible.builtin.file:
@@ -81,14 +19,6 @@
   loop:
     - "{{ test_root }}/bin"
     - "{{ chia_darwin_db_volume }}"
-    - "{{ chia_darwin_launchd_dir }}"
-
-- name: Write the default enabled launchd plists
-  ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-plist.yml"
-  loop: "{{ chia_darwin_launchd_jobs | selectattr('enabled', 'truthy') | list }}"
-  loop_control:
-    loop_var: local_external_plist
-    label: "{{ local_external_plist.label }}"
 
 - name: Write the fake mounted filesystem list
   ansible.builtin.copy:
@@ -106,103 +36,10 @@
     dest: "{{ test_root }}/bin/mount-unmounted"
     mode: "0755"
 
-- name: Write the stateful fake launchctl executable
+- name: Write a fake mount list with a similarly named volume
   ansible.builtin.copy:
     content: |
       #!/bin/sh
-      root='{{ test_root }}'
-      state="$root/launchd-state"
-      printf '%s\n' "$*" >> "$root/launchctl.log"
-      action=${1:-}
-      case "$action" in
-        print)
-          label=${2#system/}
-          if [ -f "$state/loaded/$label" ]; then
-            echo "loaded $label"
-            exit 0
-          fi
-          echo "absent $label"
-          exit 1
-          ;;
-        bootout)
-          label=${2#system/}
-          if [ -f "$state/loaded/$label" ]; then
-            rm -f "$state/loaded/$label"
-            exit 0
-          fi
-          echo "not loaded $label" >&2
-          exit 1
-          ;;
-        bootstrap)
-          plist=${3:-}
-          label=${plist##*/}
-          label=${label%.plist}
-          mkdir -p "$state/loaded"
-          : > "$state/loaded/$label"
-          exit 0
-          ;;
-        enable|disable)
-          exit 0
-          ;;
-        *)
-          exit 0
-          ;;
-      esac
-    dest: "{{ test_root }}/bin/launchctl-stateful"
+      printf '%s\n' 'fake on {{ chia_darwin_db_volume }} 1 (apfs, local)'
+    dest: "{{ test_root }}/bin/mount-prefixed"
     mode: "0755"
-
-- name: Write the logging rsync wrapper
-  ansible.builtin.copy:
-    content: |
-      #!/bin/sh
-      printf '%s\n' "rsync $*" >> '{{ test_root }}/launchctl.log'
-      exec /usr/bin/rsync "$@"
-    dest: "{{ test_root }}/bin/rsync-logging"
-    mode: "0755"
-
-- name: Write the fake mv wrappers that fail the selected swaps
-  ansible.builtin.copy:
-    content: |
-      #!/bin/sh
-      dest=
-      prev=
-      for arg in "$@"; do
-        prev=$dest
-        dest=$arg
-      done
-      case "$prev:$dest" in
-        */.chia.migrating:*/.chia)
-          echo "fake mv: refusing the staging swap" >&2
-          exit 1
-          ;;
-      esac
-      case "${0##*/}" in
-        mv-fail-swap-and-restore)
-          case "$prev:$dest" in
-            */.chia.legacy-volume-link:*/.chia)
-              echo "fake mv: refusing the legacy restore" >&2
-              exit 1
-              ;;
-          esac
-          ;;
-      esac
-      exec /bin/mv "$@"
-    dest: "{{ test_root }}/bin/{{ item }}"
-    mode: "0755"
-  loop:
-    - mv-fail-swap
-    - mv-fail-swap-and-restore
-
-- name: Create an empty fake launchctl log without truncating it on reruns
-  ansible.builtin.copy:
-    content: ""
-    dest: "{{ test_root }}/launchctl.log"
-    force: false
-    mode: "0644"
-
-- name: Create an empty fake mount log without truncating it on reruns
-  ansible.builtin.copy:
-    content: ""
-    dest: "{{ test_root }}/mount.log"
-    force: false
-    mode: "0644"

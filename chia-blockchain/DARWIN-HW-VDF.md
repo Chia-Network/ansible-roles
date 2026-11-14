@@ -256,13 +256,14 @@ Topology behavior:
 
 - `local-internal` and `local-external` keep the role-managed daemon and full
   node. The app reads the timelord peer identity from CHIA_ROOT with
-  `timelord-service local-node`. For `local-external`, identities and config
-  live on the internal CHIA_ROOT; only the blockchain DB directory is on the
-  volume. The app process is expected not to need Full Disk Access to read those
-  internal identities. The full-node process is expected to need it for the
-  volume DB directory (unverified on hardware). The volume still must be
-  mounted for the full node, so mount it before relying on unattended proof
-  production after a reboot.
+  `timelord-service local-node`. For `local-external`, `~/.chia` and CHIA_ROOT
+  are real directories on the internal disk; only `<chia_root>/db` is a symlink
+  to the volume. Identities, config, and the wallet database stay internal. The
+  app process does not need Full Disk Access to read those internal identities.
+  Full Disk Access is needed only for the shared `/bin/zsh` shebang interpreter
+  and the full node's real Homebrew Python binary for the volume DB directory.
+  The volume still must be mounted for the full node, so mount it before
+  relying on unattended proof production after a reboot.
 - `remote-node` installs no Homebrew Python, virtualenv, chia-blockchain, daemon,
   or full node. The app imports a connection bundle with
   `timelord-service import-node`. Set `chia_darwin_timelord_app_bundle_path` for
@@ -389,23 +390,26 @@ with `chia_darwin_companion_rotpipe_max_bytes` and
 
 `chia_darwin_companion_chia_root` is the `CHIA_ROOT` the exporter and
 healthcheck use. It defaults to `chia_root`. A host can point it at a read-only
-config copy instead. Companions no longer wait for the database volume because
-`local-external` keeps CHIA_ROOT on the internal disk and only `<chia_root>/db`
-on the volume.
+config copy instead. Companions do not wait for the database volume because
+`local-external` keeps CHIA_ROOT, including the wallet database, on the internal
+disk and only `<chia_root>/db` on the volume. Only the full-node wrapper waits
+on the volume; it lists the on-volume DB directory with `/bin/ls`.
 
-When `CHIA_ROOT` is internal (the `local-external` layout this role now
-enforces), the companion binaries should not need Full Disk Access and should
-not need to wait for the database volume. That is expected, not yet proven on
-hardware. If a companion is pointed at a read-only config copy on the volume,
-it would need its own grant, but do not add companion binaries to the profile
-for the default internal-CHIA_ROOT layout. Ansible and this role cannot grant
-TCC Full Disk Access; see the `FULL-DISK-ACCESS.txt` note the role writes on
-the Mac.
+Full Disk Access is needed only for `/bin/zsh` (launchd uses it as the shebang
+interpreter for every job wrapper, so the grant is shared by every wrapped job)
+and the full node's Python interpreter, meaning the real Homebrew binary that
+the venv `python3.13` resolves to, for example
+`/opt/homebrew/Cellar/python@3.13/<ver>/Frameworks/Python.framework/Versions/3.13/bin/python3.13`.
+That Python grant is tied to the Cellar version path; a Homebrew Python upgrade
+changes the path and the node loses DB access until the grant is added for the
+new binary. Do not add companion binaries, tailscaled, alloy, exporters, hw-vdf,
+the watchdog, Bash, or healthcheck to Full Disk Access for this layout. Ansible
+and this role cannot grant TCC Full Disk Access; see the `FULL-DISK-ACCESS.txt`
+note the role writes on the Mac, which prints the resolved Python path.
 
 Operator note: on a Mac full-node timelord, keep `~/.chia` on the internal disk
-and put only the blockchain DB directory on the external drive. Otherwise many
-helper binaries need GUI Full Disk Access grants. This is the `local-external`
-layout the role now enforces.
+and put only the blockchain DB directory on the external drive. This avoids
+grants for helper binaries and is the `local-external` layout the role enforces.
 
 ## Watchdog
 

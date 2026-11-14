@@ -1,0 +1,87 @@
+---
+# Runtime checks for the Darwin Full Disk Access text when
+# chia_darwin_emit_pppc is false and chia_darwin_fda_python is never resolved.
+- name: Exercise the Darwin Full Disk Access text without a Python path
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+  tasks:
+    - name: Create a temporary CHIA_ROOT fixture
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: " darwin fda no python"
+      register: darwin_fda_temp
+
+    - name: Record the fixture paths and the local-external stub variables
+      ansible.builtin.set_fact:
+        user: "{{ lookup('env', 'USER') }}"
+        chia_root: "{{ darwin_fda_temp.path }}/.chia/{{ network }}"
+        chia_darwin_topology: local-external
+        chia_darwin_emit_pppc: false
+        chia_darwin_local_full_node: true
+        chia_darwin_volume_db_dir: "{{ darwin_fda_temp.path }}/Volumes/Chia-DB/dot-chia/{{ network }}/db"
+        chia_darwin_fda_note_dest: "{{ darwin_fda_temp.path }}/etc/FULL-DISK-ACCESS.txt"
+        chia_darwin_pppc_dest: "{{ darwin_fda_temp.path }}/etc/chia-timelord-fda.mobileconfig"
+        chia_darwin_launchd_jobs:
+          - label: net.chia.timelord.full-node
+            enabled: true
+          - label: net.chia.timelord.timelord
+            enabled: true
+      changed_when: false
+
+    - name: Create the readable CHIA_ROOT config fixture
+      ansible.builtin.file:
+        path: "{{ chia_root }}/config"
+        state: directory
+        mode: "0755"
+
+    - name: Write the readable CHIA_ROOT config fixture
+      ansible.builtin.copy:
+        content: "selected_network: {{ network }}\n"
+        dest: "{{ chia_root }}/config/config.yaml"
+        mode: "0644"
+
+    - name: Confirm the fixture config is present and readable
+      ansible.builtin.stat:
+        path: "{{ chia_root }}/config/config.yaml"
+      register: chia_darwin_root_stat
+
+    - name: Load the production Darwin tasks
+      ansible.builtin.set_fact:
+        darwin_fda_tasks: "{{ lookup('file', playbook_dir ~ '/../../chia-blockchain/tasks/darwin.yml') | from_yaml }}"
+
+    - name: Extract the CHIA_ROOT access assertion from the production block
+      ansible.builtin.set_fact:
+        darwin_fda_assert_tasks: >-
+          {{ (darwin_fda_tasks
+          | selectattr('name', 'equalto', 'Write the Darwin Full Disk Access notes and verify CHIA_ROOT access')
+          | first)['block']
+          | selectattr('name', 'equalto', 'Fail when the service user cannot read CHIA_ROOT')
+          | list }}
+
+    - name: Extract the timelord recap from the production tasks
+      ansible.builtin.set_fact:
+        darwin_fda_recap_tasks: >-
+          {{ darwin_fda_tasks
+          | selectattr('name', 'equalto', 'Summarize the Darwin timelord')
+          | list }}
+
+    - name: Write the production tasks to a temporary include
+      ansible.builtin.copy:
+        content: "{{ (darwin_fda_assert_tasks + darwin_fda_recap_tasks) | to_nice_yaml }}"
+        dest: "{{ darwin_fda_temp.path }}/fda-text.yml"
+        mode: "0644"
+
+    - name: Run the production Full Disk Access and recap tasks without a Python fact
+      ansible.builtin.include_tasks: "{{ darwin_fda_temp.path }}/fda-text.yml"
+
+    - name: Require the Python path fact to stay unset
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_fda_python is not defined
+
+    - name: Report the Darwin Full Disk Access text check
+      ansible.builtin.debug:
+        msg: "Darwin Full Disk Access text passed without a resolved Python path"

@@ -187,6 +187,23 @@
   when: not (chia_darwin_timelord_app_enabled | bool)
   ansible.builtin.include_tasks: darwin-timelord-app-remove.yml
 
+- name: Read mounted filesystems
+  ansible.builtin.command:
+    argv: ["{{ chia_darwin_mount }}"]
+  register: chia_darwin_mounts
+  changed_when: false
+  check_mode: false
+  when: chia_darwin_topology == "local-external"
+
+- name: Require the database volume to be mounted now
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_mounts.stdout is search(' on ' ~ (chia_darwin_db_volume | regex_escape) ~ ' \(')
+    fail_msg: >-
+      {{ chia_darwin_db_volume }} is not mounted. Mount it before running
+      local-external. The role does not format or mount disks.
+  when: chia_darwin_topology == "local-external"
+
 - name: Manage the chia-blockchain CHIA_ROOT
   when: chia_darwin_install_chia_blockchain | bool
   block:
@@ -205,22 +222,6 @@
           local-internal and remote-node keep CHIA_ROOT on the internal disk.
           Remove the symlink manually before switching topology.
       when: chia_darwin_topology != "local-external"
-
-    - name: Read mounted filesystems
-      ansible.builtin.command:
-        argv: ["{{ chia_darwin_mount }}"]
-      register: chia_darwin_mounts
-      changed_when: false
-      when: chia_darwin_topology == "local-external"
-
-    - name: Require the database volume to be mounted now
-      ansible.builtin.assert:
-        that:
-          - chia_darwin_mounts.stdout is search(' on ' ~ (chia_darwin_db_volume | regex_escape) ~ ' ')
-        fail_msg: >-
-          {{ chia_darwin_db_volume }} is not mounted. Mount it before running
-          local-external. The role does not format or mount disks.
-      when: chia_darwin_topology == "local-external"
 
     - name: Ensure the internal CHIA_ROOT directory exists
       become: true
@@ -367,8 +368,8 @@
   ansible.builtin.include_tasks: darwin-hw-vdf-launchd.yml
 
 # The mount preflight above already ran. This include creates the internal
-# ~/.chia / CHIA_ROOT layout, links only <chia_root>/db at the existing
-# on-volume database, and migrates the old ~/.chia volume symlink in place.
+# ~/.chia / CHIA_ROOT layout and links only <chia_root>/db at the existing
+# on-volume database. A legacy ~/.chia volume symlink is refused unchanged.
 - name: Prepare the local-external CHIA_ROOT and database symlink
   ansible.builtin.include_tasks: darwin-local-external-root.yml
   when: chia_darwin_topology == "local-external"
@@ -462,6 +463,23 @@
           {{ chia_root }}/db must remain a symlink to
           {{ chia_darwin_volume_db_dir }} for local-external. The role did not
           replace or retarget it.
+      when: chia_darwin_topology == "local-external"
+
+    - name: Inspect the local-external CHIA_ROOT directory
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_home }}/.chia"
+        follow: false
+      register: chia_darwin_local_external_dot_check
+      when: chia_darwin_topology == "local-external"
+
+    - name: Require the local-external CHIA_ROOT directory to be internal
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_local_external_dot_check.stat.isdir | default(false)
+          - not (chia_darwin_local_external_dot_check.stat.islnk | default(false))
+        fail_msg: >-
+          {{ chia_darwin_home }}/.chia must remain a real directory on the
+          internal disk for local-external. The role did not replace it.
       when: chia_darwin_topology == "local-external"
 
     - name: Check for an existing chia config
@@ -678,6 +696,48 @@
 - name: Write the Darwin Full Disk Access notes and verify CHIA_ROOT access
   when: chia_darwin_install_chia_blockchain | bool
   block:
+    - name: Inspect the full-node Python interpreter for the Full Disk Access note
+      when: chia_darwin_emit_pppc | bool
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_venv }}/bin/python3.13"
+      register: chia_darwin_fda_python_bin
+      changed_when: false
+
+    - name: Fail when the full-node Python interpreter is missing outside check mode
+      when:
+        - chia_darwin_emit_pppc | bool
+        - not (ansible_check_mode | bool)
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_fda_python_bin.stat.exists | default(false)
+        fail_msg: >-
+          {{ chia_darwin_venv }}/bin/python3.13 does not exist, so the Full
+          Disk Access note cannot record the full node's Python interpreter.
+          Create the virtualenv and install chia-blockchain before writing it.
+
+    - name: Resolve the full-node Python interpreter for the Full Disk Access note
+      when:
+        - chia_darwin_emit_pppc | bool
+        - chia_darwin_fda_python_bin.stat.exists | default(false)
+      become: true
+      become_user: "{{ user }}"
+      ansible.builtin.command:
+        argv:
+          - "{{ chia_darwin_venv }}/bin/python3.13"
+          - -c
+          - "import os, sys; print(os.path.realpath(sys.executable))"
+      register: chia_darwin_fda_python_real
+      changed_when: false
+      check_mode: false
+
+    - name: Record the resolved full-node Python interpreter
+      when:
+        - chia_darwin_emit_pppc | bool
+        - chia_darwin_fda_python_bin.stat.exists | default(false)
+      ansible.builtin.set_fact:
+        chia_darwin_fda_python: "{{ chia_darwin_fda_python_real.stdout | trim }}"
+      changed_when: false
+
     - name: Write the Full Disk Access note
       when: chia_darwin_emit_pppc | bool
       become: true
@@ -711,15 +771,21 @@
           - chia_darwin_root_stat.stat.readable | default(false)
         fail_msg: >-
           {{ user }} cannot read {{ chia_root }}/config/config.yaml. That path
-          is now on the internal disk for every topology. For local-external,
-          the expected Full Disk Access is for the process that opens the
-          blockchain DB only ({{ chia_darwin_interpreter }} running
-          chia_full_node), not for companion binaries or tailscaled. Grant it
-          in System Settings if the full node cannot read
-          {{ chia_darwin_volume_db_dir }}, or install
-          {{ chia_darwin_pppc_dest }} with MDM. See
-          {{ chia_darwin_fda_note_dest }}. This role does not edit TCC.db.
-          An SSH session being able to read the volume does not mean launchd can.
+          is on the internal disk for every topology. For local-external, Full
+          Disk Access is needed only for /bin/zsh (the launchd shebang
+          interpreter for every job wrapper){% if chia_darwin_fda_python is defined %} and the full node's Python
+          interpreter ({{ chia_darwin_fda_python }}){% endif %}. Grant
+          {{ 'them' if chia_darwin_fda_python is defined else 'it' }} in System
+          Settings if the full node cannot read {{ chia_darwin_volume_db_dir }}.
+          Installing {{ chia_darwin_pppc_dest }} with MDM grants /bin/zsh only{% if chia_darwin_fda_python is defined %},
+          so the printed Python path must still be added by hand in System
+          Settings, and again after every Homebrew Python upgrade{% else %}.
+          Add the full node's Python interpreter by hand in System Settings,
+          and again after every Homebrew Python upgrade{% endif %}. See
+          {{ chia_darwin_fda_note_dest }}. Do not add companion binaries,
+          tailscaled, hw-vdf, the watchdog, or healthcheck for this layout.
+          This role does not edit TCC.db. An SSH session being able to read the
+          volume does not mean launchd can.
 
 - name: Install enabled hw_vdf wrappers
   ansible.builtin.include_tasks: darwin-hw-vdf-install.yml
@@ -780,9 +846,9 @@
       {% endif %}
       {% endif %}
       {% if chia_darwin_topology == 'local-external' %}
-      CHIA_ROOT and companion services stay on the internal disk. Expected
-      Full Disk Access is only for the process that opens the blockchain DB
-      ({{ chia_darwin_interpreter }} running chia_full_node) to read
+      CHIA_ROOT and companion services stay on the internal disk. Full Disk
+      Access is only for /bin/zsh (the shared launchd shebang interpreter){% if chia_darwin_fda_python is defined %} and
+      the full node's Python interpreter ({{ chia_darwin_fda_python }}){% endif %} to read
       {{ chia_darwin_volume_db_dir }}. See {{ chia_darwin_fda_note_dest }}.
       An SSH read of that volume does not prove launchd can read it.
       {% elif chia_darwin_topology == 'remote-node' %}

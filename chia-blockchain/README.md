@@ -27,8 +27,17 @@ the role does not edit `/etc/sudoers.d`. Set `chia_darwin_brew_user` so Homebrew
 runs as the prefix owner. The same inventory entry shape covers additional Macs.
 See [DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#companion-services) for the service table,
 watchdog behavior, binary pins, and Full Disk Access guidance. For the
-`local-external` layout, Full Disk Access is expected to be needed only for the
-full-node process, not the companion binaries.
+`local-external` layout, `~/.chia` is a real directory on the internal disk and
+only `<chia_root>/db` is a symlink to the volume. The wallet database stays
+under the internal `CHIA_ROOT`. Only the full-node wrapper waits on the volume;
+it lists the on-volume DB directory with `/bin/ls`. Full Disk Access is needed
+only for `/bin/zsh` (the launchd shebang interpreter shared by every wrapper) and
+the full node's Python interpreter, the real Homebrew Cellar binary the venv
+`python3.13` resolves to. A Homebrew Python upgrade changes that path, so the
+node loses DB access until the new binary is granted. Do not add companion
+binaries, tailscaled, alloy, exporters, hw-vdf, the watchdog, Bash, or
+healthcheck for this layout.
+
 See [DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#managing-several-macs) for the
 approved-sudoers note and leftover service-account sudoers fragments.
 
@@ -47,8 +56,10 @@ connection count through `chia_darwin_hw_vdf_port`.
 | `remote-node`    | The app only. No Python, chia-blockchain, daemon, full node, or local CHIA_ROOT.        |
 | `vdf-only`       | Refused with `timelord-app`; use `chia-blockchain` for ASIC-only Macs.                  |
 
-For `local-external`, Full Disk Access is expected, not proven, to be needed
-only for the full-node process, not the companion binaries.
+For `local-external`, `~/.chia` and `CHIA_ROOT` are internal directories and
+only `<chia_root>/db` is on the volume. The wallet database stays internal. Only
+the full-node wrapper waits on the volume, and Full Disk Access is needed only
+for `/bin/zsh` and the full node's resolved Homebrew Python binary.
 
 Remote-node deployments require a connection bundle created on the full-node host:
 

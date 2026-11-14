@@ -1,0 +1,108 @@
+---
+# Runtime checks that the Darwin Full Disk Access block reports a missing
+# full-node interpreter before it tries to resolve it.
+- name: Exercise the Darwin Full Disk Access missing interpreter failure
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Create a temporary fixture without a Python 3.13 binary
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: " darwin fda missing python"
+      register: darwin_fda_missing_temp
+
+    - name: Record the missing interpreter stub variables
+      ansible.builtin.set_fact:
+        user: "{{ lookup('env', 'USER') }}"
+        chia_darwin_emit_pppc: true
+        chia_darwin_venv: "{{ darwin_fda_missing_temp.path }}/venv"
+      changed_when: false
+
+    - name: Load the production Darwin tasks
+      ansible.builtin.set_fact:
+        darwin_fda_missing_tasks: "{{ lookup('file', playbook_dir ~ '/../../chia-blockchain/tasks/darwin.yml') | from_yaml }}"
+      changed_when: false
+
+    - name: Extract the production Full Disk Access block
+      ansible.builtin.set_fact:
+        darwin_fda_missing_block: >-
+          {{ (darwin_fda_missing_tasks
+          | selectattr('name', 'equalto', 'Write the Darwin Full Disk Access notes and verify CHIA_ROOT access')
+          | first)['block'] }}
+      changed_when: false
+
+    - name: Extract the interpreter tasks in production order
+      ansible.builtin.set_fact:
+        darwin_fda_missing_tasks_subset: >-
+          {{ (darwin_fda_missing_block
+          | selectattr('name', 'in', [
+            'Inspect the full-node Python interpreter for the Full Disk Access note',
+            'Fail when the full-node Python interpreter is missing outside check mode',
+            'Resolve the full-node Python interpreter for the Full Disk Access note',
+            'Record the resolved full-node Python interpreter',
+          ])
+          | list) }}
+      changed_when: false
+
+    - name: Assert the interpreter tasks keep production order
+      ansible.builtin.assert:
+        that:
+          - >-
+            (darwin_fda_missing_tasks_subset | map(attribute='name') | list)
+            == darwin_fda_missing_expected_names
+        fail_msg: >-
+          Expected the Full Disk Access interpreter tasks in production order,
+          got {{ darwin_fda_missing_tasks_subset | map(attribute='name') | list }}
+      vars:
+        darwin_fda_missing_expected_names:
+          - Inspect the full-node Python interpreter for the Full Disk Access note
+          - Fail when the full-node Python interpreter is missing outside check mode
+          - Resolve the full-node Python interpreter for the Full Disk Access note
+          - Record the resolved full-node Python interpreter
+
+    - name: Write the production tasks to a temporary include
+      ansible.builtin.copy:
+        content: "{{ darwin_fda_missing_tasks_subset | to_nice_yaml }}"
+        dest: "{{ darwin_fda_missing_temp.path }}/fda-missing-python.yml"
+        mode: "0644"
+
+    - name: Start the missing interpreter guard as unseen
+      ansible.builtin.set_fact:
+        darwin_fda_missing_assert_seen: false
+      changed_when: false
+
+    - name: Run the production tasks without a Python 3.13 binary
+      block:
+        - name: Run the production interpreter tasks
+          ansible.builtin.include_tasks: "{{ darwin_fda_missing_temp.path }}/fda-missing-python.yml"
+      rescue:
+        - name: Require the missing interpreter assertion to fire first
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_task.name == 'Fail when the full-node Python interpreter is missing outside check mode'
+              - "'does not exist, so the Full Disk Access note cannot record' in (ansible_failed_result.msg | default(''))"
+            fail_msg: >-
+              Expected the production missing-interpreter assertion, got
+              {{ ansible_failed_task.name }}:
+              {{ ansible_failed_result.msg | default('') }}
+
+        - name: Record that the expected assertion fired
+          ansible.builtin.set_fact:
+            darwin_fda_missing_assert_seen: true
+          changed_when: false
+
+    - name: Require the expected assertion to have fired
+      ansible.builtin.assert:
+        that:
+          - darwin_fda_missing_assert_seen | bool
+
+    - name: Require the resolver and the fact to stay unset
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_fda_python is not defined
+          - chia_darwin_fda_python_real is not defined
+
+    - name: Report the Darwin missing interpreter check
+      ansible.builtin.debug:
+        msg: "Darwin Full Disk Access missing interpreter assertion passed"
