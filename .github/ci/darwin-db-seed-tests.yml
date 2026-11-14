@@ -18,7 +18,7 @@
     - name: Record the test root
       ansible.builtin.set_fact:
         test_root: "{{ darwin_db_seed_temp.path }}"
-        mainnet_root: "{{ darwin_db_seed_temp.path }}/internal/mainnet"
+        mainnet_root: "{{ darwin_db_seed_temp.path }}/home ext/.chia/mainnet"
         existing_root: "{{ darwin_db_seed_temp.path }}/existing/mainnet"
         directory_root: "{{ darwin_db_seed_temp.path }}/directory/mainnet"
         symlink_root: "{{ darwin_db_seed_temp.path }}/symlink/mainnet"
@@ -57,31 +57,32 @@
         - "{{ publish_root }}/db"
         - "{{ cache_publish_root }}/db"
 
-    - name: Seed an absent local-internal database
+    - name: Seed an absent local-external database through the db symlink
       ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
       vars:
         case:
-          name: absent local-internal
+          name: absent local-external
           root: "{{ mainnet_root }}"
+          topology: local-external
 
-    - name: Assert the local-internal database was seeded
+    - name: Assert the local-external database was seeded
       ansible.builtin.assert:
         that:
-          - lookup('file', mainnet_root ~ '/db/blockchain_v2_mainnet.sqlite') == fixture_main
-          - lookup('file', mainnet_root ~ '/db/height-to-hash') == fixture_h2h
-          - lookup('file', mainnet_root ~ '/db/sub-epoch-summaries') == fixture_ses
+          - lookup('file', external_root ~ '/mainnet/db/blockchain_v2_mainnet.sqlite') == fixture_main
+          - lookup('file', external_root ~ '/mainnet/db/height-to-hash') == fixture_h2h
+          - lookup('file', external_root ~ '/mainnet/db/sub-epoch-summaries') == fixture_ses
           - "'s3://test-bucket/mainnet/blockchain_v2_mainnet.sqlite' in lookup('file', test_root ~ '/aws.log')"
           - "'s3://test-bucket/mainnet/height-to-hash' in lookup('file', test_root ~ '/aws.log')"
           - "'s3://test-bucket/mainnet/sub-epoch-summaries' in lookup('file', test_root ~ '/aws.log')"
 
-    - name: Inspect the seeded local-internal database
+    - name: Inspect the seeded local-external database
       ansible.builtin.stat:
-        path: "{{ mainnet_root }}/db/blockchain_v2_mainnet.sqlite"
+        path: "{{ external_root }}/mainnet/db/blockchain_v2_mainnet.sqlite"
       register: darwin_db_seed_internal_main
 
-    - name: Inspect the local-internal staging directory
+    - name: Inspect the local-external staging directory
       ansible.builtin.stat:
-        path: "{{ mainnet_root }}/db/.chia-s3-seed-mainnet"
+        path: "{{ external_root }}/mainnet/db/.chia-s3-seed-mainnet"
       register: darwin_db_seed_internal_staging
 
     - name: Assert ownership, permissions, and staging cleanup
@@ -99,16 +100,17 @@
         first_run_size: "{{ darwin_db_seed_internal_main.stat.size }}"
         first_run_mtime: "{{ darwin_db_seed_internal_main.stat.mtime }}"
 
-    - name: Run the local-internal seed a second time
+    - name: Run the local-external seed a second time
       ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
       vars:
         case:
-          name: second local-internal run
+          name: second local-external run
           root: "{{ mainnet_root }}"
+          topology: local-external
 
     - name: Inspect the database after the second run
       ansible.builtin.stat:
-        path: "{{ mainnet_root }}/db/blockchain_v2_mainnet.sqlite"
+        path: "{{ external_root }}/mainnet/db/blockchain_v2_mainnet.sqlite"
       register: darwin_db_seed_internal_second
 
     - name: A second successful run does not redownload or change the database

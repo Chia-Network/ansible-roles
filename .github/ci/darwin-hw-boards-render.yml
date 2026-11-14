@@ -20,7 +20,7 @@
         chia_root: "{{ render_out }}/shell-home/.chia/mainnet"
         chia_darwin_env_script: "{{ render_out }}/boards/chia-env.sh"
         chia_darwin_venv: "{{ render_out }}/shell-home/chia-venv"
-        chia_darwin_topology: local-internal
+        chia_darwin_topology: local-external
         chia_darwin_local_timelord: true
         chia_darwin_hw_vdf_expected_serial: FIX-BOARD-0001
     - name: Create render directories

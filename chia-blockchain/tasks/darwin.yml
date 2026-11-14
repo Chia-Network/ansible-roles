@@ -16,13 +16,8 @@
       chia-blockchain Darwin support targets Apple Silicon
       (arm64). This host reports {{ ansible_architecture }}.
 
-- name: Require a known Darwin topology
-  ansible.builtin.assert:
-    that:
-      - chia_darwin_topology in ["local-internal", "local-external", "remote-node", "vdf-only"]
-    fail_msg: >-
-      chia_darwin_topology must be local-internal, local-external, remote-node,
-      or vdf-only. Got {{ chia_darwin_topology }}.
+- name: Validate the Darwin topology
+  ansible.builtin.include_tasks: darwin-topology-validate.yml
 
 - name: Build the Darwin LaunchDaemon job list
   ansible.builtin.include_tasks: darwin-jobs.yml
@@ -48,31 +43,6 @@
       SSH/automation account separate; using the service account as that login
       requires chia_darwin_allow_root_capable_service_user and a weaker
       posture.
-
-- name: Require a remote timelord VDF server for vdf-only
-  ansible.builtin.assert:
-    that:
-      - chia_darwin_hw_vdf_ip | length > 0
-      - chia_darwin_hw_vdf_ip not in ["localhost", "127.0.0.1", "::1"]
-    fail_msg: >-
-      vdf-only has no local timelord. Set chia_darwin_hw_vdf_ip to the remote
-      timelord's VDF server address (the board wrappers connect there instead
-      of waiting for a local listener).
-  when: not (chia_darwin_local_timelord | bool)
-
-- name: Require a remote full node when this Mac does not run one
-  ansible.builtin.assert:
-    that:
-      - chia_timelord_full_node_peer_host | length > 0
-      - chia_timelord_full_node_peer_host not in ["localhost", "127.0.0.1", "::1"]
-    fail_msg: >-
-      remote-node has no local full node. Set chia_timelord_full_node_peer_host
-      to the LAN full node. On chia 2.7.1 and later that node must list this
-      Mac in exempt_peer_networks.
-  when:
-    - chia_darwin_local_timelord | bool
-    - not (chia_darwin_local_full_node | bool)
-    - not (chia_darwin_timelord_app_enabled | bool)
 
 - name: Require the external database volume for local-external
   ansible.builtin.assert:
@@ -204,34 +174,6 @@
       local-external. The role does not format or mount disks.
   when: chia_darwin_topology == "local-external"
 
-- name: Manage the chia-blockchain CHIA_ROOT
-  when: chia_darwin_install_chia_blockchain | bool
-  block:
-    - name: Inspect ~/.chia before choosing where CHIA_ROOT lives
-      ansible.builtin.stat:
-        path: "{{ chia_darwin_home }}/.chia"
-      register: chia_darwin_dot_chia
-
-    - name: Refuse to follow an external-volume symlink for an internal CHIA_ROOT
-      ansible.builtin.assert:
-        that:
-          - not (chia_darwin_dot_chia.stat.islnk | default(false))
-        fail_msg: >-
-          {{ chia_darwin_home }}/.chia is a symlink
-          ({{ chia_darwin_dot_chia.stat.lnk_target | default('') }}).
-          local-internal and remote-node keep CHIA_ROOT on the internal disk.
-          Remove the symlink manually before switching topology.
-      when: chia_darwin_topology != "local-external"
-
-    - name: Ensure the internal CHIA_ROOT directory exists
-      become: true
-      become_user: "{{ user }}"
-      ansible.builtin.file:
-        path: "{{ chia_root }}"
-        state: directory
-        mode: "0755"
-      when: chia_darwin_topology != "local-external"
-
 - name: Install Homebrew packages as the Homebrew prefix owner
   when: chia_darwin_install_chia_blockchain | bool or chia_darwin_enable_hw_vdf | bool
   become: "{{ chia_darwin_brew_user | length > 0 }}"
@@ -362,6 +304,18 @@
 - name: Resolve ASIC boards and hw-vdf LaunchDaemon slots
   ansible.builtin.include_tasks: darwin-hw-vdf-boards.yml
 
+- name: Require 1-3 active ASIC boards when role-managed hw-vdf is enabled
+  when: chia_darwin_enable_hw_vdf | bool
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_hw_vdf_active | length >= 1
+      - chia_darwin_hw_vdf_active | length <= 3
+    fail_msg: >-
+      chia_darwin_enable_hw_vdf needs 1-3 active ASIC boards, but
+      {{ chia_darwin_hw_vdf_active | length }} were resolved. Check
+      chia_darwin_hw_vdf_boards, chia_darwin_hw_vdf_expected_serial, or
+      autodiscovery.
+
 # Read-only ownership checks. Keep every deterministic refusal before this
 # run rewrites a wrapper or plist.
 - name: Choose which hw-vdf LaunchDaemons this role will change
@@ -435,15 +389,6 @@
         path: "{{ chia_root }}/config"
         state: directory
         mode: "0755"
-
-    - name: Ensure the CHIA_ROOT db directory exists for internal topologies
-      become: true
-      become_user: "{{ user }}"
-      ansible.builtin.file:
-        path: "{{ chia_root }}/db"
-        state: directory
-        mode: "0755"
-      when: chia_darwin_topology != "local-external"
 
     - name: Inspect the local-external CHIA_ROOT db symlink
       ansible.builtin.stat:
@@ -854,7 +799,4 @@
       {% elif chia_darwin_topology == 'remote-node' %}
       The remote full node must accept this timelord (exempt_peer_networks on
       chia 2.7.1 and later).
-      {% elif chia_darwin_topology == 'vdf-only' %}
-      Only ASIC board jobs run. Boards connect to the remote VDF server at
-      {{ chia_darwin_hw_vdf_ip }}:{{ chia_darwin_hw_vdf_port }}.
       {% endif %}

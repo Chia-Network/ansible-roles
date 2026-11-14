@@ -9,14 +9,17 @@
       chia_darwin_timelord_implementation must be chia-blockchain or
       timelord-app. Got {{ chia_darwin_timelord_implementation }}.
 
-- name: Refuse timelord-app for the vdf-only topology
+- name: Require the local-external topology and role-managed ASIC boards for chia-blockchain
   ansible.builtin.assert:
     that:
-      - not (chia_darwin_timelord_app_enabled | bool and chia_darwin_topology == "vdf-only")
+      - chia_darwin_topology == "local-external"
+      - chia_darwin_enable_hw_vdf | bool
     fail_msg: >-
-      timelord-app runs both the timelord and its bundled ASIC clients, so it
-      cannot be combined with vdf-only. Use chia-blockchain for vdf-only, or
-      choose local-internal, local-external, or remote-node.
+      chia_darwin_timelord_implementation: chia-blockchain runs the Python node
+      and timelord, so it needs chia_darwin_topology: local-external with the
+      external database and 1-3 role-managed hw-vdf boards. Set
+      chia_darwin_enable_hw_vdf: true, or use timelord-app.
+  when: chia_darwin_timelord_implementation == "chia-blockchain"
 
 - name: Refuse role-managed ASIC clients when the app owns the hardware
   ansible.builtin.assert:

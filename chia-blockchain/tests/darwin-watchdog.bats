@@ -209,19 +209,10 @@ run_watchdog() {
 	! grep -q 'grace until +3600s' "$LOG"
 }
 
-@test "vdf-only restarts when a board job is down" {
-	render_watchdog vdf-only
+@test "Board job is down restarts hw-vdf on local-external" {
+	render_watchdog local-external
 	export FAKE_BOARD_DOWN=1
 	run_watchdog 12
 	grep -q 'a board job is not running' "$LOG"
-	grep -q 'RESTART hw-vdf boards' "$LOG"
-	! grep -q 'CHECK_VDF_CONNS' "$SCRIPT"
-}
-
-@test "vdf-only checks the remote VDF connection count" {
-	render_watchdog vdf-only
-	export FAKE_VDF_CONNS=0
-	run_watchdog 12
-	grep -q 'established=0 (want 3)' "$LOG"
 	grep -q 'RESTART hw-vdf boards' "$LOG"
 }

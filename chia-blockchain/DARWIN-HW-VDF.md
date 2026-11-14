@@ -225,11 +225,7 @@ and setting only the scalar serial (which omits `--device-loc` and retires the
 other role-owned wrappers). Attaching one board for auto-discovery is not a
 rollback: the other wrappers still claim their boards, so the set stays
 larger. `remote-node` still has no local full node, and every ASIC client
-still connects to the local timelord. `vdf-only` disables the local daemon,
-full node, timelord, chia-exporter, and healthcheck; set
-`chia_darwin_hw_vdf_ip` to the remote timelord's VDF server so the boards
-connect there. The watchdog still supervises the board jobs and the remote VDF
-connection count.
+still connects to the local timelord.
 
 ## Timelord.app
 
@@ -248,13 +244,13 @@ is arm64-only, requires macOS 14 or later, and is verified with
 
 The app owns the timelord worker and every ASIC USB client, so the role refuses
 `timelord-app` with `chia_darwin_enable_hw_vdf: true` (the derived default is
-false) and refuses `vdf-only`. Board discovery, automatic tuning, and the
+false). Board discovery, automatic tuning, and the
 `automatic-profiles.json` state belong to the app. The role does not render a
 board list; the app adds visible boards at client ports starting at 18110.
 
 Topology behavior:
 
-- `local-internal` and `local-external` keep the role-managed daemon and full
+- `local-external` keeps the role-managed daemon and full
   node. The app reads the timelord peer identity from CHIA_ROOT with
   `timelord-service local-node`. For `local-external`, `~/.chia` and CHIA_ROOT
   are real directories on the internal disk; only `<chia_root>/db` is a symlink
@@ -271,8 +267,6 @@ Topology behavior:
   controller directory copied to `chia_darwin_timelord_app_bundle_dest`. The
   bundle contains `connection.toml` plus the dedicated peer/RPC client
   identities created on the full-node host.
-- `vdf-only` is not an app topology. Use `chia-blockchain` when a Mac only
-  supplies ASIC VDF engines to a timelord elsewhere.
 
 The vendor installer registers the fixed label
 `net.chia.timelord.supervisor`. It is intentionally not built from
@@ -373,8 +367,8 @@ Central logs and SMART metrics remain separate roles (`alloy` and
 `smartctl-exporter`), which now have Darwin paths.
 
 The `periodic-connect` job is installed only when `chia_periodic_connect_peers`
-is nonempty and the topology has a local full node (`local-internal` or
-`local-external`). It runs as the service user on a launchd `StartInterval` of
+is nonempty and the topology has a local full node (`local-external`). It runs
+as the service user on a launchd `StartInterval` of
 `chia_darwin_periodic_connect_interval_seconds` (default 300) and runs
 `chia peer full_node -a <peer>:<full_node_port>` for each entry, matching the
 Linux cron job.
@@ -424,9 +418,7 @@ Linux triggers:
   default).
 - The VDF port having the expected number of established connections and every
   enabled `hw-vdf` job running is the board-health check. A failure restarts
-  all enabled boards in ID order. This works for `vdf-only` too: the port comes
-  from `chia_darwin_hw_vdf_port`, so the remote VDF server connection is
-  counted.
+  all enabled boards in ID order.
 - The exporter ports not listening for three cycles kickstart that exporter
   job.
 - If the healthcheck itself is unreachable, only the healthcheck is restarted.
