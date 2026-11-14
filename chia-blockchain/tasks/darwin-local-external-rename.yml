@@ -23,7 +23,7 @@
   become_user: "{{ user }}"
   ansible.builtin.command:
     argv:
-      - /bin/mv
+      - "{{ chia_darwin_mv }}"
       - "{{ chia_darwin_local_external_rename_flag.stdout }}"
       - "{{ local_external_rename_src }}"
       - "{{ local_external_rename_dest }}"

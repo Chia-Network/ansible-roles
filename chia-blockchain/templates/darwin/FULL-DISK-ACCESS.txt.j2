@@ -26,10 +26,10 @@ binaries should not need it now that config and wallet data are on the internal
 disk.
 
 The wrapper waits on {{ chia_darwin_db_marker }}, which is now the on-volume
-database directory rather than a config file. That wait tests whether the
-directory is readable. Whether a TCC denial is visible through that test the
-same way it was for the old config.yaml file marker is expected, not proven on
-hardware. The wait log also includes the failure from /bin/ls.
+database directory rather than a config file. The wait lists that directory
+with /bin/ls, a readdir operation, rather than testing file readability. A TCC
+denial is expected to make that listing fail, but the narrowing is still not
+proven on hardware. The wait log also includes the failure from /bin/ls.
 
 How to grant it
 ---------------

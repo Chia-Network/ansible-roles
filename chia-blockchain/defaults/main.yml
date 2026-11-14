@@ -450,11 +450,17 @@ chia_darwin_db_marker: "{{ chia_darwin_volume_db_dir }}"
 # Refuse a legacy migration when a non-database file on the volume is larger
 # than this many MiB. Only <network>/db is pruned; wallet/db and db.bak are not.
 chia_darwin_local_external_copy_max_mb: 512
+# Refuse another automatic retry once this many failed-migration leftover trees
+# already exist next to a legacy ~/.chia volume symlink. The role never deletes
+# them; an operator inspects them and fixes the cause.
+chia_darwin_local_external_leftover_max: 3
 # Overridable so CI can stub the mount binary. Production uses /sbin/mount.
 chia_darwin_mount: /sbin/mount
 # Overridable so CI can force a mid-migration failure. Production uses the
 # system rsync (openrsync on current macOS).
 chia_darwin_rsync: /usr/bin/rsync
+# Overridable so CI can force a rename failure. Production uses /bin/mv.
+chia_darwin_mv: /bin/mv
 chia_darwin_wait_interval: 5
 chia_darwin_wait_log_every: 12
 chia_darwin_launchd_prefix: net.chia.timelord

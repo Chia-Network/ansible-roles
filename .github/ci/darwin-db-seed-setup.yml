@@ -12,6 +12,11 @@
     chia_darwin_brew: "{{ test_root }}/bin/brew"
     chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-notloaded"
     chia_darwin_launchd_prefix: net.chia.seedtest
+    chia_darwin_service_jobs:
+      - name: full-node
+        label: net.chia.seedtest.full-node
+        enabled: true
+        exit_timeout: 1
     chia_darwin_db_volume: "{{ test_root }}/Volumes/Chia DB"
     chia_darwin_launchd_become: false
     chia_darwin_db_seed_stub_bytes: 10240

@@ -1,0 +1,32 @@
+---
+# Prepare a legacy ~/.chia fixture for a failed-swap test, start the restart
+# fixture jobs loaded, and reset the fake launchctl log. The caller sets
+# failure_home to the home directory under test.
+- name: Prepare the failed-migration home directory
+  ansible.builtin.file:
+    path: "{{ failure_home }}"
+    state: directory
+    mode: "0755"
+
+- name: Create the failed-migration legacy ~/.chia link
+  ansible.builtin.file:
+    src: "{{ external_chia }}"
+    dest: "{{ failure_home }}/.chia"
+    state: link
+    force: false
+
+- name: Ensure the restart fixture jobs start loaded
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ test_root }}/launchd-state/loaded/{{ item }}"
+    force: false
+    mode: "0644"
+  loop:
+    - net.chia.roottest.timelord
+    - net.chia.roottest.chia-exporter
+
+- name: Reset the fake launchctl log before the failed migration
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ test_root }}/launchctl.log"
+    mode: "0644"

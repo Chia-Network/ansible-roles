@@ -15,5 +15,9 @@
     - name: Record the local-external case failure
       ansible.builtin.set_fact:
         local_external_case_failed: true
-        local_external_case_message: "{{ ansible_failed_result.msg | default('no message') }}"
+        local_external_case_message: >-
+          {{ (ansible_failed_result.results | default([])
+          | selectattr('failed', 'defined') | selectattr('failed')
+          | map(attribute='item.msg') | first)
+          | default(ansible_failed_result.msg | default('no message'), true) }}
       changed_when: false

@@ -1,6 +1,6 @@
 ---
 # Local tests for chia-blockchain/tasks/darwin-local-external-root.yml. They
-# use a temporary test root, a fake mount, and a fake unloaded launchctl. No
+# use a temporary test root, a fake mount, and a stateful fake launchctl. No
 # real Mac, external volume, launchd job, or S3 bucket is touched.
 - name: Test the local-external CHIA_ROOT layout without a Mac
   hosts: localhost
@@ -309,24 +309,39 @@
           - migrated_stats.results[9].stat.isreg | default(false)
           - lookup('file', test_root ~ '/legacy/home/.chia/mainnet/config/config.yaml') == 'mainnet config fixture'
           - lookup('file', test_root ~ '/legacy/home/.chia/mainnet/wallet/db/wallet.sqlite') == 'wallet db fixture'
-          - chia_darwin_restart_services | bool
+          - chia_darwin_local_external_restarted | bool
         fail_msg: >-
           The legacy migration must keep ~/.chia internal and real, copy non-db
           data, preserve modes, link only <chia_root>/db at the original volume
-          DB, leave the volume database in place, and request a restart.
+          DB, leave the volume database in place, and restart the loaded jobs.
 
-    - name: Require the migration to restart the enabled job and not the disabled one
+    - name: Require the migration to restart the enabled jobs and not the disabled one
       vars:
         launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
       ansible.builtin.assert:
         that:
           - launchctl_lines | select('search', 'bootout system/net.chia.roottest.timelord') | list | length >= 1
           - launchctl_lines | select('search', 'bootstrap .*net.chia.roottest.timelord') | list | length >= 1
+          - launchctl_lines | select('search', 'bootout system/net.chia.roottest.chia-exporter') | list | length >= 1
+          - launchctl_lines | select('search', 'bootstrap .*net.chia.roottest.chia-exporter') | list | length >= 1
           - launchctl_lines | select('search', 'net.chia.roottest.disabled') | list | length == 0
         fail_msg: >-
-          The migration must stop and restart only this role's enabled jobs and
-          must not touch disabled or non-chia jobs. Log:
+          The migration must stop and restart only this role's loaded enabled
+          jobs and must not touch disabled or non-chia jobs. Log:
           {{ launchctl_lines }}
+
+    - name: Require the migration to stop the timelord before rsync copies
+      vars:
+        launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
+      ansible.builtin.assert:
+        that:
+          - launchctl_lines | select('search', '^rsync ') | list | length >= 1
+          - >-
+            (launchctl_lines.index('bootout system/net.chia.roottest.timelord')) <
+            (launchctl_lines.index(launchctl_lines | select('search', '^rsync ') | first))
+        fail_msg: >-
+          The timelord must be booted out before the migration copies data.
+          Log: {{ launchctl_lines }}
 
     - name: Record the migrated on-volume database before the directory tasks
       ansible.builtin.stat:
@@ -365,255 +380,11 @@
           The later CHIA_ROOT directory tasks must leave the migrated db
           symlink and the on-volume database file in place.
 
-    - name: Move leftover staging aside instead of refusing while ~/.chia exists
-      vars:
-        chia_darwin_home: "{{ test_root }}/staging/home"
-        chia_root: "{{ test_root }}/staging/home/.chia/{{ network }}"
-      block:
-        - name: Prepare a real ~/.chia and a leftover staging tree
-          ansible.builtin.file:
-            path: "{{ item }}"
-            state: directory
-            mode: "0755"
-          loop:
-            - "{{ chia_darwin_home }}/.chia"
-            - "{{ chia_darwin_home }}/.chia.migrating"
-
-        - name: Write a file in the leftover staging tree
-          ansible.builtin.copy:
-            content: staged-data
-            dest: "{{ chia_darwin_home }}/.chia.migrating/keep.txt"
-            mode: "0644"
-
-        - name: Run the local-external root include with a leftover staging tree
-          ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
-
-        - name: Require the leftover staging tree run to proceed
-          ansible.builtin.assert:
-            that:
-              - not (local_external_case_failed | bool)
-            fail_msg: "The leftover staging tree was refused: {{ local_external_case_message }}"
-
-        - name: Inspect the moved-aside staging tree
-          ansible.builtin.stat:
-            path: "{{ item }}"
-            follow: false
-          loop:
-            - "{{ chia_darwin_home }}/.chia"
-            - "{{ chia_darwin_home }}/.chia.migrating"
-            - "{{ chia_darwin_home }}/.chia.migrating.leftover/keep.txt"
-          register: staging_stats
-
-        - name: Require the leftover staging tree to be preserved aside
-          ansible.builtin.assert:
-            that:
-              - staging_stats.results[0].stat.isdir | default(false)
-              - not (staging_stats.results[1].stat.exists | default(false))
-              - staging_stats.results[2].stat.isreg | default(false)
-              - lookup('file', chia_darwin_home ~ '/.chia.migrating.leftover/keep.txt') == 'staged-data'
-            fail_msg: >-
-              A leftover staging tree next to a real ~/.chia must be renamed
-              aside, not deleted, and the include must continue.
-
-    - name: Reuse the next leftover name when the first is already taken
-      vars:
-        chia_darwin_home: "{{ test_root }}/leftover-collision/home"
-        chia_root: "{{ test_root }}/leftover-collision/home/.chia/{{ network }}"
-      block:
-        - name: Prepare a real ~/.chia, an old leftover, and a new staging tree
-          ansible.builtin.file:
-            path: "{{ item }}"
-            state: directory
-            mode: "0755"
-          loop:
-            - "{{ chia_darwin_home }}/.chia"
-            - "{{ chia_darwin_home }}/.chia.migrating.leftover"
-            - "{{ chia_darwin_home }}/.chia.migrating"
-
-        - name: Write the old leftover and new staging fixtures
-          ansible.builtin.copy:
-            content: "{{ item.content }}"
-            dest: "{{ item.dest }}"
-            mode: "0644"
-          loop:
-            - content: old-leftover
-              dest: "{{ chia_darwin_home }}/.chia.migrating.leftover/old.txt"
-            - content: staged-data
-              dest: "{{ chia_darwin_home }}/.chia.migrating/keep.txt"
-          loop_control:
-            label: "{{ item.dest }}"
-
-        - name: Run the local-external root include when the first leftover exists
-          ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
-
-        - name: Require the collided leftover run to proceed
-          ansible.builtin.assert:
-            that:
-              - not (local_external_case_failed | bool)
-            fail_msg: "The collided leftover staging tree was refused: {{ local_external_case_message }}"
-
-        - name: Inspect the collided leftover layout
-          ansible.builtin.stat:
-            path: "{{ item }}"
-            follow: false
-          loop:
-            - "{{ chia_darwin_home }}/.chia.migrating.leftover/old.txt"
-            - "{{ chia_darwin_home }}/.chia.migrating.leftover.1/keep.txt"
-            - "{{ chia_darwin_home }}/.chia.migrating"
-          register: leftover_collision_stats
-
-        - name: Require the staging tree to move to the next leftover name
-          ansible.builtin.assert:
-            that:
-              - leftover_collision_stats.results[0].stat.isreg | default(false)
-              - lookup('file', chia_darwin_home ~ '/.chia.migrating.leftover/old.txt') == 'old-leftover'
-              - leftover_collision_stats.results[1].stat.isreg | default(false)
-              - lookup('file', chia_darwin_home ~ '/.chia.migrating.leftover.1/keep.txt') == 'staged-data'
-              - not (leftover_collision_stats.results[2].stat.exists | default(false))
-            fail_msg: >-
-              An occupied first leftover name must not block the move; the new
-              staging tree must use the next unused name and keep its data.
-
-        - name: Create another staging tree after the collision
-          ansible.builtin.file:
-            path: "{{ chia_darwin_home }}/.chia.migrating"
-            state: directory
-            mode: "0755"
-
-        - name: Write the next staging fixture
-          ansible.builtin.copy:
-            content: retry-data
-            dest: "{{ chia_darwin_home }}/.chia.migrating/retry.txt"
-            mode: "0644"
-
-        - name: Run the local-external root include again after the collision
-          ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
-
-        - name: Require the later run to proceed
-          ansible.builtin.assert:
-            that:
-              - not (local_external_case_failed | bool)
-            fail_msg: "The later run after a collision was refused: {{ local_external_case_message }}"
-
-        - name: Inspect the later leftover names
-          ansible.builtin.stat:
-            path: "{{ item }}"
-            follow: false
-          loop:
-            - "{{ chia_darwin_home }}/.chia.migrating.leftover.2/retry.txt"
-            - "{{ chia_darwin_home }}/.chia.migrating"
-          register: leftover_retry_stats
-
-        - name: Require the later run to use the next unused leftover name
-          ansible.builtin.assert:
-            that:
-              - leftover_retry_stats.results[0].stat.isreg | default(false)
-              - lookup('file', chia_darwin_home ~ '/.chia.migrating.leftover.2/retry.txt') == 'retry-data'
-              - not (leftover_retry_stats.results[1].stat.exists | default(false))
-            fail_msg: >-
-              A later run must still be able to move a new staging tree aside
-              and keep retrying after earlier leftover names are occupied.
-
     - name: Run the local-external refusal and guard cases
       ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-refusals.yml"
 
-    - name: Restore the legacy link and restart jobs after an rsync failure
-      vars:
-        chia_darwin_home: "{{ test_root }}/rescue/home"
-        chia_root: "{{ test_root }}/rescue/home/.chia/{{ network }}"
-      block:
-        - name: Prepare the rescue home directory
-          ansible.builtin.file:
-            path: "{{ chia_darwin_home }}"
-            state: directory
-            mode: "0755"
-
-        - name: Create the rescue legacy ~/.chia link
-          ansible.builtin.file:
-            src: "{{ external_chia }}"
-            dest: "{{ chia_darwin_home }}/.chia"
-            state: link
-            force: false
-
-        - name: Reset the fake launchctl log before the rescue run
-          ansible.builtin.copy:
-            content: ""
-            dest: "{{ test_root }}/launchctl.log"
-            mode: "0644"
-
-        - name: Run the local-external root include with a failing rsync
-          vars:
-            chia_darwin_rsync: /bin/false
-          ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
-
-        - name: Require the failed migration to report and restore the legacy link
-          vars:
-            launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
-          ansible.builtin.assert:
-            that:
-              - local_external_case_failed | bool
-              - local_external_case_message is search('migration failed')
-              - launchctl_lines | select('search', 'bootout system/net.chia.roottest.timelord') | list | length >= 1
-              - launchctl_lines | select('search', 'bootstrap .*net.chia.roottest.timelord') | list | length >= 1
-              - launchctl_lines | select('search', 'net.chia.roottest.disabled') | list | length == 0
-            fail_msg: >-
-              A failed rsync must restore the legacy link and restart the
-              enabled job. Failure: {{ local_external_case_message }} Log:
-              {{ launchctl_lines }}
-
-        - name: Inspect the rescue layout after the failure
-          ansible.builtin.stat:
-            path: "{{ item }}"
-            follow: false
-          loop:
-            - "{{ chia_darwin_home }}/.chia"
-            - "{{ chia_darwin_home }}/.chia.migrating"
-            - "{{ chia_darwin_home }}/.chia.migrating.leftover"
-          register: rescue_stats
-
-        - name: Require the rescue to restore the link and move staging aside
-          ansible.builtin.assert:
-            that:
-              - rescue_stats.results[0].stat.islnk | default(false)
-              - >-
-                (rescue_stats.results[0].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
-                (external_chia | regex_replace('/+$', ''))
-              - not (rescue_stats.results[1].stat.exists | default(false))
-              - rescue_stats.results[2].stat.isdir | default(false)
-            fail_msg: >-
-              A failed migration must restore ~/.chia as the legacy link and
-              move its staging tree aside, not delete it.
-
-        - name: Run the local-external root include again after the rescue
-          vars:
-            chia_darwin_rsync: /usr/bin/rsync
-          ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
-
-        - name: Require the second run to proceed and migrate
-          ansible.builtin.assert:
-            that:
-              - not (local_external_case_failed | bool)
-            fail_msg: >-
-              A second run after a rescue must not refuse on leftover staging:
-              {{ local_external_case_message }}
-
-        - name: Inspect the rescue layout after the second run
-          ansible.builtin.stat:
-            path: "{{ item }}"
-            follow: false
-          loop:
-            - "{{ chia_darwin_home }}/.chia"
-            - "{{ chia_darwin_home }}/.chia.legacy-volume-link"
-            - "{{ chia_darwin_home }}/.chia.migrating"
-          register: rescue_second
-
-        - name: Require the second run to finish the migration
-          ansible.builtin.assert:
-            that:
-              - rescue_second.results[0].stat.isdir | default(false)
-              - not (rescue_second.results[0].stat.islnk | default(false))
-              - rescue_second.results[1].stat.islnk | default(false)
-              - not (rescue_second.results[2].stat.exists | default(false))
+    - name: Run the local-external leftover, rescue, and restart cases
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-restart.yml"
 
     - name: Finish a migration interrupted after the first rename
       vars:

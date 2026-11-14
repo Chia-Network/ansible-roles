@@ -414,3 +414,70 @@
         that:
           - big_db_after.stat.isreg | default(false)
           - big_db_after.stat.inode == (big_db_before.stat.inode | int)
+
+- name: Refuse repeated migration failures before stopping any job
+  vars:
+    chia_darwin_home: "{{ test_root }}/repeated/home"
+    chia_root: "{{ test_root }}/repeated/home/.chia/{{ network }}"
+    repeated_leftovers:
+      - "{{ test_root }}/repeated/home/.chia.migrating.leftover-20000101T000000Z"
+      - "{{ test_root }}/repeated/home/.chia.migrating.leftover-20000101T000001Z"
+      - "{{ test_root }}/repeated/home/.chia.migrating.leftover-20000101T000002Z"
+  block:
+    - name: Prepare a legacy ~/.chia link and three leftover trees
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop: "{{ [chia_darwin_home] + repeated_leftovers }}"
+
+    - name: Write a marker into each existing leftover tree
+      ansible.builtin.copy:
+        content: keep-leftover
+        dest: "{{ item }}/keep.txt"
+        mode: "0644"
+      loop: "{{ repeated_leftovers }}"
+
+    - name: Create the legacy ~/.chia link next to the leftovers
+      ansible.builtin.file:
+        src: "{{ external_chia }}"
+        dest: "{{ chia_darwin_home }}/.chia"
+        state: link
+        force: false
+
+    - name: Reset the fake launchctl log before the repeated-failure case
+      ansible.builtin.copy:
+        content: ""
+        dest: "{{ test_root }}/launchctl.log"
+        mode: "0644"
+
+    - name: Run the local-external root include with the leftover cap reached
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+    - name: Require the repeated-failure refusal before any job stop
+      vars:
+        launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
+      ansible.builtin.assert:
+        that:
+          - local_external_case_failed | bool
+          - local_external_case_message is search('Repeated local-external migration failures')
+          - local_external_case_message is search('reaching the cap')
+          - local_external_case_message is search('\\.chia\\.migrating\\.leftover')
+          - launchctl_lines | select('search', 'bootout') | list | length == 0
+        fail_msg: >-
+          A legacy ~/.chia with the leftover cap reached must refuse before any
+          bootout. Failure: {{ local_external_case_message }} Log:
+          {{ launchctl_lines }}
+
+    - name: Inspect the existing leftover trees after the refusal
+      ansible.builtin.stat:
+        path: "{{ item }}/keep.txt"
+        follow: false
+      loop: "{{ repeated_leftovers }}"
+      register: repeated_leftover_stats
+
+    - name: Require the repeated-failure refusal to leave every leftover untouched
+      ansible.builtin.assert:
+        that:
+          - repeated_leftover_stats.results | rejectattr('stat.exists') | list | length == 0
+          - repeated_leftover_stats.results | map(attribute='stat.path') | list | length == 3

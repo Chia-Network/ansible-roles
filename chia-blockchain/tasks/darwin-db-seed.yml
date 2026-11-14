@@ -100,16 +100,26 @@
       become: "{{ chia_darwin_launchd_become | bool }}"
 
     # A later ordered restart brings the node back, so an already requested
-    # restart may stop only the loaded full node instead of refusing to seed.
+    # restart, or the migration's own restart, may stop only the loaded full
+    # node instead of refusing to seed.
     - name: Stop the loaded full node before seeding when a restart is requested
       when:
         - chia_darwin_db_seed_node.rc | default(1) | int == 0
-        - chia_darwin_restart_services | default(false) | bool
+        - >-
+          (chia_darwin_restart_services | default(false) | bool) or
+          (chia_darwin_local_external_restarted | default(false) | bool)
       vars:
-        chia_job:
-          label: "{{ chia_darwin_launchd_prefix }}.full-node"
-          exit_timeout: "{{ chia_darwin_full_node_exit_timeout }}"
+        chia_job: "{{ chia_darwin_service_jobs | selectattr('name', 'equalto', 'full-node') | first }}"
       ansible.builtin.include_tasks: darwin-stop-job.yml
+
+    - name: Request a Darwin restart after stopping the full node for the seed
+      when:
+        - chia_darwin_db_seed_node.rc | default(1) | int == 0
+        - >-
+          (chia_darwin_restart_services | default(false) | bool) or
+          (chia_darwin_local_external_restarted | default(false) | bool)
+      ansible.builtin.set_fact:
+        chia_darwin_restart_services: true
 
     - name: Refuse to replace a database under a loaded full node
       ansible.builtin.fail:
@@ -120,7 +130,9 @@
           and rerun. This role never replaces a live node's database.
       when:
         - chia_darwin_db_seed_node.rc | default(1) | int == 0
-        - not (chia_darwin_restart_services | default(false) | bool)
+        - >-
+          not ((chia_darwin_restart_services | default(false) | bool) or
+          (chia_darwin_local_external_restarted | default(false) | bool))
 
     - name: Ensure the AWS CLI is available for the database seed
       when: not ansible_check_mode

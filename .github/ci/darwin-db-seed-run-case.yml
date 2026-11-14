@@ -23,6 +23,7 @@
         chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-{{ case.launchctl | default('notloaded') }}"
         chia_darwin_db_volume: "{{ case.volume | default(external_volume) }}"
         chia_darwin_restart_services: "{{ case.restart_services | default(false) }}"
+        chia_darwin_local_external_restarted: "{{ case.local_external_restarted | default(false) }}"
 
     - name: Fail when the {{ case.name }} seed unexpectedly succeeded
       ansible.builtin.fail:
@@ -47,4 +48,5 @@
     chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-{{ case.launchctl | default('notloaded') }}"
     chia_darwin_db_volume: "{{ case.volume | default(external_volume) }}"
     chia_darwin_restart_services: "{{ case.restart_services | default(false) }}"
+    chia_darwin_local_external_restarted: "{{ case.local_external_restarted | default(false) }}"
   when: case.expect_failure is not defined

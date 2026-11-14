@@ -397,6 +397,38 @@
           before seeding instead of refusing. Log:
           {{ lookup('file', test_root ~ '/launchctl.log') }}
 
+    - name: Reset the fake tool state before the migration-restart seed case
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-reset-tools.yml"
+      vars:
+        reset_files: ["aws.log", "launchctl.log", "launchctl.booted-out"]
+
+    - name: Prepare a stub with the full node loaded after a migration restart
+      ansible.builtin.copy:
+        content: "{{ 'S' * 8192 }}"
+        dest: "{{ running_root }}/db/blockchain_v2_mainnet.sqlite"
+        mode: "0644"
+
+    - name: A loaded full node is stopped for the seed after a migration restart
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-run-case.yml"
+      vars:
+        case:
+          name: loaded stub after migration restart
+          root: "{{ running_root }}"
+          launchctl: bootout
+          local_external_restarted: true
+
+    - name: Assert the migration-restart seed stopped the node and requested a restart
+      ansible.builtin.assert:
+        that:
+          - lookup('file', running_root ~ '/db/blockchain_v2_mainnet.sqlite') == fixture_main
+          - "'bootout system/' ~ chia_darwin_launchd_prefix ~ '.full-node' in lookup('file', test_root ~ '/launchctl.log')"
+          - chia_darwin_restart_services | bool
+          - (lookup('file', test_root ~ '/aws.log') | split('\n') | reject('eq', '') | list | length) == 3
+        fail_msg: >-
+          A loaded full node after a migration restart must be stopped for the
+          seed and the later restart must be requested. Log:
+          {{ lookup('file', test_root ~ '/launchctl.log') }}
+
     - name: Each snapshot copy failure is fatal and publishes no partial database
       ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-failure-case.yml"
       loop:
