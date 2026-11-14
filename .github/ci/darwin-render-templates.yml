@@ -10,10 +10,8 @@
   vars:
     render_out: /tmp/darwin
     topologies:
-      - local-internal
       - local-external
       - remote-node
-      - vdf-only
     templates:
       - chia-daemon-run.sh
       - chia-env.sh
@@ -111,8 +109,8 @@
         mode: "0644"
       vars:
         chia_darwin_topology: "{{ item.0 }}"
-        chia_darwin_local_full_node: "{{ item.0 in ['local-internal', 'local-external'] }}"
-        chia_darwin_local_timelord: "{{ item.0 != 'vdf-only' }}"
+        chia_darwin_local_full_node: "{{ item.0 == 'local-external' }}"
+        chia_darwin_local_timelord: "{{ item.0 in ['local-external', 'remote-node'] }}"
       loop: "{{ topologies | product(templates) | list }}"
       loop_control:
         label: "{{ item.0 }}/{{ item.1 }}"
@@ -249,56 +247,6 @@
             'launchctl enable "system/$PREFIX.$1"' in text
           - >-
             'launchctl disable "system/$PREFIX.$1"' in text
-
-    - name: Read the vdf-only hw-vdf wrapper
-      ansible.builtin.slurp:
-        src: "{{ render_out }}/vdf-only/chia-hw-vdf-run.sh"
-      register: vdf_only_wrapper
-
-    - name: vdf-only skips the local timelord wait
-      vars:
-        text: "{{ vdf_only_wrapper.content | b64decode }}"
-      ansible.builtin.assert:
-        that:
-          - "'vdf-only has no local timelord' in text"
-          - '''wait_for_listen "$PORT"'' not in text'
-
-    - name: Create the vdf-only watchdog fixture directory
-      ansible.builtin.file:
-        path: "{{ render_out }}/vdf-only-no-services"
-        state: directory
-        mode: "0755"
-
-    - name: Set the vdf-only service and companion lists
-      ansible.builtin.set_fact:
-        chia_darwin_service_jobs: "{{ no_local_service_jobs }}"
-        chia_darwin_companion_jobs: "{{ minimal_companion_jobs }}"
-
-    - name: Render the vdf-only watchdog with no local services
-      ansible.builtin.template:
-        src: "../../chia-blockchain/templates/darwin/chia-watchdog.sh.j2"
-        dest: "{{ render_out }}/vdf-only-no-services/chia-watchdog.sh"
-        mode: "0644"
-      vars:
-        chia_darwin_topology: vdf-only
-
-    - name: Read the vdf-only watchdog
-      ansible.builtin.slurp:
-        src: "{{ render_out }}/vdf-only-no-services/chia-watchdog.sh"
-      register: vdf_only_watchdog
-
-    - name: The vdf-only watchdog checks boards but not local HTTP services
-      vars:
-        text: "{{ vdf_only_watchdog.content | b64decode }}"
-      ansible.builtin.assert:
-        that:
-          - '''CHECK_FULL_NODE="0"'' in text'
-          - '''CHECK_HEALTHCHECK="0"'' in text'
-          - '''CHECK_FULL_NODE_PORTS="0"'' in text'
-          - "'CHECK_VDF_CONNS' not in text"
-          - '''SERVICE_JOB_LIST=""'' in text'
-          - '''EXPECTED_VDFS="3"'' in text'
-          - "'hw_jobs_running' in text"
 
     - name: Create the VDF tuning fixture directory
       ansible.builtin.file:

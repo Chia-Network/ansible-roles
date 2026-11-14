@@ -5,8 +5,8 @@ Relevant only for topology local-external. ~/.chia is a real directory on the
 internal disk, and CHIA_ROOT ({{ chia_root }}) stays there, including the wallet
 database. Only {{ chia_root }}/db is a symlink to the on-volume database
 directory ({{ chia_darwin_volume_db_dir }}) on {{ chia_darwin_db_volume }}.
-local-internal and remote-node keep everything on the internal disk and do not
-need this grant.
+local-external keeps CHIA_ROOT on the internal disk. remote-node has no volume
+and no local database, so it does not need this grant.
 
 Why
 ---

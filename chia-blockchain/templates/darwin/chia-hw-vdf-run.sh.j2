@@ -29,12 +29,7 @@ N_VDFS={{ chia_hw_board.n_vdfs | quote }}
 SERIAL={{ chia_hw_board.expected_serial | quote }}
 {% endif %}
 
-{% if chia_darwin_local_timelord | default(true) | bool == false %}
-# vdf-only has no local timelord: connect to the remote VDF server and do not
-# block on a local listener that will never appear.
-{% else %}
 wait_for_listen "$PORT" # timelord vdf_server must be up (hw_vdf_client exits if it can't connect)
-{% endif %}
 sleep {{ chia_darwin_hw_vdf_settle_seconds | int }}
 {% if per_board %}
 OPEN_DELAY={{ chia_hw_board.open_delay | int }}

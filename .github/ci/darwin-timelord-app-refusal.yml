@@ -1,18 +1,25 @@
 ---
-- name: Refuse Timelord.app with {{ refusal_case.name }}
+- name: Refuse {{ refusal_case.name }}
   block:
     - name: Set the invalid {{ refusal_case.name }} inventory
       ansible.builtin.set_fact:
         chia_darwin_topology: "{{ refusal_case.facts.chia_darwin_topology }}"
         chia_darwin_timelord_implementation: "{{ refusal_case.facts.chia_darwin_timelord_implementation }}"
-        chia_darwin_timelord_app_bundle_path: "{{ refusal_case.facts.chia_darwin_timelord_app_bundle_path }}"
-        chia_darwin_timelord_app_bundle_src: "{{ refusal_case.facts.chia_darwin_timelord_app_bundle_src }}"
-        chia_darwin_local_full_node: "{{ refusal_case.facts.chia_darwin_local_full_node }}"
-        chia_darwin_local_timelord: "{{ refusal_case.facts.chia_darwin_local_timelord }}"
-        chia_darwin_timelord_app_enabled: "{{ refusal_case.facts.chia_darwin_timelord_app_enabled }}"
-        chia_darwin_enable_hw_vdf: "{{ refusal_case.facts.chia_darwin_enable_hw_vdf }}"
+        chia_darwin_timelord_app_bundle_path: "{{ refusal_case.facts.chia_darwin_timelord_app_bundle_path | default('') }}"
+        chia_darwin_timelord_app_bundle_src: "{{ refusal_case.facts.chia_darwin_timelord_app_bundle_src | default('') }}"
+        chia_darwin_enable_hw_vdf: "{{ refusal_case.facts.chia_darwin_enable_hw_vdf | default(refusal_case.facts.chia_darwin_timelord_implementation == 'chia-blockchain') }}"
 
-    - name: Include the implementation checks for the invalid inventory
+    # local-internal and vdf-only fail here, before jobs or implementation
+    # validation run.
+    - name: Include the early topology check for {{ refusal_case.name }}
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-topology-validate.yml
+
+    # The remaining invalid combinations pass the topology allow-list, so
+    # derive the production job facts before the implementation checks.
+    - name: Derive the job facts for {{ refusal_case.name }}
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-jobs.yml
+
+    - name: Include the implementation checks for {{ refusal_case.name }}
       ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-implementation-validate.yml
 
     - name: Fail when the {{ refusal_case.name }} inventory was accepted

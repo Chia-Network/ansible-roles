@@ -333,8 +333,6 @@ chia_wallet_connect_to_unknown_peers: true
 # variables.
 #
 # chia_darwin_topology:
-#   local-internal   Local full node and timelord. CHIA_ROOT is a real directory
-#                    on the internal disk. Wrappers do not wait for a volume.
 #   local-external   Local full node and timelord. ~/.chia and CHIA_ROOT are
 #                    real directories on the internal disk. Only
 #                    <chia_root>/db is a symlink onto the volume at
@@ -357,12 +355,12 @@ chia_wallet_connect_to_unknown_peers: true
 #                    later the remote full node accepts inbound timelords only
 #                    from localhost or exempt_peer_networks, so that node must
 #                    list this Mac.
-#   vdf-only         Only the ASIC hw_vdf_client jobs. The daemon, full node,
-#                    timelord, chia-exporter, and chia-healthcheck jobs are not
-#                    installed. Set chia_darwin_hw_vdf_ip to the remote
-#                    timelord's VDF server address. The watchdog still watches
-#                    the board LaunchDaemons. This topology is for a Mac that
-#                    only supplies ASIC VDF engines to a timelord elsewhere.
+#
+# Allowed combinations:
+#   1. chia-blockchain + local-external with 1-3 role-managed hw-vdf boards
+#   2. timelord-app + local-external
+#   3. timelord-app + remote-node
+# local-internal and vdf-only are no longer supported.
 #
 # Network: the same `network` variable as Linux (mainnet or testnet11). Darwin
 # CHIA_ROOT defaults to ~/.chia/<network>, so the two networks do not share a
@@ -393,11 +391,11 @@ chia_wallet_connect_to_unknown_peers: true
 # ---------------------------------------------------------------------------
 chia_darwin_topology: local-external
 # chia-blockchain runs the Python timelord and the role-managed hw_vdf_client
-# jobs. timelord-app runs the signed Timelord.app supervisor instead; the app
-# owns both the timelord and the ASIC USB clients, so role-managed hw-vdf jobs
-# are refused. local-internal and local-external still install the role-managed
-# full node and daemon. remote-node with the app skips Python and chia-blockchain
-# entirely and imports a prebuilt connection bundle. vdf-only is incompatible.
+# jobs on local-external. timelord-app runs the signed Timelord.app supervisor
+# instead; the app owns both the timelord and the ASIC USB clients, so
+# role-managed hw-vdf jobs are refused. local-external with the app still
+# installs the role-managed full node and daemon. remote-node with the app skips
+# Python and chia-blockchain entirely and imports a prebuilt connection bundle.
 chia_darwin_timelord_implementation: chia-blockchain
 chia_darwin_timelord_app_enabled: "{{ chia_darwin_timelord_implementation == 'timelord-app' }}"
 chia_darwin_enable_hw_vdf: "{{ chia_darwin_timelord_implementation == 'chia-blockchain' }}"
@@ -438,7 +436,7 @@ chia_darwin_chiavdf_version: "1.2.2"
 chia_darwin_hw_vdf_client: "{{ chia_darwin_homebrew_prefix }}/bin/hw_vdf_client"
 # Initial full-node database seeding from the same S3 snapshot Linux uses.
 # Reuses blockchain_backup_bucket, download_blockchain_db, network, and
-# db_version. Only local-internal and local-external seed. The AWS CLI is
+# db_version. Only local-external seeds. The AWS CLI is
 # installed with Homebrew when a seed is actually needed. Credentials use the
 # AWS CLI's normal discovery as the service user.
 chia_darwin_aws: "{{ chia_darwin_homebrew_prefix }}/bin/aws"
@@ -591,8 +589,8 @@ chia_darwin_periodic_connect_interval_seconds: 300
 # Signed Timelord.app (chia_darwin_timelord_implementation: timelord-app).
 #
 # The app owns the timelord worker and the bundled hw_vdf_client ASIC clients.
-# The role still installs the full node and daemon for local-internal and
-# local-external. remote-node app deployments install no Python or
+# The role still installs the full node and daemon for local-external.
+# remote-node app deployments install no Python or
 # chia-blockchain and must provide a connection bundle created on the full-node
 # host. The app writes learned board settings into its config, so the role only
 # renders the full base config when it is missing or force_config is true; it

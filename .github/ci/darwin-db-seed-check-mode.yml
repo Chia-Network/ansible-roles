@@ -17,12 +17,6 @@
         - name: Create the shared fixtures and fake tools
           ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-setup.yml"
 
-        - name: Prepare the check-mode database directory
-          ansible.builtin.file:
-            path: "{{ test_root }}/checkmode/mainnet/db"
-            state: directory
-            mode: "0755"
-
         - name: Reset the fake tool state
           ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-reset-tools.yml"
 
@@ -31,8 +25,8 @@
         - name: Run the seed with the full node loaded in check mode
           ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
           vars:
-            chia_darwin_topology: local-internal
-            chia_root: "{{ test_root }}/checkmode/mainnet"
+            chia_darwin_topology: local-external
+            chia_root: "{{ test_root }}/home ext/.chia/mainnet"
             network: mainnet
             download_blockchain_db: true
             blockchain_backup_bucket: test-bucket
@@ -52,8 +46,8 @@
       ansible.builtin.stat:
         path: "{{ item }}"
       loop:
-        - "{{ test_root }}/checkmode/mainnet/db/blockchain_v2_mainnet.sqlite"
-        - "{{ test_root }}/checkmode/mainnet/db/.chia-s3-seed-mainnet"
+        - "{{ external_root }}/mainnet/db/blockchain_v2_mainnet.sqlite"
+        - "{{ external_root }}/mainnet/db/.chia-s3-seed-mainnet"
       register: darwin_db_seed_checkmode
 
     - name: Assert check mode downloaded nothing and wrote nothing

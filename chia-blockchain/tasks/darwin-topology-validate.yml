@@ -1,0 +1,13 @@
+---
+# Early topology check. Runs before the job list so a removed topology cannot
+# derive jobs or reach any host-changing task.
+- name: Require a known Darwin topology
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_topology in ["local-external", "remote-node"]
+    fail_msg: >-
+      chia_darwin_topology must be local-external or remote-node. The allowed
+      combinations are chia-blockchain with local-external and 1-3 role-managed
+      hw-vdf boards, timelord-app with local-external, and timelord-app with
+      remote-node. local-internal and vdf-only are no longer supported. Got
+      {{ chia_darwin_topology }}.

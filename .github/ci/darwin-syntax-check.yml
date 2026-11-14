@@ -12,6 +12,8 @@
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-local-external-root.yml
     - name: Import the Darwin companion tasks
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-companions.yml
+    - name: Import the Darwin topology checks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-topology-validate.yml
     - name: Import the Darwin job-list tasks
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-jobs.yml
     - name: Import the Darwin implementation checks
