@@ -403,7 +403,7 @@ the venv `python3.13` resolves to, for example
 That Python grant is tied to the Cellar version path; a Homebrew Python upgrade
 changes the path and the node loses DB access until the grant is added for the
 new binary. Do not add companion binaries, tailscaled, alloy, exporters, hw-vdf,
-the watchdog, bash, or healthcheck to Full Disk Access for this layout. Ansible
+the watchdog, Bash, or healthcheck to Full Disk Access for this layout. Ansible
 and this role cannot grant TCC Full Disk Access; see the `FULL-DISK-ACCESS.txt`
 note the role writes on the Mac, which prints the resolved Python path.
 

@@ -35,7 +35,7 @@ only for `/bin/zsh` (the launchd shebang interpreter shared by every wrapper) an
 the full node's Python interpreter, the real Homebrew Cellar binary the venv
 `python3.13` resolves to. A Homebrew Python upgrade changes that path, so the
 node loses DB access until the new binary is granted. Do not add companion
-binaries, tailscaled, alloy, exporters, hw-vdf, the watchdog, bash, or
+binaries, tailscaled, alloy, exporters, hw-vdf, the watchdog, Bash, or
 healthcheck for this layout.
 
 See [DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#managing-several-macs) for the

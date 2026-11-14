@@ -20,7 +20,7 @@
     Do not add a second identifier for that versioned Cellar path here because a
     Homebrew Python upgrade changes it. CHIA_ROOT and the companion services stay
     on the internal disk, so companion binaries, tailscaled, hw-vdf, the
-    watchdog, bash, and healthcheck are not added to this profile. Granting Full
+    watchdog, Bash, and healthcheck are not added to this profile. Granting Full
     Disk Access to {{ chia_darwin_interpreter | e }} is still broad: other jobs
     that start via the same interpreter inherit it.
   -->
