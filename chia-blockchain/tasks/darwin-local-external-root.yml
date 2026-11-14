@@ -1,12 +1,10 @@
 ---
 # local-external keeps ~/.chia and CHIA_ROOT on the internal disk. Only
-# <chia_root>/db is a symlink onto the existing on-volume database directory
-# <chia_darwin_volume_chia_dir>/<network>/db. This file creates that layout,
-# repairs a missing db symlink, and migrates the old ~/.chia -> volume/dot-chia
-# symlink without moving, copying, or deleting the blockchain database. A
-# failed migration moves its staging tree aside and brings every enabled job
-# whose plist is installed back. The caller (darwin.yml) requires the volume
-# to be mounted first.
+# <chia_root>/db is a symlink to <chia_darwin_volume_chia_dir>/<network>/db.
+# The same path creates a fresh layout and leaves a converged one unchanged.
+# A legacy ~/.chia volume symlink is refused and left untouched; this role
+# never migrates, renames, or deletes user data. The caller (darwin.yml)
+# requires the volume to be mounted first.
 
 - name: Set the local-external CHIA_ROOT paths
   ansible.builtin.set_fact:
@@ -66,35 +64,10 @@
       else ('real-directory' if root_db.isdir | default(false) else 'file'))) }}
   changed_when: false
 
-- name: Detect the portable directory rename flag
-  ansible.builtin.command:
-    argv:
-      - /bin/sh
-      - -c
-      - 'if [ "$(/usr/bin/uname -s)" = Darwin ]; then printf %s -h; else printf %s -T; fi'
-  register: chia_darwin_local_external_rename_flag
-  changed_when: false
-
-- name: Find existing failed-migration leftover directories
-  ansible.builtin.find:
-    paths: "{{ chia_darwin_home }}"
-    patterns:
-      - ".chia.migrating.leftover*"
-    file_type: directory
-    hidden: true
-    recurse: false
-  register: chia_darwin_local_external_leftovers
-  changed_when: false
-
-- name: Classify the local-external layout action
-  vars:
-    stats: "{{ chia_darwin_local_external_stats }}"
+- name: Decide whether the local-external layout can be ensured
   ansible.builtin.set_fact:
     chia_darwin_local_external_ensure_layout: >-
-      {{ (chia_darwin_local_external_dot_kind == 'real-directory') or
-      (chia_darwin_local_external_dot_kind == 'absent' and
-      not (stats.migrating.exists | default(false)) and
-      not (stats.legacy.exists | default(false))) }}
+      {{ chia_darwin_local_external_dot_kind in ['real-directory', 'absent'] }}
   changed_when: false
 
 - name: Refuse an unsafe or unfinished local-external layout
@@ -109,52 +82,38 @@
     ensure_layout: "{{ chia_darwin_local_external_ensure_layout | bool }}"
     staging: "{{ stats.migrating.exists | default(false) }}"
     legacy_exists: "{{ stats.legacy.exists | default(false) }}"
-    volume_db_exists: "{{ stats.volume_db.isdir | default(false) }}"
-    leftover_glob: "{{ chia_darwin_home }}/.chia.migrating.leftover*"
-    leftover_count: "{{ chia_darwin_local_external_leftovers.matched | default(0) | int }}"
-    leftover_max: "{{ chia_darwin_local_external_leftover_max | default(3) | int }}"
   ansible.builtin.fail:
     msg: "{{ item.msg }}"
   when: item.refuse | bool
   loop:
-    - refuse: "{{ chia_darwin_local_external_dot_kind == 'absent' and not staging and legacy_exists }}"
+    - refuse: "{{ chia_darwin_local_external_dot_kind == 'legacy-volume-link' }}"
       msg: >-
-        {{ dot }} is missing but {{ legacy }} exists. That link is a finished
-        migration's backup; this role will not restore the old volume layout.
-        Restore ~/.chia or move the legacy link aside.
-    - refuse: "{{ chia_darwin_local_external_dot_kind == 'absent' and staging and not legacy_exists }}"
-      msg: >-
-        {{ dot }} is missing and {{ migrating }} exists without {{ legacy }}.
-        Inspect the staging tree manually; this role will not overwrite or
-        delete it.
+        {{ dot }} is a symlink to {{ stats.dot.lnk_target | default('') }}. This
+        role does not migrate a legacy volume symlink. Move it aside manually;
+        nothing was changed.
     - refuse: "{{ chia_darwin_local_external_dot_kind == 'unexpected-symlink' }}"
       msg: >-
         {{ dot }} is a symlink to {{ stats.dot.lnk_target | default('') }}, not
-        {{ volume_chia }}. This role only migrates the historical
-        local-external volume symlink. Move it aside manually.
+        {{ volume_chia }}. Move it aside manually; nothing was changed.
     - refuse: "{{ chia_darwin_local_external_dot_kind == 'unexpected' }}"
       msg: >-
         {{ dot }} exists but is neither a directory nor a symlink. Move it aside
         before using local-external. This role does not delete data.
-    - refuse: "{{ chia_darwin_local_external_dot_kind == 'legacy-volume-link' and leftover_count >= leftover_max }}"
+    - refuse: "{{ chia_darwin_local_external_dot_kind == 'absent' and staging }}"
       msg: >-
-        Repeated local-external migration failures: {{ leftover_count }} leftover
-        trees match {{ leftover_glob }}, reaching the cap of {{ leftover_max }}.
-        Inspect those trees (they may contain config, keys, and wallet database
-        copies) and fix the cause before rerunning. Move them out of
-        {{ chia_darwin_home }} (fewer than {{ leftover_max }} may remain) or
-        raise chia_darwin_local_external_leftover_max. This role does not delete
-        leftovers.
-    - refuse: "{{ chia_darwin_local_external_dot_kind == 'legacy-volume-link' and legacy_exists }}"
+        {{ dot }} is missing and {{ migrating }} exists. Inspect that staging
+        tree manually; this role will not create a new layout beside it or
+        delete it. Nothing was changed.
+    - refuse: "{{ chia_darwin_local_external_dot_kind == 'absent' and legacy_exists }}"
       msg: >-
-        {{ legacy }} already exists while {{ dot }} is still the legacy volume
-        symlink. Inspect both paths manually before rerunning. This role will not
-        overwrite the backup path.
-    - refuse: "{{ chia_darwin_local_external_dot_kind == 'legacy-volume-link' and not volume_db_exists }}"
+        {{ dot }} is missing but {{ legacy }} exists. That link is a finished
+        migration's backup; this role will not restore the old volume layout.
+        Restore ~/.chia or move the legacy link aside. Nothing was changed.
+    - refuse: "{{ chia_darwin_local_external_dot_kind == 'real-directory' and staging }}"
       msg: >-
-        {{ volume_db }} does not exist or is not a directory. The legacy
-        migration expects the existing on-volume database and will not invent a
-        new location. Nothing local was changed.
+        {{ dot }} is a valid internal directory but {{ migrating }} still exists.
+        Inspect the staging tree manually; this role will not rename or delete
+        it. Nothing was changed.
     - refuse: "{{ ensure_layout and chia_darwin_local_external_root_db_kind == 'real-directory' }}"
       msg: >-
         {{ root_db }} is a real directory. The data may already be local. This
@@ -171,91 +130,6 @@
   loop_control:
     label: "{{ item.msg | truncate(40) }}"
 
-- name: Move a leftover staging tree aside while ~/.chia exists
-  when:
-    - chia_darwin_local_external_dot_kind != "absent"
-    - chia_darwin_local_external_stats.migrating.exists | default(false)
-  block:
-    - name: Name the leftover migration staging tree
-      ansible.builtin.set_fact:
-        chia_darwin_local_external_leftover: >-
-          {{ chia_darwin_local_external_dot_chia_migrating }}.leftover-{{ now(utc=true, fmt='%Y%m%dT%H%M%SZ') }}
-      changed_when: false
-
-    - name: Rename the leftover migration staging tree aside
-      ansible.builtin.include_tasks: darwin-local-external-rename.yml
-      vars:
-        local_external_rename_src: "{{ chia_darwin_local_external_dot_chia_migrating }}"
-        local_external_rename_dest: "{{ chia_darwin_local_external_leftover }}"
-        local_external_rename_name: "the leftover migration staging tree"
-
-    - name: Warn that the leftover migration staging tree was kept
-      ansible.builtin.debug:
-        msg: >-
-          Kept {{ chia_darwin_local_external_leftover }}. It may contain config,
-          keys, and wallet database copies. This role does not delete leftovers.
-
-- name: Find large non-database files the legacy migration would copy
-  become: "{{ chia_darwin_launchd_become | bool }}"
-  ansible.builtin.command:
-    argv:
-      - /usr/bin/find
-      - "{{ chia_darwin_volume_chia_dir }}/"
-      - -path
-      - "{{ chia_darwin_volume_chia_dir }}/*/db"
-      - -prune
-      - -o
-      - -type
-      - f
-      - -size
-      - "+{{ chia_darwin_local_external_copy_max_mb | default(512) }}M"
-      - -print
-  register: chia_darwin_local_external_big_files
-  changed_when: false
-  when: chia_darwin_local_external_dot_kind == "legacy-volume-link"
-
-- name: Refuse to copy large non-database files onto the internal disk
-  ansible.builtin.assert:
-    that:
-      - chia_darwin_local_external_big_files.stdout_lines | default([]) | length == 0
-    fail_msg: >-
-      Move these files off the CHIA_ROOT tree before migrating:
-      {{ chia_darwin_local_external_big_files.stdout_lines | default([]) }}
-  when: chia_darwin_local_external_dot_kind == "legacy-volume-link"
-
-- name: Finish a local-external migration interrupted after the first rename
-  when:
-    - chia_darwin_local_external_dot_kind == "absent"
-    - chia_darwin_local_external_stats.migrating.exists | default(false)
-    - chia_darwin_local_external_stats.legacy.exists | default(false)
-  block:
-    - name: Inspect the interrupted staging network directory
-      ansible.builtin.stat:
-        path: "{{ chia_darwin_local_external_dot_chia_migrating }}/{{ network }}"
-        follow: false
-      register: chia_darwin_local_external_interrupted_network
-
-    - name: Require the interrupted staging tree to look complete
-      ansible.builtin.assert:
-        that:
-          - chia_darwin_local_external_interrupted_network.stat.isdir | default(false)
-        fail_msg: >-
-          {{ chia_darwin_local_external_dot_chia }} is missing and
-          {{ chia_darwin_local_external_dot_chia_migrating }} is not complete.
-          The legacy link was left in place. Inspect both paths manually; this
-          role will not overwrite the staging tree.
-
-    - name: Finish the interrupted local-external swap
-      ansible.builtin.include_tasks: darwin-local-external-rename.yml
-      vars:
-        local_external_rename_src: "{{ chia_darwin_local_external_dot_chia_migrating }}"
-        local_external_rename_dest: "{{ chia_darwin_local_external_dot_chia }}"
-        local_external_rename_name: "the interrupted migration staging tree"
-
-    - name: Request a Darwin restart after finishing the interrupted migration
-      ansible.builtin.set_fact:
-        chia_darwin_restart_services: true
-
 - name: Ensure the local-external directories exist
   become: "{{ chia_darwin_launchd_become | bool }}"
   become_user: "{{ user }}"
@@ -268,8 +142,11 @@
   loop: >-
     {{ ([chia_darwin_local_external_dot_chia]
     if chia_darwin_local_external_dot_kind == 'absent' else []) +
-    ([chia_root, chia_darwin_volume_db_dir]
-    if chia_darwin_local_external_root_db_kind == 'absent' else []) }}
+    ([chia_root]
+    if chia_darwin_local_external_root_db_kind == 'absent' else []) +
+    ([chia_darwin_volume_db_dir]
+    if not (chia_darwin_local_external_stats.volume_db.exists | default(false))
+    else []) }}
   when: chia_darwin_local_external_ensure_layout | bool
 
 - name: Link the local-external database path at the on-volume database
@@ -283,270 +160,6 @@
   when:
     - chia_darwin_local_external_ensure_layout | bool
     - chia_darwin_local_external_root_db_kind == "absent"
-
-- name: Migrate the legacy external CHIA_ROOT symlink
-  when:
-    - chia_darwin_local_external_dot_kind == "legacy-volume-link"
-    - not (chia_darwin_local_external_stats.legacy.exists | default(false))
-  block:
-    # Staging runs as the service user in production so rsync -a keeps user
-    # ownership and links are not root:wheel. launchctl stays with the daemon
-    # user (become launchd_become, no become_user). Stop every enabled job
-    # again, even one an interrupted run left unloaded; darwin-stop-job.yml
-    # tolerates an already-unloaded job.
-    - name: Stop the enabled chia LaunchDaemons before the migration
-      vars:
-        chia_job: "{{ item }}"
-      ansible.builtin.include_tasks: darwin-stop-job.yml
-      loop: "{{ chia_darwin_launchd_jobs | default([]) | selectattr('enabled', 'truthy') | list }}"
-      loop_control:
-        label: "{{ item.label }}"
-
-    - name: Create the local-external migration staging directory
-      become: "{{ chia_darwin_launchd_become | bool }}"
-      become_user: "{{ user }}"
-      ansible.builtin.file:
-        path: "{{ chia_darwin_local_external_dot_chia_migrating }}"
-        state: directory
-        owner: "{{ user }}"
-        group: "{{ chia_darwin_group }}"
-        mode: "0755"
-
-    - name: Copy non-database CHIA_ROOT contents into the staging directory
-      become: "{{ chia_darwin_launchd_become | bool }}"
-      become_user: "{{ user }}"
-      ansible.builtin.command:
-        argv:
-          - "{{ chia_darwin_rsync }}"
-          - -a
-          - --exclude=/*/db/
-          - --exclude=/*/db/**
-          - "{{ chia_darwin_volume_chia_dir }}/"
-          - "{{ chia_darwin_local_external_dot_chia_migrating }}/"
-      changed_when: true
-
-    - name: List the top-level network directories on the database volume
-      become: "{{ chia_darwin_launchd_become | bool }}"
-      become_user: "{{ user }}"
-      ansible.builtin.find:
-        paths: "{{ chia_darwin_volume_chia_dir }}"
-        file_type: directory
-        recurse: false
-      register: chia_darwin_local_external_volume_networks
-
-    - name: Inspect each volume network database directory
-      become: "{{ chia_darwin_launchd_become | bool }}"
-      become_user: "{{ user }}"
-      ansible.builtin.stat:
-        path: "{{ item.path }}/db"
-        follow: false
-      loop: "{{ chia_darwin_local_external_volume_networks.files }}"
-      loop_control:
-        label: "{{ item.path | basename }}"
-      register: chia_darwin_local_external_volume_network_dbs
-
-    - name: Ensure each staged network directory exists
-      become: "{{ chia_darwin_launchd_become | bool }}"
-      become_user: "{{ user }}"
-      ansible.builtin.file:
-        path: "{{ chia_darwin_local_external_dot_chia_migrating }}/{{ item.path | basename }}"
-        state: directory
-        owner: "{{ user }}"
-        group: "{{ chia_darwin_group }}"
-        mode: "0755"
-      loop: "{{ chia_darwin_local_external_volume_networks.files }}"
-      loop_control:
-        label: "{{ item.path | basename }}"
-
-    - name: Link each staged network database directory at the volume
-      become: "{{ chia_darwin_launchd_become | bool }}"
-      become_user: "{{ user }}"
-      ansible.builtin.file:
-        src: "{{ item.item.path }}/db"
-        dest: "{{ chia_darwin_local_external_dot_chia_migrating }}/{{ item.item.path | basename }}/db"
-        state: link
-        force: false
-      loop: "{{ chia_darwin_local_external_volume_network_dbs.results | selectattr('stat.isdir', 'defined') | selectattr('stat.isdir') | list }}"
-      loop_control:
-        label: "{{ item.item.path | basename }}"
-
-    - name: Rename the legacy ~/.chia symlink out of the way
-      ansible.builtin.include_tasks: darwin-local-external-rename.yml
-      vars:
-        local_external_rename_src: "{{ chia_darwin_local_external_dot_chia }}"
-        local_external_rename_dest: "{{ chia_darwin_local_external_dot_chia_legacy }}"
-        local_external_rename_name: "the legacy ~/.chia symlink"
-
-    - name: Move the staged internal CHIA_ROOT into place
-      ansible.builtin.include_tasks: darwin-local-external-rename.yml
-      vars:
-        local_external_rename_src: "{{ chia_darwin_local_external_dot_chia_migrating }}"
-        local_external_rename_dest: "{{ chia_darwin_local_external_dot_chia }}"
-        local_external_rename_name: "the staged internal CHIA_ROOT"
-
-  rescue:
-    - name: Reset the failed staging tree marker
-      ansible.builtin.set_fact:
-        chia_darwin_local_external_leftover_moved: false
-      changed_when: false
-
-    - name: Inspect ~/.chia and the legacy link after a failed migration
-      ansible.builtin.stat:
-        path: "{{ item }}"
-        follow: false
-      loop:
-        - "{{ chia_darwin_local_external_dot_chia }}"
-        - "{{ chia_darwin_local_external_dot_chia_legacy }}"
-      register: chia_darwin_local_external_failed_stats
-
-    - name: Record the failed migration paths
-      ansible.builtin.set_fact:
-        chia_darwin_local_external_failed: >-
-          {{ dict(['dot', 'legacy'] | zip(chia_darwin_local_external_failed_stats.results
-          | map(attribute='stat', default={}) | list)) }}
-      changed_when: false
-
-    - name: Restore the legacy ~/.chia symlink after a failed swap
-      ansible.builtin.include_tasks:
-        file: darwin-local-external-rename.yml
-        apply:
-          ignore_errors: true
-      vars:
-        local_external_rename_src: "{{ chia_darwin_local_external_dot_chia_legacy }}"
-        local_external_rename_dest: "{{ chia_darwin_local_external_dot_chia }}"
-        local_external_rename_name: "the restored legacy ~/.chia symlink"
-      when:
-        - not (chia_darwin_local_external_failed.dot.exists | default(false))
-        - chia_darwin_local_external_failed.legacy.islnk | default(false)
-
-    - name: Inspect ~/.chia and staging after restoring the legacy link
-      ansible.builtin.stat:
-        path: "{{ item }}"
-        follow: false
-      loop:
-        - "{{ chia_darwin_local_external_dot_chia }}"
-        - "{{ chia_darwin_local_external_dot_chia_migrating }}"
-      register: chia_darwin_local_external_restored_stats
-
-    - name: Record the restored migration paths
-      ansible.builtin.set_fact:
-        chia_darwin_local_external_restored: >-
-          {{ dict(['dot', 'migrating'] | zip(chia_darwin_local_external_restored_stats.results
-          | map(attribute='stat', default={}) | list)) }}
-      changed_when: false
-
-    - name: Name the failed migration staging tree
-      ansible.builtin.set_fact:
-        chia_darwin_local_external_leftover: >-
-          {{ chia_darwin_local_external_dot_chia_migrating }}.leftover-{{ now(utc=true, fmt='%Y%m%dT%H%M%SZ') }}
-      when:
-        - chia_darwin_local_external_restored.dot.exists | default(false)
-        - chia_darwin_local_external_restored.migrating.exists | default(false)
-      changed_when: false
-
-    - name: Move a failed migration's staging tree aside
-      ansible.builtin.include_tasks: darwin-local-external-rename.yml
-      vars:
-        local_external_rename_src: "{{ chia_darwin_local_external_dot_chia_migrating }}"
-        local_external_rename_dest: "{{ chia_darwin_local_external_leftover }}"
-        local_external_rename_name: "the failed migration staging tree"
-      when:
-        - chia_darwin_local_external_restored.dot.exists | default(false)
-        - chia_darwin_local_external_restored.migrating.exists | default(false)
-
-    - name: Record that the failed staging tree was kept
-      ansible.builtin.set_fact:
-        chia_darwin_local_external_leftover_moved: true
-      when:
-        - chia_darwin_local_external_restored.dot.exists | default(false)
-        - chia_darwin_local_external_restored.migrating.exists | default(false)
-      changed_when: false
-
-    - name: Warn that the failed migration staging tree was kept
-      ansible.builtin.debug:
-        msg: >-
-          Kept {{ chia_darwin_local_external_leftover }}. It may contain config,
-          keys, and wallet database copies. This role does not delete leftovers.
-      when: chia_darwin_local_external_leftover_moved | default(false)
-
-    - name: Report the failed local-external migration
-      ansible.builtin.fail:
-        msg: >-
-          The local-external CHIA_ROOT migration failed while running
-          "{{ ansible_failed_task.name | default('a migration task') }}":
-          {{ ansible_failed_result.msg | default('no further detail') }}.
-          The database on the volume was not moved or deleted.
-          {% if chia_darwin_local_external_leftover_moved | default(false) %}
-          The failed staging tree is at {{ chia_darwin_local_external_leftover }}.
-          It may contain config, keys, and wallet database copies and is not
-          deleted.
-          {% endif %}
-          {% if chia_darwin_local_external_restored.dot.exists | default(false) %}
-          The legacy ~/.chia layout is back in place. A rerun retries the
-          migration unless the leftover cap now refuses.
-          {% else %}
-          ~/.chia is still missing and the legacy link was not restored. The
-          staging tree is complete at
-          {{ chia_darwin_local_external_dot_chia_migrating }}. A rerun finishes
-          the interrupted migration and returns the enabled jobs whose plist is
-          installed; the jobs stay stopped until then. The leftover cap can
-          still refuse a rerun.
-          {% endif %}
-
-  always:
-    - name: Inspect ~/.chia after the migration attempt
-      ansible.builtin.stat:
-        path: "{{ chia_darwin_local_external_dot_chia }}"
-        follow: false
-      register: chia_darwin_local_external_after_dot
-
-    - name: Find the installed plists of the enabled jobs
-      ansible.builtin.stat:
-        path: "{{ chia_darwin_launchd_dir }}/{{ item.label }}.plist"
-      loop: "{{ chia_darwin_launchd_jobs | default([]) | selectattr('enabled', 'truthy') | list }}"
-      loop_control:
-        label: "{{ item.label }}"
-      register: chia_darwin_local_external_plists
-      when: chia_darwin_local_external_after_dot.stat.exists | default(false)
-
-    - name: Record the labels with an installed plist
-      ansible.builtin.set_fact:
-        chia_darwin_local_external_installed_labels: >-
-          {{ chia_darwin_local_external_plists.results | default([])
-          | selectattr('stat.exists', 'defined') | selectattr('stat.exists')
-          | map(attribute='item.label') | list }}
-      when: chia_darwin_local_external_after_dot.stat.exists | default(false)
-      changed_when: false
-
-    - name: Select the installed jobs to restart after the migration
-      ansible.builtin.set_fact:
-        chia_darwin_local_external_restart_services_jobs: >-
-          {{ chia_darwin_service_jobs | default([]) | selectattr('enabled', 'truthy')
-          | selectattr('label', 'in', chia_darwin_local_external_installed_labels) | list }}
-        chia_darwin_local_external_restart_companion_jobs: >-
-          {{ chia_darwin_companion_jobs | default([]) | selectattr('enabled', 'truthy')
-          | selectattr('label', 'in', chia_darwin_local_external_installed_labels) | list }}
-        chia_darwin_local_external_restart_hw_vdf_jobs: >-
-          {{ chia_darwin_hw_vdf_jobs | default([]) | selectattr('enabled', 'truthy')
-          | selectattr('label', 'in', chia_darwin_local_external_installed_labels) | list }}
-        chia_darwin_local_external_restart_watchdog_enabled: >-
-          {{ (chia_darwin_enable_watchdog | default(false) | bool) and
-          ((chia_darwin_watchdog_job.label | default('')) in chia_darwin_local_external_installed_labels) }}
-        chia_darwin_local_external_migrated: true
-      when: chia_darwin_local_external_after_dot.stat.exists | default(false)
-      changed_when: false
-
-    - name: Restart the jobs the migration stopped
-      vars:
-        chia_darwin_service_jobs: "{{ chia_darwin_local_external_restart_services_jobs }}"
-        chia_darwin_companion_jobs: "{{ chia_darwin_local_external_restart_companion_jobs }}"
-        chia_darwin_hw_vdf_jobs: "{{ chia_darwin_local_external_restart_hw_vdf_jobs }}"
-        chia_darwin_restart_services: "{{ chia_darwin_local_external_restart_services_jobs | length > 0 }}"
-        chia_darwin_restart_companions: "{{ chia_darwin_local_external_restart_companion_jobs | length > 0 }}"
-        chia_darwin_start_down_boards: "{{ chia_darwin_local_external_restart_hw_vdf_jobs | length > 0 }}"
-        chia_darwin_enable_watchdog: "{{ chia_darwin_local_external_restart_watchdog_enabled }}"
-      ansible.builtin.include_tasks: darwin-restart-ordered.yml
-      when: chia_darwin_local_external_after_dot.stat.exists | default(false)
 
 - name: Verify the local-external CHIA_ROOT layout
   ansible.builtin.include_tasks: darwin-local-external-verify.yml

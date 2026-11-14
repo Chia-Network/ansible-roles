@@ -29,7 +29,7 @@
       ansible.builtin.assert:
         that:
           - local_external_case_failed | bool
-          - local_external_case_message is search('only migrates the historical')
+          - local_external_case_message is search('Move it aside manually')
           - local_external_case_message is search((chia_darwin_home ~ '/.chia') | regex_escape)
         fail_msg: >-
           The unexpected ~/.chia symlink failed with the wrong result:
@@ -254,232 +254,99 @@
     that:
       - not (finished_dot.stat.exists | default(false))
 
-- name: Refuse a legacy migration when the backup path already exists
+- name: Refuse a missing ~/.chia next to a live staging tree
   vars:
-    chia_darwin_home: "{{ test_root }}/backup-exists/home"
-    chia_root: "{{ test_root }}/backup-exists/home/.chia/{{ network }}"
+    chia_darwin_home: "{{ test_root }}/staging-only/home"
+    chia_root: "{{ test_root }}/staging-only/home/.chia/{{ network }}"
   block:
-    - name: Prepare a home directory for the backup path guard
+    - name: Prepare a home directory and a live staging tree
       ansible.builtin.file:
-        path: "{{ chia_darwin_home }}"
+        path: "{{ item }}"
         state: directory
         mode: "0755"
+      loop:
+        - "{{ chia_darwin_home }}"
+        - "{{ chia_darwin_home }}/.chia.migrating/{{ network }}"
 
-    - name: Create the legacy ~/.chia link and an existing backup
-      ansible.builtin.file:
-        src: "{{ external_chia }}"
-        dest: "{{ item }}"
-        state: link
-        force: false
+    - name: Write a marker in the live staging tree
+      ansible.builtin.copy:
+        content: keep-staging
+        dest: "{{ chia_darwin_home }}/.chia.migrating/{{ network }}/keep.txt"
+        mode: "0644"
+
+    - name: Run the local-external root include with a missing ~/.chia
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+    - name: Require the live staging refusal
+      ansible.builtin.assert:
+        that:
+          - local_external_case_failed | bool
+          - local_external_case_message is search('Inspect that staging tree')
+          - local_external_case_message is search((chia_darwin_home ~ '/.chia.migrating') | regex_escape)
+        fail_msg: >-
+          The missing ~/.chia next to a live staging tree failed with the wrong
+          result: {{ local_external_case_message }}
+
+    - name: Inspect the refused staging layout
+      ansible.builtin.stat:
+        path: "{{ item }}"
+        follow: false
       loop:
         - "{{ chia_darwin_home }}/.chia"
-        - "{{ chia_darwin_home }}/.chia.legacy-volume-link"
+        - "{{ chia_darwin_home }}/.chia.migrating/{{ network }}/keep.txt"
+      register: staging_only_stats
 
-    - name: Run the local-external root include with an existing backup path
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
-
-    - name: Require the existing backup path refusal
+    - name: Require the live staging refusal to leave both paths unchanged
       ansible.builtin.assert:
         that:
-          - local_external_case_failed | bool
-          - local_external_case_message is search('backup path')
-          - local_external_case_message is search((chia_darwin_home ~ '/.chia') | regex_escape)
-        fail_msg: >-
-          The existing backup path failed with the wrong result:
-          {{ local_external_case_message }}
+          - not (staging_only_stats.results[0].stat.exists | default(false))
+          - lookup('file', chia_darwin_home ~ '/.chia.migrating/' ~ network ~ '/keep.txt') == 'keep-staging'
 
-- name: Refuse a legacy migration when the on-volume database is missing
+- name: Refuse a live staging tree next to a valid internal ~/.chia
   vars:
-    chia_darwin_home: "{{ test_root }}/missing-db/home"
-    chia_root: "{{ test_root }}/missing-db/home/.chia/{{ network }}"
-    missing_volume: "{{ test_root }}/missing-db/volume/dot-chia"
+    chia_darwin_home: "{{ test_root }}/live-staging/home"
+    chia_root: "{{ test_root }}/live-staging/home/.chia/{{ network }}"
   block:
-    - name: Prepare a volume without a database directory
+    - name: Prepare a valid internal ~/.chia and a live staging tree
       ansible.builtin.file:
         path: "{{ item }}"
         state: directory
         mode: "0755"
       loop:
-        - "{{ missing_volume }}/{{ network }}"
-        - "{{ chia_darwin_home }}"
+        - "{{ chia_darwin_home }}/.chia"
+        - "{{ chia_darwin_home }}/.chia.migrating/{{ network }}"
 
-    - name: Create the legacy ~/.chia link at the incomplete volume
-      ansible.builtin.file:
-        src: "{{ missing_volume }}"
-        dest: "{{ chia_darwin_home }}/.chia"
-        state: link
-        force: false
+    - name: Write a marker in the live staging tree beside ~/.chia
+      ansible.builtin.copy:
+        content: keep-staging
+        dest: "{{ chia_darwin_home }}/.chia.migrating/{{ network }}/keep.txt"
+        mode: "0644"
 
-    - name: Run the local-external root include with a missing volume database
-      vars:
-        chia_darwin_volume_chia_dir: "{{ missing_volume }}"
-        chia_darwin_volume_db_dir: "{{ missing_volume }}/{{ network }}/db"
+    - name: Run the local-external root include with live staging beside ~/.chia
       ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
 
-    - name: Require the missing volume database refusal
+    - name: Require the live staging beside ~/.chia refusal
       ansible.builtin.assert:
         that:
           - local_external_case_failed | bool
-          - local_external_case_message is search('does not exist or is not a directory')
+          - local_external_case_message is search('still exists')
+          - local_external_case_message is search((chia_darwin_home ~ '/.chia.migrating') | regex_escape)
         fail_msg: >-
-          The missing volume database failed with the wrong result:
-          {{ local_external_case_message }}
+          A live staging tree beside a valid ~/.chia failed with the wrong
+          result: {{ local_external_case_message }}
 
-    - name: Inspect the missing database staging tree
+    - name: Inspect the live staging layout after the refusal
       ansible.builtin.stat:
-        path: "{{ chia_darwin_home }}/.chia.migrating"
-        follow: false
-      register: missing_db_staging
-
-    - name: Require the missing database refusal to happen before staging
-      ansible.builtin.assert:
-        that:
-          - not (missing_db_staging.stat.exists | default(false))
-
-- name: Refuse large non-database files before stopping any job
-  vars:
-    chia_darwin_home: "{{ test_root }}/big-file/home"
-    chia_root: "{{ test_root }}/big-file/home/.chia/{{ network }}"
-    big_volume: "{{ test_root }}/big-file/volume/dot-chia"
-  block:
-    - name: Prepare a volume with a large db.bak file and a large database
-      ansible.builtin.file:
         path: "{{ item }}"
-        state: directory
-        mode: "0755"
+        follow: false
       loop:
-        - "{{ big_volume }}/{{ network }}/db"
-        - "{{ big_volume }}/{{ network }}/db.bak"
-        - "{{ chia_darwin_home }}"
+        - "{{ chia_darwin_home }}/.chia"
+        - "{{ chia_darwin_home }}/.chia.migrating/{{ network }}/keep.txt"
+      register: live_staging_stats
 
-    - name: Write a large database file that the guard must prune
-      ansible.builtin.copy:
-        content: "{{ 'd' * 1048576 }}"
-        dest: "{{ big_volume }}/{{ network }}/db/blockchain_v2_{{ network }}.sqlite"
-        mode: "0644"
-
-    - name: Write a large db.bak file that the guard must find
-      ansible.builtin.copy:
-        content: "{{ 'x' * 1048576 }}"
-        dest: "{{ big_volume }}/{{ network }}/db.bak/big"
-        mode: "0644"
-
-    - name: Create the legacy ~/.chia link at the large-file volume
-      ansible.builtin.file:
-        src: "{{ big_volume }}"
-        dest: "{{ chia_darwin_home }}/.chia"
-        state: link
-        force: false
-
-    - name: Record the large on-volume database before the guard
-      ansible.builtin.stat:
-        path: "{{ big_volume }}/{{ network }}/db/blockchain_v2_{{ network }}.sqlite"
-      register: big_db_before
-
-    - name: Reset the fake launchctl log before the large-file guard
-      ansible.builtin.copy:
-        content: ""
-        dest: "{{ test_root }}/launchctl.log"
-        mode: "0644"
-
-    - name: Run the local-external root include with a large db.bak file
-      vars:
-        chia_darwin_volume_chia_dir: "{{ big_volume }}"
-        chia_darwin_volume_db_dir: "{{ big_volume }}/{{ network }}/db"
-        chia_darwin_local_external_copy_max_mb: 0
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
-
-    - name: Require the large-file refusal before any job stop
-      vars:
-        launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
+    - name: Require the live staging refusal to leave both paths unchanged
       ansible.builtin.assert:
         that:
-          - local_external_case_failed | bool
-          - local_external_case_message is search('Move these files off')
-          - local_external_case_message is search('db.bak/big')
-          - local_external_case_message is not search('/db/blockchain')
-          - launchctl_lines | select('search', 'bootout') | list | length == 0
-        fail_msg: >-
-          A large db.bak file must be refused before bootout and only
-          <network>/db may be pruned. Failure:
-          {{ local_external_case_message }} Log: {{ launchctl_lines }}
-
-    - name: Inspect the large on-volume database after the guard
-      ansible.builtin.stat:
-        path: "{{ big_volume }}/{{ network }}/db/blockchain_v2_{{ network }}.sqlite"
-      register: big_db_after
-
-    - name: Require the large-file guard to leave the database untouched
-      ansible.builtin.assert:
-        that:
-          - big_db_after.stat.isreg | default(false)
-          - big_db_after.stat.inode == (big_db_before.stat.inode | int)
-
-- name: Refuse repeated migration failures before stopping any job
-  vars:
-    chia_darwin_home: "{{ test_root }}/repeated/home"
-    chia_root: "{{ test_root }}/repeated/home/.chia/{{ network }}"
-    repeated_leftovers:
-      - "{{ test_root }}/repeated/home/.chia.migrating.leftover-20000101T000000Z"
-      - "{{ test_root }}/repeated/home/.chia.migrating.leftover-20000101T000001Z"
-      - "{{ test_root }}/repeated/home/.chia.migrating.leftover-20000101T000002Z"
-  block:
-    - name: Prepare a legacy ~/.chia link and three leftover trees
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: directory
-        mode: "0755"
-      loop: "{{ [chia_darwin_home] + repeated_leftovers }}"
-
-    - name: Write a marker into each existing leftover tree
-      ansible.builtin.copy:
-        content: keep-leftover
-        dest: "{{ item }}/keep.txt"
-        mode: "0644"
-      loop: "{{ repeated_leftovers }}"
-
-    - name: Create the legacy ~/.chia link next to the leftovers
-      ansible.builtin.file:
-        src: "{{ external_chia }}"
-        dest: "{{ chia_darwin_home }}/.chia"
-        state: link
-        force: false
-
-    - name: Reset the fake launchctl log before the repeated-failure case
-      ansible.builtin.copy:
-        content: ""
-        dest: "{{ test_root }}/launchctl.log"
-        mode: "0644"
-
-    - name: Run the local-external root include with the leftover cap reached
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
-
-    - name: Require the repeated-failure refusal before any job stop
-      vars:
-        launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
-      ansible.builtin.assert:
-        that:
-          - local_external_case_failed | bool
-          - local_external_case_message is search('Repeated local-external migration failures')
-          - local_external_case_message is search('reaching the cap')
-          - local_external_case_message is search('\\.chia\\.migrating\\.leftover')
-          - local_external_case_message is search('Move them out of')
-          - local_external_case_message is search('raise chia_darwin_local_external_leftover_max')
-          - launchctl_lines | select('search', 'bootout') | list | length == 0
-        fail_msg: >-
-          A legacy ~/.chia with the leftover cap reached must refuse before any
-          bootout and explain how to clear the leftovers. Failure:
-          {{ local_external_case_message }} Log: {{ launchctl_lines }}
-
-    - name: Inspect the existing leftover trees after the refusal
-      ansible.builtin.stat:
-        path: "{{ item }}/keep.txt"
-        follow: false
-      loop: "{{ repeated_leftovers }}"
-      register: repeated_leftover_stats
-
-    - name: Require the repeated-failure refusal to leave every leftover untouched
-      ansible.builtin.assert:
-        that:
-          - repeated_leftover_stats.results | rejectattr('stat.exists') | list | length == 0
-          - repeated_leftover_stats.results | map(attribute='stat.path') | list | length == 3
+          - live_staging_stats.results[0].stat.isdir | default(false)
+          - not (live_staging_stats.results[0].stat.islnk | default(false))
+          - lookup('file', chia_darwin_home ~ '/.chia.migrating/' ~ network ~ '/keep.txt') == 'keep-staging'

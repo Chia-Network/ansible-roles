@@ -29,8 +29,8 @@
       - "'state = running' in tailscale_darwin_running.stdout"
     fail_msg: >-
       tailscale is not ready. Remove competing jobs, keep net.chia.tailscaled
-      running per the M6 runbook, never run Homebrew's service wrapper with
-      sudo, and keep the formula pinned.
+      running per the operator runbook, never run Homebrew's service wrapper
+      with sudo, and keep the formula pinned.
 
 - name: Install the tailscaled LaunchDaemon
   become: true

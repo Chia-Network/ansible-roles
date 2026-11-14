@@ -1,7 +1,7 @@
 ---
 # Run twice with the same test_root. The first run creates a fresh layout and
-# migrates a legacy layout. The second must report changed=0 because both
-# layouts are already in place.
+# leaves a converged, migrated-looking layout unchanged. The second must report
+# changed=0 because both layouts are already in place.
 - name: Prove a second local-external root run is idempotent
   hosts: localhost
   connection: local
@@ -17,39 +17,48 @@
     - name: Record the idempotence paths
       ansible.builtin.set_fact:
         fresh_home: "{{ test_root }}/fresh/home"
-        legacy_home: "{{ test_root }}/legacy/home"
-        legacy_volume: "{{ test_root }}/legacy/volume/dot-chia"
+        converged_home: "{{ test_root }}/converged/home"
+        external_chia: "{{ chia_darwin_volume_chia_dir }}"
+        external_db: "{{ chia_darwin_volume_db_dir }}"
+        converged_leftover: "{{ test_root }}/converged/home/.chia.migrating.leftover-20000101T000000Z"
       changed_when: false
 
-    - name: Prepare the legacy on-volume data for the idempotence migration
+    - name: Prepare the on-volume database and the converged home
       ansible.builtin.file:
         path: "{{ item }}"
         state: directory
         mode: "0755"
       loop:
-        - "{{ legacy_volume }}/{{ network }}/db"
-        - "{{ legacy_volume }}/{{ network }}/config"
-        - "{{ legacy_home }}"
+        - "{{ external_db }}"
+        - "{{ converged_home }}/.chia"
+        - "{{ converged_home }}/.chia/{{ network }}"
+        - "{{ converged_leftover }}"
 
-    - name: Write the legacy on-volume database fixture
+    - name: Write the on-volume database fixture
       ansible.builtin.copy:
-        content: legacy database
-        dest: "{{ legacy_volume }}/{{ network }}/db/blockchain_v2_{{ network }}.sqlite"
+        content: converged database
+        dest: "{{ external_db }}/blockchain_v2_{{ network }}.sqlite"
         mode: "0644"
 
-    - name: Stat the legacy ~/.chia link before the idempotence run
-      ansible.builtin.stat:
-        path: "{{ legacy_home }}/.chia"
-        follow: false
-      register: idempotent_legacy_link
-
-    - name: Create the legacy ~/.chia volume link once
+    - name: Link the converged database at the volume
       ansible.builtin.file:
-        src: "{{ legacy_volume }}"
-        dest: "{{ legacy_home }}/.chia"
+        src: "{{ external_db }}"
+        dest: "{{ converged_home }}/.chia/{{ network }}/db"
         state: link
         force: false
-      when: not (idempotent_legacy_link.stat.exists | default(false))
+
+    - name: Create the converged legacy backup link
+      ansible.builtin.file:
+        src: "{{ external_chia }}"
+        dest: "{{ converged_home }}/.chia.legacy-volume-link"
+        state: link
+        force: false
+
+    - name: Write a marker in the converged leftover tree
+      ansible.builtin.copy:
+        content: keep-leftover
+        dest: "{{ converged_leftover }}/keep.txt"
+        mode: "0644"
 
     - name: Run the local-external include on a fresh layout
       vars:
@@ -57,12 +66,10 @@
         chia_root: "{{ fresh_home }}/.chia/{{ network }}"
       ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-local-external-root.yml"
 
-    - name: Run the local-external include on a legacy layout
+    - name: Run the local-external include on a converged layout
       vars:
-        chia_darwin_home: "{{ legacy_home }}"
-        chia_root: "{{ legacy_home }}/.chia/{{ network }}"
-        chia_darwin_volume_chia_dir: "{{ legacy_volume }}"
-        chia_darwin_volume_db_dir: "{{ legacy_volume }}/{{ network }}/db"
+        chia_darwin_home: "{{ converged_home }}"
+        chia_root: "{{ converged_home }}/.chia/{{ network }}"
       ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-local-external-root.yml"
 
     - name: Inspect both idempotent local-external layouts
@@ -72,9 +79,10 @@
       loop:
         - "{{ fresh_home }}/.chia"
         - "{{ fresh_home }}/.chia/{{ network }}/db"
-        - "{{ legacy_home }}/.chia"
-        - "{{ legacy_home }}/.chia/{{ network }}/db"
-        - "{{ legacy_home }}/.chia.legacy-volume-link"
+        - "{{ converged_home }}/.chia"
+        - "{{ converged_home }}/.chia/{{ network }}/db"
+        - "{{ converged_home }}/.chia.legacy-volume-link"
+        - "{{ converged_leftover }}"
       register: idempotent_stats
 
     - name: Require both idempotent local-external layouts
@@ -88,14 +96,17 @@
           - idempotent_stats.results[3].stat.islnk | default(false)
           - >-
             (idempotent_stats.results[3].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
-            ((legacy_volume ~ '/' ~ network ~ '/db') | regex_replace('/+$', ''))
+            (external_db | regex_replace('/+$', ''))
           - idempotent_stats.results[4].stat.islnk | default(false)
           - >-
             (idempotent_stats.results[4].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
-            (legacy_volume | regex_replace('/+$', ''))
+            (external_chia | regex_replace('/+$', ''))
+          - idempotent_stats.results[5].stat.isdir | default(false)
+          - lookup('file', converged_leftover ~ '/keep.txt') == 'keep-leftover'
         fail_msg: >-
-          Fresh and migrated layouts must both stay internal with only
-          <chia_root>/db linked at the on-volume database.
+          Fresh and converged layouts must both stay internal with only
+          <chia_root>/db linked at the on-volume database, and the backup link
+          and leftover tree beside the converged root must stay in place.
 
     - name: Report the idempotent local-external root layout
       ansible.builtin.debug:

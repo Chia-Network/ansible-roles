@@ -1,9 +1,10 @@
 Chia timelord on macOS — Full Disk Access
 ==========================================
 
-Relevant only for topology local-external. CHIA_ROOT ({{ chia_root }}) and
-~/.chia stay on the internal disk. Only the blockchain database directory
-({{ chia_darwin_volume_db_dir }}) lives on {{ chia_darwin_db_volume }}.
+Relevant only for topology local-external. ~/.chia is a real directory on the
+internal disk, and CHIA_ROOT ({{ chia_root }}) stays there, including the wallet
+database. Only {{ chia_root }}/db is a symlink to the on-volume database
+directory ({{ chia_darwin_volume_db_dir }}) on {{ chia_darwin_db_volume }}.
 local-internal and remote-node keep everything on the internal disk and do not
 need this grant.
 
@@ -11,31 +12,41 @@ Why
 ---
 LaunchDaemons run outside a user GUI session and have no Transparency, Consent,
 and Control (TCC) grants of their own. A job whose program is a script is
-attributed to its shebang interpreter. These wrappers use {{ chia_darwin_interpreter }}.
-Until that interpreter has Full Disk Access, the full-node job can see that
-{{ chia_darwin_db_volume }} is mounted and still fail to read
+attributed to its shebang interpreter. These wrappers use
+{{ chia_darwin_interpreter }}, so that one grant is shared by every wrapped job.
+
+Only the full-node wrapper waits on the volume. It lists
+{{ chia_darwin_db_marker }} with /bin/ls, a readdir operation. Other wrappers do
+not wait on the volume. When Full Disk Access is missing, the full node can see
+that {{ chia_darwin_db_volume }} is mounted and still fail to read
 {{ chia_darwin_volume_db_dir }}. The wrapper then loops on "waiting for
 {{ chia_darwin_db_volume }}" and the log's ls= line is "Operation not permitted".
 An interactive SSH session can read the same path while launchd cannot. That
 mismatch is TCC, not a missing mount.
 
-This narrowing is expected, not yet proven on hardware. Only the full-node
-process is expected to need this grant: the interpreter running chia_full_node,
-because TCC attributes the script job to its shebang interpreter. Companion
-binaries should not need it now that config and wallet data are on the internal
-disk.
+Full Disk Access is needed only for:
+1. {{ chia_darwin_interpreter }} — launchd uses it as the shebang interpreter for
+   every job wrapper, so this grant is shared by every wrapped job;
+2. the full node's Python interpreter — the real Homebrew binary that the venv
+   python3.13 resolves to:
 
-The wrapper waits on {{ chia_darwin_db_marker }}, which is now the on-volume
-database directory rather than a config file. The wait lists that directory
-with /bin/ls, a readdir operation, rather than testing file readability. A TCC
-denial is expected to make that listing fail, but the narrowing is still not
-proven on hardware. The wait log also includes the failure from /bin/ls.
+   {{ chia_darwin_fda_python }}
+
+That Python grant is tied to the Cellar version path. A Homebrew Python upgrade
+changes the path, and the node loses DB access until the grant is added for the
+new binary.
+
+Do not add companion binaries, tailscaled, alloy, exporters, hw-vdf, the
+watchdog, bash, or healthcheck to Full Disk Access for this layout. Companion
+jobs keep their CHIA_ROOT on the internal disk and do not wait for the database
+volume.
 
 How to grant it
 ---------------
 1. GUI (this Mac):
    System Settings -> Privacy & Security -> Full Disk Access -> add
-   {{ chia_darwin_interpreter }} (Cmd-Shift-G if it is hidden) and enable it.
+   {{ chia_darwin_interpreter }} and {{ chia_darwin_fda_python }}
+   (Cmd-Shift-G if either is hidden) and enable both.
    Then restart the full-node LaunchDaemon
    (launchctl kickstart -k system/<full-node label>).
 
@@ -50,19 +61,15 @@ Full Disk Access to launchd jobs.
 
 Scope
 -----
-The grant is for {{ chia_darwin_interpreter }} itself (identifier path,
-code requirement: {{ chia_darwin_pppc_code_requirement }}). Any other
-LaunchDaemon that starts through that interpreter can then read protected
-files, including external volumes. That is the interpreter the running
-deployment uses. This role will not swap in a different interpreter or a
-custom Mach-O stub.
+The {{ chia_darwin_interpreter }} grant uses the identifier path and code
+requirement {{ chia_darwin_pppc_code_requirement }}. Any other LaunchDaemon that
+starts through that interpreter can then read protected files, including
+external volumes. That is the interpreter the running deployment uses. This role
+will not swap in a different interpreter or a custom Mach-O stub.
 
-Companion binaries
-------------------
-chia-exporter, chia-healthcheck, and the other companion jobs keep their
-CHIA_ROOT on the internal disk and no longer wait for the database volume.
-Do not add {{ chia_darwin_companion_bin_dir }} binaries to Full Disk Access for
-this layout. config and wallet data are internal now.
+The Python path in this note is resolved from the venv when the role writes the
+file. The PPPC profile template keeps only the /bin/zsh identifier because a
+versioned Cellar path goes stale on the next Python upgrade.
 
 This role cannot grant TCC Full Disk Access. It only writes this note and the
 profile template. It never runs `profiles`, `tccutil`, or SQL against TCC.db.

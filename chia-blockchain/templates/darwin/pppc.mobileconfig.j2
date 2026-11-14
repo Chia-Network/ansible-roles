@@ -13,19 +13,22 @@
 
     The LaunchDaemon wrappers are {{ chia_darwin_interpreter | e }} scripts. TCC
     attributes their file access to that interpreter, so the identifier is the
-    interpreter path, not the script path. For local-external, this is the
-    expected grant for the full-node wrapper to read the external blockchain DB
-    directory ({{ chia_darwin_volume_db_dir | e }}). CHIA_ROOT and the companion
-    services stay on the internal disk, so companion binaries are not added to
-    this profile. Granting Full Disk Access to {{ chia_darwin_interpreter | e }}
-    is still broad: other jobs that start via the same interpreter inherit it.
-    That is the deployment that has been running.
+    interpreter path, not the script path. For local-external, Full Disk Access
+    is needed only for this shared shebang interpreter and the full node's
+    Python interpreter. The Python path is the real Homebrew Cellar binary the
+    venv resolves to; it is printed in the sibling FULL-DISK-ACCESS.txt note.
+    Do not add a second identifier for that versioned Cellar path here because a
+    Homebrew Python upgrade changes it. CHIA_ROOT and the companion services stay
+    on the internal disk, so companion binaries, tailscaled, hw-vdf, the
+    watchdog, bash, and healthcheck are not added to this profile. Granting Full
+    Disk Access to {{ chia_darwin_interpreter | e }} is still broad: other jobs
+    that start via the same interpreter inherit it.
   -->
   <key>PayloadContent</key>
   <array>
     <dict>
       <key>PayloadDescription</key>
-      <string>Full Disk Access for the Chia timelord LaunchDaemon interpreter ({{ chia_darwin_interpreter | e }}).</string>
+      <string>Full Disk Access for the shared Chia timelord LaunchDaemon interpreter ({{ chia_darwin_interpreter | e }}).</string>
       <key>PayloadDisplayName</key>
       <string>Chia timelord Full Disk Access</string>
       <key>PayloadIdentifier</key>
@@ -46,7 +49,7 @@
             <key>CodeRequirement</key>
             <string>{{ chia_darwin_pppc_code_requirement | e }}</string>
             <key>Comment</key>
-            <string>Shebang interpreter for the full-node LaunchDaemon. Expected to be required to read the external blockchain DB directory.</string>
+            <string>Shared shebang interpreter for the Chia job wrappers, including the full-node LaunchDaemon that reads the external blockchain DB directory.</string>
             <key>Identifier</key>
             <string>{{ chia_darwin_interpreter | e }}</string>
             <key>IdentifierType</key>
@@ -59,7 +62,7 @@
     </dict>
   </array>
   <key>PayloadDescription</key>
-  <string>MDM profile so the Chia full-node LaunchDaemon can read the external blockchain DB directory. Do not install by double-click. Does not modify TCC.db.</string>
+  <string>MDM profile so the shared Chia job interpreter can read the external blockchain DB directory. Do not install by double-click. Does not modify TCC.db.</string>
   <key>PayloadDisplayName</key>
   <string>Chia timelord Full Disk Access</string>
   <key>PayloadIdentifier</key>

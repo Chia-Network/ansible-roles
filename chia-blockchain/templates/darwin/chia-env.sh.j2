@@ -17,14 +17,15 @@ CHIA_DB_VOLUME={{ chia_darwin_db_volume | quote }}
 CHIA_DB_MARKER={{ chia_darwin_db_marker | quote }}
 
 # Block until the external DB volume is mounted AND the blockchain DB
-# directory can be listed. ~/.chia is no longer a symlink into the volume; only
-# <chia_root>/db is. Keeps launchd from crash-looping at boot.
-# A mounted volume that cannot be listed is still the usual Full Disk Access
-# failure. This is expected for the full-node process only (the interpreter
-# {{ chia_darwin_interpreter }} running chia_full_node); it is not yet proven on
-# hardware. This role cannot grant TCC access.
-# CHIA_DB_MARKER is now the volume DB directory, not a file. /bin/ls performs a
-# readdir on that directory, which is what TCC gates. The wait log includes the
+# directory can be listed. ~/.chia is a real internal directory; only
+# <chia_root>/db is a symlink into the volume. Keeps launchd from crash-looping
+# at boot.
+# A mounted volume that cannot be listed is the usual Full Disk Access failure.
+# Full Disk Access is needed only for the shared shebang interpreter
+# {{ chia_darwin_interpreter }} and the full node's real Homebrew Python binary.
+# Only this full-node wrapper waits on the volume. This role cannot grant TCC
+# access. CHIA_DB_MARKER is the volume DB directory, not a file. /bin/ls performs
+# a readdir on that directory, which is what TCC gates. The wait log includes the
 # /bin/ls failure.
 wait_for_db_volume() {
 	local n=0

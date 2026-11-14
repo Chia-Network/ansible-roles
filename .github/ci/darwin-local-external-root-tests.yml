@@ -1,6 +1,6 @@
 ---
 # Local tests for chia-blockchain/tasks/darwin-local-external-root.yml. They
-# use a temporary test root, a fake mount, and a stateful fake launchctl. No
+# use a temporary test root, a fake mount, and a logging fake launchctl. No
 # real Mac, external volume, launchd job, or S3 bucket is touched.
 - name: Test the local-external CHIA_ROOT layout without a Mac
   hosts: localhost
@@ -40,9 +40,7 @@
     - name: Extract the production mount preflight tasks
       ansible.builtin.set_fact:
         local_external_mount_tasks: >-
-          {{ (local_external_darwin_tasks
-          | selectattr('name', 'equalto', 'Manage the chia-blockchain CHIA_ROOT')
-          | first)['block']
+          {{ local_external_darwin_tasks
           | selectattr('name', 'in', ['Read mounted filesystems', 'Require the database volume to be mounted now'])
           | list }}
 
@@ -196,274 +194,165 @@
               A real ~/.chia with no <chia_root>/db must be repaired by
               creating the internal CHIA_ROOT and linking db at the volume.
 
-    - name: Prepare a legacy ~/.chia volume symlink with on-volume data
+    - name: Leave a converged host unchanged next to a backup link and leftover
       vars:
-        legacy_home: "{{ test_root }}/legacy/home"
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: directory
-        mode: "0755"
-      loop:
-        - "{{ legacy_home }}"
-        - "{{ external_chia }}/mainnet/config"
-        - "{{ external_chia }}/mainnet/wallet/db"
-        - "{{ external_chia }}/mainnet/db"
-        - "{{ external_chia }}/testnet11/db"
-
-    - name: Write the legacy on-volume fixtures
-      ansible.builtin.copy:
-        content: "{{ item.content }}"
-        dest: "{{ item.dest }}"
-        mode: "{{ item.mode }}"
-      loop:
-        - content: mainnet config fixture
-          dest: "{{ external_chia }}/mainnet/config/config.yaml"
-          mode: "0644"
-        - content: keeper mode fixture
-          dest: "{{ external_chia }}/mainnet/config/secret.txt"
-          mode: "0600"
-        - content: wallet db fixture
-          dest: "{{ external_chia }}/mainnet/wallet/db/wallet.sqlite"
-          mode: "0644"
-        - content: volume-only blockchain database
-          dest: "{{ external_chia }}/mainnet/db/blockchain_v2_mainnet.sqlite"
-          mode: "0644"
-        - content: testnet11 blockchain database
-          dest: "{{ external_chia }}/testnet11/db/blockchain_v2_testnet11.sqlite"
-          mode: "0644"
-        - content: leftover non-db file on the volume
-          dest: "{{ external_chia }}/mainnet/leftover.txt"
-          mode: "0644"
-
-    - name: Create the legacy ~/.chia volume symlink
-      ansible.builtin.file:
-        src: "{{ external_chia }}"
-        dest: "{{ test_root }}/legacy/home/.chia"
-        state: link
-        force: false
-
-    - name: Record the on-volume database inode before migration
-      ansible.builtin.stat:
-        path: "{{ external_chia }}/mainnet/db/blockchain_v2_mainnet.sqlite"
-      register: legacy_volume_db_before
-
-    - name: Reset the fake launchctl log before the migration
-      ansible.builtin.copy:
-        content: ""
-        dest: "{{ test_root }}/launchctl.log"
-        mode: "0644"
-
-    - name: Migrate the legacy ~/.chia volume symlink
-      vars:
-        chia_darwin_home: "{{ test_root }}/legacy/home"
-        chia_root: "{{ test_root }}/legacy/home/.chia/{{ network }}"
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
-
-    - name: Require the legacy migration to succeed
-      ansible.builtin.assert:
-        that:
-          - not (local_external_case_failed | bool)
-        fail_msg: "The legacy migration failed: {{ local_external_case_message }}"
-
-    - name: Inspect the migrated local-external layout
-      ansible.builtin.stat:
-        path: "{{ item }}"
-        follow: false
-      loop:
-        - "{{ test_root }}/legacy/home/.chia"
-        - "{{ test_root }}/legacy/home/.chia/mainnet/db"
-        - "{{ test_root }}/legacy/home/.chia/testnet11/db"
-        - "{{ test_root }}/legacy/home/.chia.legacy-volume-link"
-        - "{{ test_root }}/legacy/home/.chia.migrating"
-        - "{{ external_chia }}/mainnet/db/blockchain_v2_mainnet.sqlite"
-        - "{{ external_chia }}/mainnet/config/config.yaml"
-        - "{{ external_chia }}/mainnet/config/secret.txt"
-        - "{{ external_chia }}/mainnet/wallet/db/wallet.sqlite"
-        - "{{ external_chia }}/mainnet/leftover.txt"
-      register: migrated_stats
-
-    - name: Require the migrated local-external layout
-      ansible.builtin.assert:
-        that:
-          - migrated_stats.results[0].stat.isdir | default(false)
-          - not (migrated_stats.results[0].stat.islnk | default(false))
-          - migrated_stats.results[1].stat.islnk | default(false)
-          - >-
-            (migrated_stats.results[1].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
-            (external_db | regex_replace('/+$', ''))
-          - migrated_stats.results[2].stat.islnk | default(false)
-          - >-
-            (migrated_stats.results[2].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
-            ((external_chia ~ '/testnet11/db') | regex_replace('/+$', ''))
-          - migrated_stats.results[3].stat.islnk | default(false)
-          - >-
-            (migrated_stats.results[3].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
-            (external_chia | regex_replace('/+$', ''))
-          - not (migrated_stats.results[4].stat.exists | default(false))
-          - migrated_stats.results[5].stat.isreg | default(false)
-          - migrated_stats.results[5].stat.inode == (legacy_volume_db_before.stat.inode | int)
-          - migrated_stats.results[6].stat.isreg | default(false)
-          - migrated_stats.results[7].stat.isreg | default(false)
-          - migrated_stats.results[7].stat.mode == '0600'
-          - migrated_stats.results[8].stat.isreg | default(false)
-          - migrated_stats.results[9].stat.isreg | default(false)
-          - lookup('file', test_root ~ '/legacy/home/.chia/mainnet/config/config.yaml') == 'mainnet config fixture'
-          - lookup('file', test_root ~ '/legacy/home/.chia/mainnet/wallet/db/wallet.sqlite') == 'wallet db fixture'
-          - chia_darwin_local_external_migrated | bool
-        fail_msg: >-
-          The legacy migration must keep ~/.chia internal and real, copy non-db
-          data, preserve modes, link only <chia_root>/db at the original volume
-          DB, leave the volume database in place, and restart the enabled jobs
-          whose plist is installed.
-
-    - name: Require the migration to restart the enabled jobs and not the disabled one
-      vars:
-        launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
-      ansible.builtin.assert:
-        that:
-          - launchctl_lines | select('search', 'bootout system/net.chia.roottest.timelord') | list | length >= 1
-          - launchctl_lines | select('search', 'bootstrap .*net.chia.roottest.timelord') | list | length >= 1
-          - launchctl_lines | select('search', 'bootout system/net.chia.roottest.chia-exporter') | list | length >= 1
-          - launchctl_lines | select('search', 'bootstrap .*net.chia.roottest.chia-exporter') | list | length >= 1
-          - launchctl_lines | select('search', 'net.chia.roottest.disabled') | list | length == 0
-        fail_msg: >-
-          The migration must stop and restart only this role's enabled jobs
-          whose plist is installed and must not touch disabled or non-chia
-          jobs. Log: {{ launchctl_lines }}
-
-    - name: Require the migration to stop the timelord before rsync copies
-      vars:
-        launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
-      ansible.builtin.assert:
-        that:
-          - launchctl_lines | select('search', '^rsync ') | list | length >= 1
-          - >-
-            (launchctl_lines.index('bootout system/net.chia.roottest.timelord')) <
-            (launchctl_lines.index(launchctl_lines | select('search', '^rsync ') | first))
-        fail_msg: >-
-          The timelord must be booted out before the migration copies data.
-          Log: {{ launchctl_lines }}
-
-    - name: Record the migrated on-volume database before the directory tasks
-      ansible.builtin.stat:
-        path: "{{ external_chia }}/mainnet/db/blockchain_v2_mainnet.sqlite"
-      register: migrated_db_before_dirs
-
-    - name: Run the production CHIA_ROOT directory tasks on the migrated layout
-      vars:
-        chia_darwin_home: "{{ test_root }}/legacy/home"
-        chia_root: "{{ test_root }}/legacy/home/.chia/{{ network }}"
-      ansible.builtin.include_tasks: "{{ test_root }}/chia-root-dirs.yml"
-
-    - name: Inspect the migrated layout after the directory tasks
-      ansible.builtin.stat:
-        path: "{{ item }}"
-        follow: false
-      loop:
-        - "{{ test_root }}/legacy/home/.chia/mainnet/config"
-        - "{{ test_root }}/legacy/home/.chia/mainnet/db"
-        - "{{ external_chia }}/mainnet/db/blockchain_v2_mainnet.sqlite"
-      register: migrated_after_dirs
-
-    - name: Require the migrated directory tasks to preserve the db symlink and database
-      ansible.builtin.assert:
-        that:
-          - migrated_after_dirs.results[0].stat.isdir | default(false)
-          - not (migrated_after_dirs.results[0].stat.islnk | default(false))
-          - migrated_after_dirs.results[1].stat.islnk | default(false)
-          - >-
-            (migrated_after_dirs.results[1].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
-            (external_db | regex_replace('/+$', ''))
-          - migrated_after_dirs.results[2].stat.isreg | default(false)
-          - migrated_after_dirs.results[2].stat.inode == (migrated_db_before_dirs.stat.inode | int)
-          - migrated_after_dirs.results[2].stat.path == external_chia ~ '/mainnet/db/blockchain_v2_mainnet.sqlite'
-        fail_msg: >-
-          The later CHIA_ROOT directory tasks must leave the migrated db
-          symlink and the on-volume database file in place.
-
-    - name: Run the local-external refusal and guard cases
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-refusals.yml"
-
-    - name: Run the local-external leftover, rescue, and restart cases
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-restart.yml"
-
-    - name: Finish a migration interrupted after the first rename
-      vars:
-        chia_darwin_home: "{{ test_root }}/interrupted/home"
-        chia_root: "{{ test_root }}/interrupted/home/.chia/{{ network }}"
+        chia_darwin_home: "{{ test_root }}/converged/home"
+        chia_root: "{{ test_root }}/converged/home/.chia/{{ network }}"
+        converged_leftover: "{{ test_root }}/converged/home/.chia.migrating.leftover-20000101T000000Z"
       block:
-        - name: Prepare an interrupted staging tree and legacy backup
+        - name: Prepare the converged internal layout
           ansible.builtin.file:
             path: "{{ item }}"
             state: directory
             mode: "0755"
           loop:
-            - "{{ chia_darwin_home }}/.chia.migrating/{{ network }}"
-            - "{{ chia_darwin_home }}"
+            - "{{ chia_darwin_home }}/.chia"
+            - "{{ chia_root }}"
+            - "{{ converged_leftover }}"
 
-        - name: Link the interrupted staging database at the volume
+        - name: Link the converged database at the volume
           ansible.builtin.file:
             src: "{{ external_db }}"
-            dest: "{{ chia_darwin_home }}/.chia.migrating/{{ network }}/db"
+            dest: "{{ chia_root }}/db"
             state: link
             force: false
 
-        - name: Create the interrupted migration legacy backup link
+        - name: Create the converged legacy backup link
           ansible.builtin.file:
             src: "{{ external_chia }}"
             dest: "{{ chia_darwin_home }}/.chia.legacy-volume-link"
             state: link
             force: false
 
-        - name: Run the local-external root include on the interrupted layout
+        - name: Write a marker in the leftover tree
+          ansible.builtin.copy:
+            content: keep-leftover
+            dest: "{{ converged_leftover }}/keep.txt"
+            mode: "0644"
+
+        - name: Reset the fake launchctl log before the converged run
+          ansible.builtin.copy:
+            content: ""
+            dest: "{{ test_root }}/launchctl.log"
+            mode: "0644"
+
+        - name: Run the local-external root include on the converged host
           ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
 
-        - name: Require the interrupted finish to succeed
+        - name: Require the converged run to succeed
           ansible.builtin.assert:
             that:
               - not (local_external_case_failed | bool)
-            fail_msg: "The interrupted finish failed: {{ local_external_case_message }}"
+            fail_msg: "The converged run failed: {{ local_external_case_message }}"
 
-        - name: Inspect the finished interrupted layout
+        - name: Inspect the converged layout after the run
           ansible.builtin.stat:
             path: "{{ item }}"
             follow: false
           loop:
             - "{{ chia_darwin_home }}/.chia"
-            - "{{ chia_darwin_home }}/.chia/{{ network }}/db"
-            - "{{ chia_darwin_home }}/.chia.migrating"
+            - "{{ chia_root }}/db"
             - "{{ chia_darwin_home }}/.chia.legacy-volume-link"
-          register: interrupted_stats
+            - "{{ converged_leftover }}/keep.txt"
+          register: converged_stats
 
-        - name: Require the interrupted finish to complete the swap
+        - name: Require the converged layout and leftovers to be unchanged
+          vars:
+            launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
           ansible.builtin.assert:
             that:
-              - interrupted_stats.results[0].stat.isdir | default(false)
-              - not (interrupted_stats.results[0].stat.islnk | default(false))
-              - interrupted_stats.results[1].stat.islnk | default(false)
+              - converged_stats.results[0].stat.isdir | default(false)
+              - not (converged_stats.results[0].stat.islnk | default(false))
+              - converged_stats.results[1].stat.islnk | default(false)
               - >-
-                (interrupted_stats.results[1].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
+                (converged_stats.results[1].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
                 (external_db | regex_replace('/+$', ''))
-              - not (interrupted_stats.results[2].stat.exists | default(false))
-              - interrupted_stats.results[3].stat.islnk | default(false)
+              - converged_stats.results[2].stat.islnk | default(false)
+              - >-
+                (converged_stats.results[2].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
+                (external_chia | regex_replace('/+$', ''))
+              - lookup('file', converged_leftover ~ '/keep.txt') == 'keep-leftover'
+              - launchctl_lines | select('search', 'bootout') | list | length == 0
+            fail_msg: >-
+              A converged host with a legacy backup link and a leftover tree must
+              succeed without refusal, keep both paths, and stop no jobs.
+
+    - name: Refuse a legacy ~/.chia volume symlink without changing it
+      vars:
+        chia_darwin_home: "{{ test_root }}/legacy-refused/home"
+        chia_root: "{{ test_root }}/legacy-refused/home/.chia/{{ network }}"
+      block:
+        - name: Prepare the legacy home directory
+          ansible.builtin.file:
+            path: "{{ chia_darwin_home }}"
+            state: directory
+            mode: "0755"
+
+        - name: Create the legacy ~/.chia volume symlink
+          ansible.builtin.file:
+            src: "{{ external_chia }}"
+            dest: "{{ chia_darwin_home }}/.chia"
+            state: link
+            force: false
+
+        - name: Reset the fake launchctl log before the legacy refusal
+          ansible.builtin.copy:
+            content: ""
+            dest: "{{ test_root }}/launchctl.log"
+            mode: "0644"
+
+        - name: Run the local-external root include with the legacy volume symlink
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+        - name: Require the legacy volume symlink refusal
+          ansible.builtin.assert:
+            that:
+              - local_external_case_failed | bool
+              - local_external_case_message is search('does not migrate a legacy volume symlink')
+              - local_external_case_message is search((chia_darwin_home ~ '/.chia') | regex_escape)
+            fail_msg: >-
+              The legacy ~/.chia volume symlink failed with the wrong result:
+              {{ local_external_case_message }}
+
+        - name: Inspect the refused legacy layout
+          ansible.builtin.stat:
+            path: "{{ item }}"
+            follow: false
+          loop:
+            - "{{ chia_darwin_home }}/.chia"
+            - "{{ chia_darwin_home }}/.chia.legacy-volume-link"
+            - "{{ chia_darwin_home }}/.chia.migrating"
+          register: legacy_refused_stats
+
+        - name: Require the legacy symlink and jobs to be untouched
+          vars:
+            launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
+          ansible.builtin.assert:
+            that:
+              - legacy_refused_stats.results[0].stat.islnk | default(false)
+              - >-
+                (legacy_refused_stats.results[0].stat.lnk_target | default('') | regex_replace('/+$', '')) ==
+                (external_chia | regex_replace('/+$', ''))
+              - not (legacy_refused_stats.results[1].stat.exists | default(false))
+              - not (legacy_refused_stats.results[2].stat.exists | default(false))
+              - launchctl_lines | select('search', 'bootout') | list | length == 0
+            fail_msg: >-
+              A legacy ~/.chia volume symlink must be refused unchanged with no
+              bootout and no rename. Log: {{ launchctl_lines }}
+
+    - name: Run the local-external refusal and guard cases
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-refusals.yml"
 
     - name: Fail closed when the production mount preflight does not see the volume
       vars:
         chia_darwin_home: "{{ test_root }}/unmounted/home"
         chia_root: "{{ test_root }}/unmounted/home/.chia/{{ network }}"
       block:
-        - name: Prepare a legacy ~/.chia symlink before the mount preflight
+        - name: Prepare a real internal ~/.chia before the mount preflight
           ansible.builtin.file:
-            path: "{{ chia_darwin_home }}"
+            path: "{{ chia_darwin_home }}/.chia"
             state: directory
             mode: "0755"
-
-        - name: Point ~/.chia at the volume before the mount preflight
-          ansible.builtin.file:
-            src: "{{ external_chia }}"
-            dest: "{{ chia_darwin_home }}/.chia"
-            state: link
-            force: false
 
         - name: Run the production mount preflight against an unmounted volume
           ansible.builtin.include_tasks: "{{ test_root }}/mount-preflight.yml"
@@ -493,10 +382,8 @@
     - name: Require the mount preflight to leave ~/.chia untouched
       ansible.builtin.assert:
         that:
-          - unmounted_stat.stat.islnk | default(false)
-          - >-
-            (unmounted_stat.stat.lnk_target | default('') | regex_replace('/+$', '')) ==
-            (external_chia | regex_replace('/+$', ''))
+          - unmounted_stat.stat.isdir | default(false)
+          - not (unmounted_stat.stat.islnk | default(false))
 
     - name: Report the temporary local-external root test directory
       ansible.builtin.debug:
