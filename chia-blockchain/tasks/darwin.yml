@@ -703,10 +703,22 @@
       register: chia_darwin_fda_python_bin
       changed_when: false
 
+    - name: Fail when the full-node Python interpreter is missing outside check mode
+      when:
+        - chia_darwin_emit_pppc | bool
+        - not (ansible_check_mode | bool)
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_fda_python_bin.stat.exists | default(false)
+        fail_msg: >-
+          {{ chia_darwin_venv }}/bin/python3.13 does not exist, so the Full
+          Disk Access note cannot record the full node's Python interpreter.
+          Create the virtualenv and install chia-blockchain before writing it.
+
     - name: Resolve the full-node Python interpreter for the Full Disk Access note
       when:
         - chia_darwin_emit_pppc | bool
-        - not (ansible_check_mode | bool) or (chia_darwin_fda_python_bin.stat.exists | default(false))
+        - chia_darwin_fda_python_bin.stat.exists | default(false)
       become: true
       become_user: "{{ user }}"
       ansible.builtin.command:
@@ -721,22 +733,10 @@
     - name: Record the resolved full-node Python interpreter
       when:
         - chia_darwin_emit_pppc | bool
-        - not (ansible_check_mode | bool) or (chia_darwin_fda_python_bin.stat.exists | default(false))
+        - chia_darwin_fda_python_bin.stat.exists | default(false)
       ansible.builtin.set_fact:
         chia_darwin_fda_python: "{{ chia_darwin_fda_python_real.stdout | trim }}"
       changed_when: false
-
-    - name: Fail when the full-node Python interpreter is missing outside check mode
-      when:
-        - chia_darwin_emit_pppc | bool
-        - not (ansible_check_mode | bool)
-      ansible.builtin.assert:
-        that:
-          - chia_darwin_fda_python_bin.stat.exists | default(false)
-        fail_msg: >-
-          {{ chia_darwin_venv }}/bin/python3.13 does not exist, so the Full
-          Disk Access note cannot record the full node's Python interpreter.
-          Create the virtualenv and install chia-blockchain before writing it.
 
     - name: Write the Full Disk Access note
       when: chia_darwin_emit_pppc | bool

@@ -41,6 +41,7 @@ jobs:
           ansible-playbook --syntax-check .github/ci/darwin-local-external-root-tests.yml
           ansible-playbook --syntax-check .github/ci/darwin-local-external-root-idempotence.yml
           ansible-playbook --syntax-check .github/ci/darwin-fda-text-without-python.yml
+          ansible-playbook --syntax-check .github/ci/darwin-fda-missing-python.yml
           ansible-playbook --syntax-check .github/ci/darwin-bare-interpreter.yml
           ansible-playbook --syntax-check .github/ci/darwin-hw-boards.yml
           ansible-playbook --syntax-check .github/ci/darwin-fleet-roles.yml
@@ -109,6 +110,11 @@ jobs:
         env:
           ANSIBLE_ROLES_PATH: ${{ github.workspace }}
         run: ansible-playbook .github/ci/darwin-fda-text-without-python.yml
+
+      - name: Exercise the Darwin Full Disk Access missing interpreter failure
+        env:
+          ANSIBLE_ROLES_PATH: ${{ github.workspace }}
+        run: ansible-playbook .github/ci/darwin-fda-missing-python.yml
 
       - name: Prove virtualenv pip works without packaging on the module interpreter
         run: |
