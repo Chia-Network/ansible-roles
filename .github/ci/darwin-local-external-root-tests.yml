@@ -415,6 +415,105 @@
               A leftover staging tree next to a real ~/.chia must be renamed
               aside, not deleted, and the include must continue.
 
+    - name: Reuse the next leftover name when the first is already taken
+      vars:
+        chia_darwin_home: "{{ test_root }}/leftover-collision/home"
+        chia_root: "{{ test_root }}/leftover-collision/home/.chia/{{ network }}"
+      block:
+        - name: Prepare a real ~/.chia, an old leftover, and a new staging tree
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: directory
+            mode: "0755"
+          loop:
+            - "{{ chia_darwin_home }}/.chia"
+            - "{{ chia_darwin_home }}/.chia.migrating.leftover"
+            - "{{ chia_darwin_home }}/.chia.migrating"
+
+        - name: Write the old leftover and new staging fixtures
+          ansible.builtin.copy:
+            content: "{{ item.content }}"
+            dest: "{{ item.dest }}"
+            mode: "0644"
+          loop:
+            - content: old-leftover
+              dest: "{{ chia_darwin_home }}/.chia.migrating.leftover/old.txt"
+            - content: staged-data
+              dest: "{{ chia_darwin_home }}/.chia.migrating/keep.txt"
+          loop_control:
+            label: "{{ item.dest }}"
+
+        - name: Run the local-external root include when the first leftover exists
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+        - name: Require the collided leftover run to proceed
+          ansible.builtin.assert:
+            that:
+              - not (local_external_case_failed | bool)
+            fail_msg: "The collided leftover staging tree was refused: {{ local_external_case_message }}"
+
+        - name: Inspect the collided leftover layout
+          ansible.builtin.stat:
+            path: "{{ item }}"
+            follow: false
+          loop:
+            - "{{ chia_darwin_home }}/.chia.migrating.leftover/old.txt"
+            - "{{ chia_darwin_home }}/.chia.migrating.leftover.1/keep.txt"
+            - "{{ chia_darwin_home }}/.chia.migrating"
+          register: leftover_collision_stats
+
+        - name: Require the staging tree to move to the next leftover name
+          ansible.builtin.assert:
+            that:
+              - leftover_collision_stats.results[0].stat.isreg | default(false)
+              - lookup('file', chia_darwin_home ~ '/.chia.migrating.leftover/old.txt') == 'old-leftover'
+              - leftover_collision_stats.results[1].stat.isreg | default(false)
+              - lookup('file', chia_darwin_home ~ '/.chia.migrating.leftover.1/keep.txt') == 'staged-data'
+              - not (leftover_collision_stats.results[2].stat.exists | default(false))
+            fail_msg: >-
+              An occupied first leftover name must not block the move; the new
+              staging tree must use the next unused name and keep its data.
+
+        - name: Create another staging tree after the collision
+          ansible.builtin.file:
+            path: "{{ chia_darwin_home }}/.chia.migrating"
+            state: directory
+            mode: "0755"
+
+        - name: Write the next staging fixture
+          ansible.builtin.copy:
+            content: retry-data
+            dest: "{{ chia_darwin_home }}/.chia.migrating/retry.txt"
+            mode: "0644"
+
+        - name: Run the local-external root include again after the collision
+          ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+        - name: Require the later run to proceed
+          ansible.builtin.assert:
+            that:
+              - not (local_external_case_failed | bool)
+            fail_msg: "The later run after a collision was refused: {{ local_external_case_message }}"
+
+        - name: Inspect the later leftover names
+          ansible.builtin.stat:
+            path: "{{ item }}"
+            follow: false
+          loop:
+            - "{{ chia_darwin_home }}/.chia.migrating.leftover.2/retry.txt"
+            - "{{ chia_darwin_home }}/.chia.migrating"
+          register: leftover_retry_stats
+
+        - name: Require the later run to use the next unused leftover name
+          ansible.builtin.assert:
+            that:
+              - leftover_retry_stats.results[0].stat.isreg | default(false)
+              - lookup('file', chia_darwin_home ~ '/.chia.migrating.leftover.2/retry.txt') == 'retry-data'
+              - not (leftover_retry_stats.results[1].stat.exists | default(false))
+            fail_msg: >-
+              A later run must still be able to move a new staging tree aside
+              and keep retrying after earlier leftover names are occupied.
+
     - name: Run the local-external refusal and guard cases
       ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-refusals.yml"
 

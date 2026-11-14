@@ -1,0 +1,26 @@
+---
+# Pick the first unused failed-migration leftover name. An earlier leftover is
+# never deleted or overwritten, so a second failure can still move its staging
+# tree aside and the next run can retry. The caller reads
+# chia_darwin_local_external_leftover after this include.
+- name: Inspect candidate leftover migration staging names
+  ansible.builtin.stat:
+    path: >-
+      {{ chia_darwin_local_external_dot_chia_leftover }}{{ '' if item == 0
+      else '.' ~ item }}
+    follow: false
+  loop: "{{ range(0, 100) | list }}"
+  register: chia_darwin_local_external_leftover_stats
+  changed_when: false
+
+- name: Select the first unused leftover migration staging name
+  vars:
+    chia_darwin_local_external_first_free: >-
+      {{ chia_darwin_local_external_leftover_stats.results
+      | selectattr('stat.exists', 'equalto', false) | first }}
+  ansible.builtin.set_fact:
+    chia_darwin_local_external_leftover: >-
+      {{ chia_darwin_local_external_dot_chia_leftover
+      ~ ('' if chia_darwin_local_external_first_free.item == 0
+      else '.' ~ chia_darwin_local_external_first_free.item) }}
+  changed_when: false

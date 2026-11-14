@@ -30,6 +30,7 @@
         that:
           - local_external_case_failed | bool
           - local_external_case_message is search('only migrates the historical')
+          - local_external_case_message is search((chia_darwin_home ~ '/.chia') | regex_escape)
         fail_msg: >-
           The unexpected ~/.chia symlink failed with the wrong result:
           {{ local_external_case_message }}
@@ -73,6 +74,7 @@
         that:
           - local_external_case_failed | bool
           - local_external_case_message is search('neither a directory nor a symlink')
+          - local_external_case_message is search((chia_darwin_home ~ '/.chia') | regex_escape)
         fail_msg: >-
           The unexpected ~/.chia path type failed with the wrong result:
           {{ local_external_case_message }}
@@ -114,6 +116,7 @@
         that:
           - local_external_case_failed | bool
           - local_external_case_message is search('real directory')
+          - local_external_case_message is search((chia_root ~ '/db') | regex_escape)
         fail_msg: >-
           The real local db directory failed with the wrong result:
           {{ local_external_case_message }}
@@ -160,6 +163,7 @@
         that:
           - local_external_case_failed | bool
           - local_external_case_message is search('will not retarget')
+          - local_external_case_message is search((chia_root ~ '/db') | regex_escape)
         fail_msg: >-
           The wrong db symlink failed with the wrong result:
           {{ local_external_case_message }}
@@ -203,6 +207,7 @@
         that:
           - local_external_case_failed | bool
           - local_external_case_message is search('regular file')
+          - local_external_case_message is search((chia_root ~ '/db') | regex_escape)
         fail_msg: >-
           The file at the db path failed with the wrong result:
           {{ local_external_case_message }}
@@ -233,6 +238,7 @@
         that:
           - local_external_case_failed | bool
           - local_external_case_message is search("finished migration's backup")
+          - local_external_case_message is search((chia_darwin_home ~ '/.chia') | regex_escape)
         fail_msg: >-
           The finished migration backup failed with the wrong result:
           {{ local_external_case_message }}
@@ -277,6 +283,7 @@
         that:
           - local_external_case_failed | bool
           - local_external_case_message is search('backup path')
+          - local_external_case_message is search((chia_darwin_home ~ '/.chia') | regex_escape)
         fail_msg: >-
           The existing backup path failed with the wrong result:
           {{ local_external_case_message }}

@@ -78,11 +78,14 @@
     - chia_darwin_local_external_dot_kind != "absent"
     - chia_darwin_local_external_staging_present | bool
   block:
+    - name: Pick an unused leftover name for the staging tree
+      ansible.builtin.include_tasks: darwin-local-external-leftover.yml
+
     - name: Rename the leftover migration staging tree aside
       ansible.builtin.include_tasks: darwin-local-external-rename.yml
       vars:
         local_external_rename_src: "{{ chia_darwin_local_external_dot_chia_migrating }}"
-        local_external_rename_dest: "{{ chia_darwin_local_external_dot_chia_leftover }}"
+        local_external_rename_dest: "{{ chia_darwin_local_external_leftover }}"
         local_external_rename_name: "the leftover migration staging tree"
 
     - name: Record that the staging tree was moved aside
@@ -131,8 +134,8 @@
 - name: Refuse an unsafe or unfinished local-external layout
   vars:
     stats: "{{ chia_darwin_local_external_stats }}"
-    dot: "{{ chia_darwin_local_external_stats.dot }}"
-    root_db: "{{ chia_darwin_local_external_stats.root_db }}"
+    dot: "{{ chia_darwin_local_external_dot_chia }}"
+    root_db: "{{ chia_darwin_local_external_root_db }}"
     migrating: "{{ chia_darwin_local_external_dot_chia_migrating }}"
     legacy: "{{ chia_darwin_local_external_dot_chia_legacy }}"
     volume_chia: "{{ chia_darwin_volume_chia_dir }}"
@@ -368,11 +371,14 @@
         - "{{ chia_darwin_local_external_dot_chia_migrating }}"
       register: chia_darwin_local_external_restored_stats
 
+    - name: Pick an unused leftover name for the failed staging tree
+      ansible.builtin.include_tasks: darwin-local-external-leftover.yml
+
     - name: Move a failed migration's staging tree aside
       ansible.builtin.include_tasks: darwin-local-external-rename.yml
       vars:
         local_external_rename_src: "{{ chia_darwin_local_external_dot_chia_migrating }}"
-        local_external_rename_dest: "{{ chia_darwin_local_external_dot_chia_leftover }}"
+        local_external_rename_dest: "{{ chia_darwin_local_external_leftover }}"
         local_external_rename_name: "the failed migration staging tree"
       when:
         - chia_darwin_local_external_restored_stats.results[0].stat.exists | default(false)

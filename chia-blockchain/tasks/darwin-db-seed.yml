@@ -99,6 +99,18 @@
       check_mode: false
       become: "{{ chia_darwin_launchd_become | bool }}"
 
+    # A later ordered restart brings the node back, so an already requested
+    # restart may stop only the loaded full node instead of refusing to seed.
+    - name: Stop the loaded full node before seeding when a restart is requested
+      when:
+        - chia_darwin_db_seed_node.rc | default(1) | int == 0
+        - chia_darwin_restart_services | default(false) | bool
+      vars:
+        chia_job:
+          label: "{{ chia_darwin_launchd_prefix }}.full-node"
+          exit_timeout: "{{ chia_darwin_full_node_exit_timeout }}"
+      ansible.builtin.include_tasks: darwin-stop-job.yml
+
     - name: Refuse to replace a database under a loaded full node
       ansible.builtin.fail:
         msg: >-
@@ -106,7 +118,9 @@
           Refusing to replace its database while the node may be running. Stop it
           with "sudo launchctl bootout system/{{ chia_darwin_launchd_prefix }}.full-node"
           and rerun. This role never replaces a live node's database.
-      when: chia_darwin_db_seed_node.rc | default(1) == 0
+      when:
+        - chia_darwin_db_seed_node.rc | default(1) | int == 0
+        - not (chia_darwin_restart_services | default(false) | bool)
 
     - name: Ensure the AWS CLI is available for the database seed
       when: not ansible_check_mode
