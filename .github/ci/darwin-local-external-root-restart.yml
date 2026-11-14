@@ -324,8 +324,8 @@
           - launchctl_lines | select('search', 'bootstrap .*net.chia.roottest.chia-exporter') | list | length >= 1
         fail_msg: >-
           A failed staging swap must restore the legacy link and bootstrap the
-          previously loaded jobs. Failure: {{ local_external_case_message }}
-          Log: {{ launchctl_lines }}
+          enabled jobs whose plist is installed. Failure:
+          {{ local_external_case_message }} Log: {{ launchctl_lines }}
 
     - name: Inspect the restored legacy link after the failed staging swap
       ansible.builtin.stat:
@@ -362,10 +362,15 @@
       ansible.builtin.assert:
         that:
           - local_external_case_failed | bool
+          - local_external_case_message is search('staging tree is complete')
+          - local_external_case_message is search('rerun finishes')
+          - local_external_case_message is not search('Restore it manually')
           - launchctl_lines | select('search', 'bootstrap') | list | length == 0
         fail_msg: >-
-          When ~/.chia is missing after a failed restore, the migration must not
-          bootstrap jobs. Log: {{ launchctl_lines }}
+          When ~/.chia is missing after a failed restore, the report must say
+          the staging tree is complete and a rerun finishes the migration, and
+          the migration must not bootstrap jobs. Failure:
+          {{ local_external_case_message }} Log: {{ launchctl_lines }}
 
     - name: Inspect ~/.chia after the failed restore
       ansible.builtin.stat:
@@ -378,65 +383,220 @@
         that:
           - not (failed_restore_dot.stat.exists | default(false))
 
-- name: Do not bootstrap an enabled companion that was not loaded before the stop
+- name: Do not bootstrap an enabled companion whose plist is missing
   vars:
-    chia_darwin_home: "{{ test_root }}/not-loaded/home"
-    chia_root: "{{ test_root }}/not-loaded/home/.chia/{{ network }}"
+    chia_darwin_home: "{{ test_root }}/missing-companion-plist/home"
+    chia_root: "{{ chia_darwin_home }}/.chia/{{ network }}"
   block:
-    - name: Prepare a legacy link for the not-loaded companion case
+    - name: Prepare a legacy link for the missing companion plist case
       ansible.builtin.file:
         path: "{{ chia_darwin_home }}"
         state: directory
         mode: "0755"
 
-    - name: Create the not-loaded legacy ~/.chia link
+    - name: Create the missing companion plist legacy ~/.chia link
       ansible.builtin.file:
         src: "{{ external_chia }}"
         dest: "{{ chia_darwin_home }}/.chia"
         state: link
         force: false
 
-    - name: Start the timelord loaded and mark the companion not loaded
-      ansible.builtin.copy:
-        content: ""
-        dest: "{{ test_root }}/launchd-state/loaded/net.chia.roottest.timelord"
-        force: true
-        mode: "0644"
-
-    - name: Remove the loaded marker for the companion
+    - name: Remove the companion plist
       ansible.builtin.file:
-        path: "{{ test_root }}/launchd-state/loaded/net.chia.roottest.chia-exporter"
+        path: "{{ chia_darwin_launchd_dir }}/net.chia.roottest.chia-exporter.plist"
         state: absent
 
-    - name: Reset the fake launchctl log before the not-loaded companion run
+    - name: Reset the fake launchctl log before the missing companion plist run
       ansible.builtin.copy:
         content: ""
         dest: "{{ test_root }}/launchctl.log"
         mode: "0644"
 
-    - name: Run the local-external root include with an unloaded companion
+    - name: Run the local-external root include with a missing companion plist
       ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
 
-    - name: Require the not-loaded companion migration to succeed
+    - name: Require the missing companion plist migration to succeed
       ansible.builtin.assert:
         that:
           - not (local_external_case_failed | bool)
-        fail_msg: "The not-loaded companion run failed: {{ local_external_case_message }}"
+        fail_msg: "The missing companion plist run failed: {{ local_external_case_message }}"
 
-    - name: Require the companion to stay unloaded while the timelord returns
+    - name: Require the installed jobs to return while the missing plist is skipped
       vars:
         launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
       ansible.builtin.assert:
         that:
           - launchctl_lines | select('search', 'bootstrap .*net.chia.roottest.timelord') | list | length >= 1
+          - launchctl_lines | select('search', 'bootstrap .*net.chia.roottest.hw-vdf-0') | list | length >= 1
           - launchctl_lines | select('search', 'bootstrap .*net.chia.roottest.chia-exporter') | list | length == 0
         fail_msg: >-
-          The migration must not bootstrap an enabled companion that was not
-          loaded before the stop. Log: {{ launchctl_lines }}
+          The migration must skip an enabled companion without a plist and
+          restart the enabled jobs that have one. Log: {{ launchctl_lines }}
 
-    - name: Restore the default companion loaded marker for later cases
+    - name: Restore the default companion plist for later cases
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-plist.yml"
+      vars:
+        local_external_plist:
+          name: chia-exporter
+          label: net.chia.roottest.chia-exporter
+
+- name: Rerun a migration killed mid-rsync and restart every installed plist
+  vars:
+    chia_darwin_home: "{{ test_root }}/killed-rsync/home"
+    chia_root: "{{ chia_darwin_home }}/.chia/{{ network }}"
+  block:
+    - name: Prepare the killed-rsync home and legacy ~/.chia link
+      ansible.builtin.file:
+        path: "{{ chia_darwin_home }}"
+        state: directory
+        mode: "0755"
+
+    - name: Create the killed-rsync legacy ~/.chia link
+      ansible.builtin.file:
+        src: "{{ external_chia }}"
+        dest: "{{ chia_darwin_home }}/.chia"
+        state: link
+        force: false
+
+    - name: Create the killed-rsync staging tree
+      ansible.builtin.file:
+        path: "{{ chia_darwin_home }}/.chia.migrating/{{ network }}"
+        state: directory
+        mode: "0755"
+
+    - name: Write a partial file into the killed-rsync staging tree
+      ansible.builtin.copy:
+        content: killed-mid-rsync
+        dest: "{{ chia_darwin_home }}/.chia.migrating/{{ network }}/partial.txt"
+        mode: "0644"
+
+    - name: Clear every loaded marker before the killed-rsync rerun
+      ansible.builtin.file:
+        path: "{{ test_root }}/launchd-state/loaded/{{ item.label }}"
+        state: absent
+      loop: "{{ chia_darwin_launchd_jobs | selectattr('enabled', 'truthy') | list }}"
+      loop_control:
+        label: "{{ item.label }}"
+
+    - name: Reset the fake launchctl log before the killed-rsync rerun
       ansible.builtin.copy:
         content: ""
-        dest: "{{ test_root }}/launchd-state/loaded/net.chia.roottest.chia-exporter"
-        force: true
+        dest: "{{ test_root }}/launchctl.log"
         mode: "0644"
+
+    - name: Rerun the local-external root include after a killed-rsync migration
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+    - name: Require the killed-rsync rerun to finish the migration
+      ansible.builtin.assert:
+        that:
+          - not (local_external_case_failed | bool)
+        fail_msg: "The killed-rsync rerun failed: {{ local_external_case_message }}"
+
+    - name: Find the killed-rsync leftover staging trees
+      ansible.builtin.find:
+        paths: "{{ chia_darwin_home }}"
+        patterns:
+          - ".chia.migrating.leftover*"
+        file_type: directory
+        hidden: true
+        recurse: false
+      register: killed_rsync_leftovers
+
+    - name: Inspect the killed-rsync layout after the rerun
+      ansible.builtin.stat:
+        path: "{{ item }}"
+        follow: false
+      loop:
+        - "{{ chia_darwin_home }}/.chia"
+        - "{{ chia_darwin_home }}/.chia.migrating"
+        - "{{ chia_darwin_home }}/.chia.legacy-volume-link"
+      register: killed_rsync_stats
+
+    - name: Require the killed-rsync rerun to move staging aside and finish
+      ansible.builtin.assert:
+        that:
+          - killed_rsync_leftovers.matched == 1
+          - killed_rsync_stats.results[0].stat.isdir | default(false)
+          - not (killed_rsync_stats.results[0].stat.islnk | default(false))
+          - not (killed_rsync_stats.results[1].stat.exists | default(false))
+          - killed_rsync_stats.results[2].stat.islnk | default(false)
+          - >-
+            lookup('file', killed_rsync_leftovers.files[0].path ~ '/' ~ network
+            ~ '/partial.txt') == 'killed-mid-rsync'
+        fail_msg: >-
+          A rerun after a killed migration must move the staging tree aside,
+          finish the migration, and keep the partial staging data.
+
+    - name: Require the killed-rsync rerun to restart every installed plist
+      vars:
+        launchctl_lines: "{{ lookup('file', test_root ~ '/launchctl.log') | split('\n') | reject('eq', '') | list }}"
+      ansible.builtin.assert:
+        that:
+          - launchctl_lines | select('search', 'bootstrap .*net.chia.roottest.timelord') | list | length >= 1
+          - launchctl_lines | select('search', 'bootstrap .*net.chia.roottest.chia-exporter') | list | length >= 1
+          - launchctl_lines | select('search', 'bootstrap .*net.chia.roottest.hw-vdf-0') | list | length >= 1
+          - launchctl_lines | select('search', 'bootstrap .*net.chia.roottest.hw-vdf-1') | list | length >= 1
+          - launchctl_lines | select('search', 'bootstrap .*net.chia.roottest.watchdog') | list | length >= 1
+          - launchctl_lines | select('search', 'net.chia.roottest.disabled') | list | length == 0
+        fail_msg: >-
+          A rerun after a killed migration must bootstrap every enabled job
+          whose plist is installed. Log: {{ launchctl_lines }}
+
+- name: Skip an enabled board whose plist is missing without blocking the others
+  vars:
+    chia_darwin_home: "{{ test_root }}/missing-board-plist/home"
+    chia_root: "{{ chia_darwin_home }}/.chia/{{ network }}"
+  block:
+    - name: Prepare a legacy link for the missing board plist case
+      ansible.builtin.file:
+        path: "{{ chia_darwin_home }}"
+        state: directory
+        mode: "0755"
+
+    - name: Create the missing board plist legacy ~/.chia link
+      ansible.builtin.file:
+        src: "{{ external_chia }}"
+        dest: "{{ chia_darwin_home }}/.chia"
+        state: link
+        force: false
+
+    - name: Remove one board plist
+      ansible.builtin.file:
+        path: "{{ chia_darwin_launchd_dir }}/net.chia.roottest.hw-vdf-1.plist"
+        state: absent
+
+    - name: Reset the fake launchctl log before the missing board plist run
+      ansible.builtin.copy:
+        content: ""
+        dest: "{{ test_root }}/launchctl.log"
+        mode: "0644"
+
+    - name: Run the local-external root include with a missing board plist
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-case.yml"
+
+    - name: Require the missing board plist migration to succeed
+      ansible.builtin.assert:
+        that:
+          - not (local_external_case_failed | bool)
+        fail_msg: "The missing board plist run failed: {{ local_external_case_message }}"
+
+    - name: Require the installed board to start while the missing board is skipped
+      vars:
+        board_launchctl_log: "{{ lookup('file', test_root ~ '/launchctl.log') }}"
+      ansible.builtin.assert:
+        that:
+          - board_launchctl_log is search('bootstrap .*net.chia.roottest.timelord')
+          - board_launchctl_log is search('bootstrap .*net.chia.roottest.hw-vdf-0')
+          - board_launchctl_log is search('bootstrap .*net.chia.roottest.watchdog')
+          - board_launchctl_log is not search('bootstrap .*net.chia.roottest.hw-vdf-1')
+        fail_msg: >-
+          The migration must skip an enabled board without a plist without
+          stranding the other boards. Log: {{ board_launchctl_log }}
+
+    - name: Restore the missing board plist for later cases
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-plist.yml"
+      vars:
+        local_external_plist:
+          name: hw-vdf-1
+          label: net.chia.roottest.hw-vdf-1

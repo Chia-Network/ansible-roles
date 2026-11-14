@@ -463,11 +463,13 @@
           - local_external_case_message is search('Repeated local-external migration failures')
           - local_external_case_message is search('reaching the cap')
           - local_external_case_message is search('\\.chia\\.migrating\\.leftover')
+          - local_external_case_message is search('Move them out of')
+          - local_external_case_message is search('raise chia_darwin_local_external_leftover_max')
           - launchctl_lines | select('search', 'bootout') | list | length == 0
         fail_msg: >-
           A legacy ~/.chia with the leftover cap reached must refuse before any
-          bootout. Failure: {{ local_external_case_message }} Log:
-          {{ launchctl_lines }}
+          bootout and explain how to clear the leftovers. Failure:
+          {{ local_external_case_message }} Log: {{ launchctl_lines }}
 
     - name: Inspect the existing leftover trees after the refusal
       ansible.builtin.stat:

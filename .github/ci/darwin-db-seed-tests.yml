@@ -415,7 +415,7 @@
           name: loaded stub after migration restart
           root: "{{ running_root }}"
           launchctl: bootout
-          local_external_restarted: true
+          local_external_migrated: true
 
     - name: Assert the migration-restart seed stopped the node and requested a restart
       ansible.builtin.assert:

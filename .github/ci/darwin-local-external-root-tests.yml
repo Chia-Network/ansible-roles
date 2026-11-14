@@ -309,11 +309,12 @@
           - migrated_stats.results[9].stat.isreg | default(false)
           - lookup('file', test_root ~ '/legacy/home/.chia/mainnet/config/config.yaml') == 'mainnet config fixture'
           - lookup('file', test_root ~ '/legacy/home/.chia/mainnet/wallet/db/wallet.sqlite') == 'wallet db fixture'
-          - chia_darwin_local_external_restarted | bool
+          - chia_darwin_local_external_migrated | bool
         fail_msg: >-
           The legacy migration must keep ~/.chia internal and real, copy non-db
           data, preserve modes, link only <chia_root>/db at the original volume
-          DB, leave the volume database in place, and restart the loaded jobs.
+          DB, leave the volume database in place, and restart the enabled jobs
+          whose plist is installed.
 
     - name: Require the migration to restart the enabled jobs and not the disabled one
       vars:
@@ -326,9 +327,9 @@
           - launchctl_lines | select('search', 'bootstrap .*net.chia.roottest.chia-exporter') | list | length >= 1
           - launchctl_lines | select('search', 'net.chia.roottest.disabled') | list | length == 0
         fail_msg: >-
-          The migration must stop and restart only this role's loaded enabled
-          jobs and must not touch disabled or non-chia jobs. Log:
-          {{ launchctl_lines }}
+          The migration must stop and restart only this role's enabled jobs
+          whose plist is installed and must not touch disabled or non-chia
+          jobs. Log: {{ launchctl_lines }}
 
     - name: Require the migration to stop the timelord before rsync copies
       vars:

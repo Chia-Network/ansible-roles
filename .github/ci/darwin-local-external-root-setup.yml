@@ -10,12 +10,12 @@
     chia_darwin_db_volume: "{{ test_root }}/Volumes/Chia DB"
     chia_darwin_mount: "{{ test_root }}/bin/mount"
     chia_darwin_launchctl: "{{ test_root }}/bin/launchctl-stateful"
+    chia_darwin_launchd_dir: "{{ test_root }}/LaunchDaemons"
     chia_darwin_launchd_prefix: net.chia.roottest
     chia_darwin_launchd_become: false
     chia_darwin_restart_services: false
     chia_darwin_restart_companions: false
-    chia_darwin_enable_watchdog: false
-    chia_darwin_hw_vdf_jobs: []
+    chia_darwin_enable_watchdog: true
     chia_darwin_hw_vdf_changed_labels: []
     chia_darwin_start_now: true
     chia_darwin_rsync: "{{ test_root }}/bin/rsync-logging"
@@ -30,19 +30,32 @@
         label: net.chia.roottest.chia-exporter
         enabled: true
         exit_timeout: 1
-    chia_darwin_launchd_jobs:
-      - name: timelord
-        label: net.chia.roottest.timelord
+      - name: watchdog
+        label: net.chia.roottest.watchdog
         enabled: true
         exit_timeout: 1
-      - name: chia-exporter
-        label: net.chia.roottest.chia-exporter
+    chia_darwin_watchdog_job:
+      name: watchdog
+      label: net.chia.roottest.watchdog
+      enabled: true
+      exit_timeout: 1
+    chia_darwin_hw_vdf_jobs:
+      - name: hw-vdf-0
+        label: net.chia.roottest.hw-vdf-0
         enabled: true
         exit_timeout: 1
-      - name: disabled
-        label: net.chia.roottest.disabled
-        enabled: false
+      - name: hw-vdf-1
+        label: net.chia.roottest.hw-vdf-1
+        enabled: true
         exit_timeout: 1
+
+- name: Assemble the local-external fixture launchd jobs
+  ansible.builtin.set_fact:
+    chia_darwin_launchd_jobs: >-
+      {{ chia_darwin_service_jobs + chia_darwin_companion_jobs +
+      chia_darwin_hw_vdf_jobs + [{'name': 'disabled', 'label':
+      'net.chia.roottest.disabled', 'enabled': false, 'exit_timeout': 1}] }}
+  changed_when: false
 
 - name: Create the stateful fake launchd state directory
   ansible.builtin.file:
@@ -68,6 +81,14 @@
   loop:
     - "{{ test_root }}/bin"
     - "{{ chia_darwin_db_volume }}"
+    - "{{ chia_darwin_launchd_dir }}"
+
+- name: Write the default enabled launchd plists
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-local-external-root-plist.yml"
+  loop: "{{ chia_darwin_launchd_jobs | selectattr('enabled', 'truthy') | list }}"
+  loop_control:
+    loop_var: local_external_plist
+    label: "{{ local_external_plist.label }}"
 
 - name: Write the fake mounted filesystem list
   ansible.builtin.copy:
