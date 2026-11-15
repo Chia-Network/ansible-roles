@@ -1,34 +1,24 @@
 ---
-# Deterministic refusals for the Darwin timelord implementation. Included before
-# the role changes the host, and by the CI harness with synthetic facts.
-- name: Require a known Darwin timelord implementation
+# The single Darwin allow-list. darwin.yml includes this before it derives jobs
+# or changes the host; the CI harness includes it with synthetic facts.
+- name: Require a supported Darwin combination
   ansible.builtin.assert:
     that:
-      - chia_darwin_timelord_implementation in ["chia-blockchain", "timelord-app"]
+      - >-
+        [chia_darwin_timelord_implementation, chia_darwin_topology,
+        chia_darwin_enable_hw_vdf | bool, chia_darwin_timelord_app_enabled | bool] in
+        [['chia-blockchain', 'local-external', true, false],
+        ['timelord-app', 'local-external', false, true],
+        ['timelord-app', 'remote-node', false, true]]
     fail_msg: >-
-      chia_darwin_timelord_implementation must be chia-blockchain or
-      timelord-app. Got {{ chia_darwin_timelord_implementation }}.
-
-- name: Require the local-external topology and role-managed ASIC boards for chia-blockchain
-  ansible.builtin.assert:
-    that:
-      - chia_darwin_topology == "local-external"
-      - chia_darwin_enable_hw_vdf | bool
-    fail_msg: >-
-      chia_darwin_timelord_implementation: chia-blockchain runs the Python node
-      and timelord, so it needs chia_darwin_topology: local-external with the
-      external database and 1-3 role-managed hw-vdf boards. Set
-      chia_darwin_enable_hw_vdf: true, or use timelord-app.
-  when: chia_darwin_timelord_implementation == "chia-blockchain"
-
-- name: Refuse role-managed ASIC clients when the app owns the hardware
-  ansible.builtin.assert:
-    that:
-      - not (chia_darwin_timelord_app_enabled | bool and chia_darwin_enable_hw_vdf | bool)
-    fail_msg: >-
-      timelord-app owns the timelord and the ASIC USB clients. Set
-      chia_darwin_enable_hw_vdf to false (the derived default) or use
-      chia_darwin_timelord_implementation: chia-blockchain.
+      Darwin supports exactly three combinations: chia-blockchain on
+      local-external with chia_darwin_enable_hw_vdf true and 1-3 role-managed
+      ASIC boards; timelord-app on local-external; timelord-app on remote-node.
+      timelord-app owns the timelord and its ASIC clients, so it needs
+      chia_darwin_enable_hw_vdf false. local-internal and vdf-only are no longer
+      supported. Got implementation={{ chia_darwin_timelord_implementation }},
+      topology={{ chia_darwin_topology }},
+      enable_hw_vdf={{ chia_darwin_enable_hw_vdf }}.
 
 - name: Require the Timelord.app remote observability opt-in
   ansible.builtin.assert:
@@ -56,6 +46,4 @@
       already on this Mac, or chia_darwin_timelord_app_bundle_src to a
       controller directory to copy. The bundle must contain connection.toml and
       the dedicated peer/RPC client identities created on the full-node host.
-  when:
-    - chia_darwin_timelord_app_enabled | bool
-    - not (chia_darwin_local_full_node | bool)
+  when: chia_darwin_topology == "remote-node"

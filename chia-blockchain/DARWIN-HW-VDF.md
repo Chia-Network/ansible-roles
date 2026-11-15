@@ -224,8 +224,7 @@ board by leaving a single explicit inventory entry, or by clearing the list
 and setting only the scalar serial (which omits `--device-loc` and retires the
 other role-owned wrappers). Attaching one board for auto-discovery is not a
 rollback: the other wrappers still claim their boards, so the set stays
-larger. `remote-node` still has no local full node, and every ASIC client
-still connects to the local timelord.
+larger. Every ASIC client connects to the local timelord.
 
 ## Timelord.app
 

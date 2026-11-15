@@ -8,16 +8,7 @@
         chia_darwin_timelord_app_bundle_path: "{{ refusal_case.facts.chia_darwin_timelord_app_bundle_path | default('') }}"
         chia_darwin_timelord_app_bundle_src: "{{ refusal_case.facts.chia_darwin_timelord_app_bundle_src | default('') }}"
         chia_darwin_enable_hw_vdf: "{{ refusal_case.facts.chia_darwin_enable_hw_vdf | default(refusal_case.facts.chia_darwin_timelord_implementation == 'chia-blockchain') }}"
-
-    # local-internal and vdf-only fail here, before jobs or implementation
-    # validation run.
-    - name: Include the early topology check for {{ refusal_case.name }}
-      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-topology-validate.yml
-
-    # The remaining invalid combinations pass the topology allow-list, so
-    # derive the production job facts before the implementation checks.
-    - name: Derive the job facts for {{ refusal_case.name }}
-      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-jobs.yml
+        chia_darwin_timelord_app_enabled: "{{ refusal_case.facts.chia_darwin_timelord_app_enabled | default(refusal_case.facts.chia_darwin_timelord_implementation == 'timelord-app') }}"
 
     - name: Include the implementation checks for {{ refusal_case.name }}
       ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-implementation-validate.yml

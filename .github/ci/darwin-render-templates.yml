@@ -110,7 +110,6 @@
       vars:
         chia_darwin_topology: "{{ item.0 }}"
         chia_darwin_local_full_node: "{{ item.0 == 'local-external' }}"
-        chia_darwin_local_timelord: "{{ item.0 in ['local-external', 'remote-node'] }}"
       loop: "{{ topologies | product(templates) | list }}"
       loop_control:
         label: "{{ item.0 }}/{{ item.1 }}"
@@ -248,6 +247,16 @@
           - >-
             'launchctl disable "system/$PREFIX.$1"' in text
 
+    - name: Read the local-external hw-vdf wrapper
+      ansible.builtin.slurp:
+        src: "{{ render_out }}/local-external/chia-hw-vdf-run.sh"
+      register: local_external_hw_wrapper
+
+    - name: The hw-vdf wrapper waits for the local timelord
+      ansible.builtin.assert:
+        that:
+          - (local_external_hw_wrapper.content | b64decode) is search('(?m)^wait_for_listen "\\$PORT"')
+
     - name: Create the VDF tuning fixture directory
       ansible.builtin.file:
         path: "{{ render_out }}/vdf-tuning"
@@ -262,7 +271,6 @@
       vars:
         chia_darwin_topology: local-external
         chia_darwin_local_full_node: true
-        chia_darwin_local_timelord: true
         chia_darwin_hw_vdf_auto_freq_period: 60
         chia_darwin_hw_vdf_max_freq: 1620
 

@@ -16,14 +16,11 @@
       chia-blockchain Darwin support targets Apple Silicon
       (arm64). This host reports {{ ansible_architecture }}.
 
-- name: Validate the Darwin topology
-  ansible.builtin.include_tasks: darwin-topology-validate.yml
+- name: Validate the Darwin topology and timelord implementation
+  ansible.builtin.include_tasks: darwin-implementation-validate.yml
 
 - name: Build the Darwin LaunchDaemon job list
   ansible.builtin.include_tasks: darwin-jobs.yml
-
-- name: Validate the Darwin timelord implementation
-  ansible.builtin.include_tasks: darwin-implementation-validate.yml
 
 - name: Require a pinned chia-blockchain version
   when: chia_darwin_install_chia_blockchain | bool
@@ -304,18 +301,6 @@
 - name: Resolve ASIC boards and hw-vdf LaunchDaemon slots
   ansible.builtin.include_tasks: darwin-hw-vdf-boards.yml
 
-- name: Require 1-3 active ASIC boards when role-managed hw-vdf is enabled
-  when: chia_darwin_enable_hw_vdf | bool
-  ansible.builtin.assert:
-    that:
-      - chia_darwin_hw_vdf_active | length >= 1
-      - chia_darwin_hw_vdf_active | length <= 3
-    fail_msg: >-
-      chia_darwin_enable_hw_vdf needs 1-3 active ASIC boards, but
-      {{ chia_darwin_hw_vdf_active | length }} were resolved. Check
-      chia_darwin_hw_vdf_boards, chia_darwin_hw_vdf_expected_serial, or
-      autodiscovery.
-
 # Read-only ownership checks. Keep every deterministic refusal before this
 # run rewrites a wrapper or plist.
 - name: Choose which hw-vdf LaunchDaemons this role will change
@@ -395,7 +380,6 @@
         path: "{{ chia_root }}/db"
         follow: false
       register: chia_darwin_local_external_db_check
-      when: chia_darwin_topology == "local-external"
 
     - name: Require the local-external CHIA_ROOT db symlink to be unchanged
       ansible.builtin.assert:
@@ -408,14 +392,12 @@
           {{ chia_root }}/db must remain a symlink to
           {{ chia_darwin_volume_db_dir }} for local-external. The role did not
           replace or retarget it.
-      when: chia_darwin_topology == "local-external"
 
     - name: Inspect the local-external CHIA_ROOT directory
       ansible.builtin.stat:
         path: "{{ chia_darwin_home }}/.chia"
         follow: false
       register: chia_darwin_local_external_dot_check
-      when: chia_darwin_topology == "local-external"
 
     - name: Require the local-external CHIA_ROOT directory to be internal
       ansible.builtin.assert:
@@ -425,7 +407,6 @@
         fail_msg: >-
           {{ chia_darwin_home }}/.chia must remain a real directory on the
           internal disk for local-external. The role did not replace it.
-      when: chia_darwin_topology == "local-external"
 
     - name: Check for an existing chia config
       ansible.builtin.stat:

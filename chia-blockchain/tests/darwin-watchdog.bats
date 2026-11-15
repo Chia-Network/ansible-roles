@@ -216,3 +216,11 @@ run_watchdog() {
 	grep -q 'a board job is not running' "$LOG"
 	grep -q 'RESTART hw-vdf boards' "$LOG"
 }
+
+@test "local-external restarts hw-vdf when the VDF connection count is short" {
+	render_watchdog local-external
+	export FAKE_VDF_CONNS=2
+	run_watchdog 12
+	grep -q 'established=2 (want 3)' "$LOG"
+	grep -q 'RESTART hw-vdf boards' "$LOG"
+}

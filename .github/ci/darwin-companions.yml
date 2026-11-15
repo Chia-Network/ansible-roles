@@ -48,7 +48,6 @@
           - "'chia_periodic_connect_peers' in jobs_text"
           - "'chia_darwin_periodic_connect_interval_seconds' in jobs_text"
           - "'chia_darwin_local_full_node' in jobs_text"
-          - "'chia_darwin_local_timelord' in jobs_text"
           - "'chia_darwin_role_daemon' in jobs_text"
           - "'chia_darwin_role_daemon' in companions_text"
           - "'darwin-companions.yml' in darwin_text"

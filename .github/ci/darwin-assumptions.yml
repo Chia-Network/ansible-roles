@@ -27,6 +27,16 @@
       ansible.builtin.set_fact:
         darwin_tasks: "{{ lookup('file', playbook_dir ~ '/../../chia-blockchain/tasks/darwin.yml') | from_yaml }}"
 
+    - name: The Darwin allow-list runs before the job list and any host change
+      vars:
+        names: "{{ darwin_tasks | map(attribute='name') | list }}"
+        gate: Validate the Darwin topology and timelord implementation
+      ansible.builtin.assert:
+        that:
+          - darwin_tasks[names.index(gate)]['ansible.builtin.include_tasks'] == 'darwin-implementation-validate.yml'
+          - names.index(gate) < names.index('Build the Darwin LaunchDaemon job list')
+          - names.index(gate) < names.index('Ensure the timelord service user exists')
+
     - name: Locate the production database seed include
       ansible.builtin.set_fact:
         darwin_db_seed_include: >-

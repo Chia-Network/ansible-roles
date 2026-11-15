@@ -348,13 +348,11 @@ chia_wallet_connect_to_unknown_peers: true
 #                    resolves to. See the note this role writes under the
 #                    service user's etc directory. This role does not edit
 #                    TCC.db and does not install the profile.
-#   remote-node      No local full node (Apple internal storage is the wrong
-#                    place for a blockchain DB). Timelord still runs locally and
-#                    peers with chia_timelord_full_node_peer_host:full_node_port.
-#                    CHIA_ROOT stays on the internal disk. On chia 2.7.1 and
-#                    later the remote full node accepts inbound timelords only
-#                    from localhost or exempt_peer_networks, so that node must
-#                    list this Mac.
+#   remote-node      timelord-app only. No local full node, Python,
+#                    chia-blockchain, or CHIA_ROOT; the app connects to the
+#                    full node in its connection bundle. On chia 2.7.1 and
+#                    later that node accepts inbound timelords only from
+#                    localhost or exempt_peer_networks, so it must list this Mac.
 #
 # Allowed combinations:
 #   1. chia-blockchain + local-external with 1-3 role-managed hw-vdf boards
