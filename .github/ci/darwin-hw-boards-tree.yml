@@ -18,7 +18,7 @@
     chia_darwin_env_script: "{{ work }}/home/bin/chia-env.sh"
     chia_darwin_launchctl: "{{ work }}/launchctl"
     chia_darwin_launchd_dir: "{{ work }}/LaunchDaemons"
-    chia_darwin_topology: remote-node
+    chia_darwin_topology: local-external
     chia_darwin_hw_vdf_client: "{{ work }}/hw_vdf_client"
 
 - name: Create the hw-vdf test tree

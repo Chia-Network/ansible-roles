@@ -56,7 +56,7 @@
           {{ (local_external_darwin_tasks
           | selectattr('name', 'equalto', 'Install chia-blockchain into the virtualenv')
           | first)['block']
-          | selectattr('name', 'in', ['Ensure the CHIA_ROOT config directory exists', 'Ensure the CHIA_ROOT db directory exists for internal topologies', 'Inspect the local-external CHIA_ROOT db symlink', 'Require the local-external CHIA_ROOT db symlink to be unchanged'])
+          | selectattr('name', 'in', ['Ensure the CHIA_ROOT config directory exists', 'Inspect the local-external CHIA_ROOT db symlink', 'Require the local-external CHIA_ROOT db symlink to be unchanged'])
           | list }}
 
     - name: Write the production CHIA_ROOT directory tasks to a temporary include

@@ -13,17 +13,11 @@
     - name: Create the shared fixtures and fake tools
       ansible.builtin.include_tasks: "{{ playbook_dir }}/darwin-db-seed-setup.yml"
 
-    - name: Prepare the idempotence database directory
-      ansible.builtin.file:
-        path: "{{ test_root }}/idempotence/mainnet/db"
-        state: directory
-        mode: "0755"
-
-    - name: Seed the idempotence database
+    - name: Seed the idempotence database through the db symlink
       ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
       vars:
-        chia_darwin_topology: local-internal
-        chia_root: "{{ test_root }}/idempotence/mainnet"
+        chia_darwin_topology: local-external
+        chia_root: "{{ test_root }}/home ext/.chia/mainnet"
         network: mainnet
         download_blockchain_db: true
         blockchain_backup_bucket: test-bucket
@@ -31,4 +25,4 @@
     - name: Require the first run to publish the fixture database
       ansible.builtin.assert:
         that:
-          - lookup('file', test_root ~ '/idempotence/mainnet/db/blockchain_v2_mainnet.sqlite') == fixture_main
+          - lookup('file', external_root ~ '/mainnet/db/blockchain_v2_mainnet.sqlite') == fixture_main

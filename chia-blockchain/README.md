@@ -41,20 +41,17 @@ healthcheck for this layout.
 See [DARWIN-HW-VDF.md](DARWIN-HW-VDF.md#managing-several-macs) for the
 approved-sudoers note and leftover service-account sudoers fragments.
 
-With `chia_darwin_timelord_implementation: chia-blockchain`, the role can also
-run a `vdf-only` topology: only the ASIC `hw-vdf` board jobs are installed. Set `chia_darwin_hw_vdf_ip` to the remote timelord's VDF server.
-There is no local daemon, full node, timelord, chia-exporter, or healthcheck.
-The watchdog still supervises the board LaunchDaemons and checks the remote VDF
-connection count through `chia_darwin_hw_vdf_port`.
-
 ## Timelord.app (optional implementation)
 
-| Topology         | What runs                                                                               |
-| ---------------- | --------------------------------------------------------------------------------------- |
-| `local-internal` | Role-managed daemon/full node plus the app and its ASIC clients.                        |
-| `local-external` | Same, with only the blockchain DB on `chia_darwin_db_volume`; CHIA_ROOT stays internal. |
-| `remote-node`    | The app only. No Python, chia-blockchain, daemon, full node, or local CHIA_ROOT.        |
-| `vdf-only`       | Refused with `timelord-app`; use `chia-blockchain` for ASIC-only Macs.                  |
+The supported Darwin combinations are `chia-blockchain` with `local-external`
+and 1-3 role-managed ASIC boards, `timelord-app` with `local-external`, and
+`timelord-app` with `remote-node`. Removed topologies are refused before any
+host-changing task runs.
+
+| Topology         | What runs                                                                        |
+| ---------------- | -------------------------------------------------------------------------------- |
+| `local-external` | Role-managed daemon/full node plus the app and its ASIC clients.                 |
+| `remote-node`    | The app only. No Python, chia-blockchain, daemon, full node, or local CHIA_ROOT. |
 
 For `local-external`, `~/.chia` and `CHIA_ROOT` are internal directories and
 only `<chia_root>/db` is on the volume. The wallet database stays internal. Only
@@ -98,11 +95,11 @@ passed to `hw_vdf_client` when greater than zero.
 
 ## Darwin full-node database seeding
 
-Darwin `local-internal` and `local-external` full nodes can optionally seed from
+Darwin `local-external` full nodes can optionally seed from
 the uncompressed S3 snapshot layout used by the Linux tasks. This is initial
 seeding, not integrity repair or an ongoing refresh, and the role does not check
-the health of an existing large database. `remote-node` and `vdf-only` never
-seed because they have no local full node. The seed reuses `download_blockchain_db`,
+the health of an existing large database. `remote-node` never seeds because it
+has no local full node. The seed reuses `download_blockchain_db`,
 `blockchain_backup_bucket`, `network` (S3 prefix and
 `blockchain_<db_version>_<network>.sqlite` filename), and `db_version`, and is
 skipped when seeding is disabled or the bucket is empty.

@@ -4,7 +4,7 @@
 - name: Run the seed scenario for {{ case.name }}
   ansible.builtin.include_tasks: "{{ playbook_dir }}/../../chia-blockchain/tasks/darwin-db-seed.yml"
   vars:
-    chia_darwin_topology: "{{ case.topology | default('local-internal') }}"
+    chia_darwin_topology: "{{ case.topology | default('local-external') }}"
     chia_root: "{{ case.root }}"
     network: "{{ case.network | default('mainnet') }}"
     download_blockchain_db: "{{ case.download | default(true) }}"

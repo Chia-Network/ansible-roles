@@ -71,33 +71,83 @@
     - name: Validate the remote Timelord.app inventory
       ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-implementation-validate.yml
 
-    - name: Refuse Timelord.app with incompatible inventory
+    - name: Refuse incompatible Darwin topology and implementation combinations
       ansible.builtin.include_tasks: darwin-timelord-app-refusal.yml
       loop:
-        - name: vdf-only
+        - name: local-internal with chia-blockchain
+          facts:
+            chia_darwin_topology: local-internal
+            chia_darwin_timelord_implementation: chia-blockchain
+            chia_darwin_enable_hw_vdf: true
+          accepted: local-internal with chia-blockchain was accepted
+          expected: supports exactly three combinations
+        - name: local-internal with timelord-app
+          facts:
+            chia_darwin_topology: local-internal
+            chia_darwin_timelord_implementation: timelord-app
+            chia_darwin_enable_hw_vdf: false
+          accepted: local-internal with timelord-app was accepted
+          expected: supports exactly three combinations
+        - name: vdf-only with chia-blockchain
+          facts:
+            chia_darwin_topology: vdf-only
+            chia_darwin_timelord_implementation: chia-blockchain
+            chia_darwin_enable_hw_vdf: true
+          accepted: vdf-only with chia-blockchain was accepted
+          expected: supports exactly three combinations
+        - name: vdf-only with timelord-app
           facts:
             chia_darwin_topology: vdf-only
             chia_darwin_timelord_implementation: timelord-app
-            chia_darwin_timelord_app_bundle_path: ""
-            chia_darwin_timelord_app_bundle_src: ""
-            chia_darwin_local_full_node: false
-            chia_darwin_local_timelord: false
-            chia_darwin_timelord_app_enabled: true
             chia_darwin_enable_hw_vdf: false
-          accepted: timelord-app with vdf-only was accepted
-          expected: vdf-only
-        - name: role-managed ASIC clients
+          accepted: vdf-only with timelord-app was accepted
+          expected: supports exactly three combinations
+        - name: chia-blockchain with remote-node
+          facts:
+            chia_darwin_topology: remote-node
+            chia_darwin_timelord_implementation: chia-blockchain
+            chia_darwin_enable_hw_vdf: true
+          accepted: chia-blockchain with remote-node was accepted
+          expected: supports exactly three combinations
+        - name: chia-blockchain with role-managed hw-vdf disabled
+          facts:
+            chia_darwin_topology: local-external
+            chia_darwin_timelord_implementation: chia-blockchain
+            chia_darwin_enable_hw_vdf: false
+          accepted: chia-blockchain with chia_darwin_enable_hw_vdf false was accepted
+          expected: supports exactly three combinations
+        - name: an unknown implementation
+          facts:
+            chia_darwin_topology: local-external
+            chia_darwin_timelord_implementation: Chia-Blockchain
+            chia_darwin_enable_hw_vdf: true
+          accepted: implementation Chia-Blockchain was accepted
+          expected: supports exactly three combinations
+        - name: role-managed boards without a local timelord
+          facts:
+            chia_darwin_topology: remote-node
+            chia_darwin_timelord_implementation: timelord-app
+            chia_darwin_timelord_app_enabled: false
+            chia_darwin_enable_hw_vdf: true
+            chia_darwin_timelord_app_bundle_path: /Users/timelord/timelord-connection
+          accepted: timelord-app with chia_darwin_timelord_app_enabled false was accepted
+          expected: supports exactly three combinations
+        - name: timelord-app on remote-node with the app turned off
+          facts:
+            chia_darwin_topology: remote-node
+            chia_darwin_timelord_implementation: timelord-app
+            chia_darwin_timelord_app_enabled: false
+            chia_darwin_enable_hw_vdf: false
+            chia_darwin_timelord_app_bundle_path: /Users/timelord/timelord-connection
+          accepted: timelord-app on remote-node with the app turned off was accepted
+          expected: supports exactly three combinations
+        - name: timelord-app with role-managed ASIC clients
           facts:
             chia_darwin_topology: local-external
             chia_darwin_timelord_implementation: timelord-app
-            chia_darwin_timelord_app_bundle_path: ""
-            chia_darwin_timelord_app_bundle_src: ""
-            chia_darwin_local_full_node: true
-            chia_darwin_local_timelord: true
-            chia_darwin_timelord_app_enabled: true
             chia_darwin_enable_hw_vdf: true
           accepted: timelord-app with chia_darwin_enable_hw_vdf was accepted
-          expected: owns the timelord
+          expected: supports exactly three combinations
       loop_control:
         loop_var: refusal_case
         label: "{{ refusal_case.name }}"
