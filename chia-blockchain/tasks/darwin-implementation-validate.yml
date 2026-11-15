@@ -18,7 +18,8 @@
       chia_darwin_enable_hw_vdf false. local-internal and vdf-only are no longer
       supported. Got implementation={{ chia_darwin_timelord_implementation }},
       topology={{ chia_darwin_topology }},
-      enable_hw_vdf={{ chia_darwin_enable_hw_vdf }}.
+      enable_hw_vdf={{ chia_darwin_enable_hw_vdf }},
+      timelord_app_enabled={{ chia_darwin_timelord_app_enabled }}.
 
 - name: Require the Timelord.app remote observability opt-in
   ansible.builtin.assert:

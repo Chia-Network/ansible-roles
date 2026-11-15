@@ -132,6 +132,15 @@
             chia_darwin_timelord_app_bundle_path: /Users/timelord/timelord-connection
           accepted: timelord-app with chia_darwin_timelord_app_enabled false was accepted
           expected: supports exactly three combinations
+        - name: timelord-app on remote-node with the app turned off
+          facts:
+            chia_darwin_topology: remote-node
+            chia_darwin_timelord_implementation: timelord-app
+            chia_darwin_timelord_app_enabled: false
+            chia_darwin_enable_hw_vdf: false
+            chia_darwin_timelord_app_bundle_path: /Users/timelord/timelord-connection
+          accepted: timelord-app on remote-node with the app turned off was accepted
+          expected: supports exactly three combinations
         - name: timelord-app with role-managed ASIC clients
           facts:
             chia_darwin_topology: local-external
