@@ -37,6 +37,29 @@
   register: git_output
   notify: restart-chia
 
+- name: Check venv health
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.shell: |
+    .venv/bin/python -c 'import chia' &&
+    .penv/bin/python -V
+  args:
+    chdir: "/home/{{ user }}/chia-blockchain"
+  changed_when: false
+  failed_when: false
+  register: chia_venv_health
+
+- name: Remove broken venvs
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - "/home/{{ user }}/chia-blockchain/.penv"
+    - "/home/{{ user }}/chia-blockchain/.venv"
+  when: chia_venv_health.rc != 0
+
 - name: Chia Install
   become: true
   become_user: "{{ user }}"
@@ -47,7 +70,8 @@
   environment:
     PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     CHIA_ROOT: "{{ chia_root }}"
-  when: git_output.changed
+  when: git_output.changed or chia_venv_health.rc != 0
+  notify: restart-chia
   register: install_action
   retries: 100
   until: install_action is success or ('Unable to acquire the dpkg frontend lock' not in install_action.stderr)
@@ -62,7 +86,7 @@
   environment:
     PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     CHIA_ROOT: "{{ chia_root }}"
-  when: git_output.changed  or chia_force_init
+  when: git_output.changed or chia_venv_health.rc != 0 or chia_force_init
 
 - name: Check for fix-ssl-permissions support
   become: true
@@ -86,7 +110,7 @@
     PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     CHIA_ROOT: "{{ chia_root }}"
   when:
-    - git_output.changed
+    - git_output.changed or chia_venv_health.rc != 0
     - init_help_output.stdout.find('fix-ssl-permissions') != -1
 
 - name: Install timelord
@@ -101,7 +125,7 @@
     PATH: "/home/{{ user }}/chia-blockchain/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     CHIA_ROOT: "{{ chia_root }}"
   when: # List is AND
-    - git_output.changed
+    - git_output.changed or chia_venv_health.rc != 0
     - '"timelord-launcher" in chia_enabled_services'
 
 # Since chia might have already been updated (via apt) from another user on this machine in some setups
