@@ -41,7 +41,7 @@
   become: true
   become_user: "{{ user }}"
   ansible.builtin.shell: |
-    .venv/bin/python -c 'import chia' &&
+    .venv/bin/chia version >/dev/null &&
     .penv/bin/python -V
   args:
     chdir: "/home/{{ user }}/chia-blockchain"
