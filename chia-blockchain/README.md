@@ -1,18 +1,5 @@
 # chia-blockchain
 
-## Linux ASIC USB access
-
-When hardware VDF support is enabled, the role manages
-`/etc/udev/rules.d/99-z-chiavdf-access.rules` for Chia USB boards (`0403:601c`).
-It grants the configured `user` and `group` read/write access with mode `0660`,
-reloads udev, and reapplies the rule to connected boards on every deployment.
-No USB replug or login is required. Rule changes notify the existing Chia
-restart handler, which respects `start_now`.
-
-If `sudo hw_vdf_client --list` finds a board but the service user cannot,
-redeploy the role and verify discovery as that user. USB enumeration by
-`lsusb` alone does not establish that the service account has access.
-
 ## Darwin companion services
 
 The Darwin tasks own the timelord stack's companion LaunchDaemons as well as

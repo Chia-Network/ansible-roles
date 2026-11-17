@@ -18,40 +18,19 @@
   retries: 100
   until: hwvdf_install is success or ('Failed to lock apt for exclusive operation' not in hwvdf_install.msg and '/var/lib/dpkg/lock' not in hwvdf_install.msg)
 
-- name: Grant the HW VDF service account USB access
-  become: true
-  ansible.builtin.copy:
-    dest: /etc/udev/rules.d/99-z-chiavdf-access.rules
-    owner: root
-    group: root
-    mode: "0644"
-    content: |
-      # Managed by Ansible. Apply after the package's 99-chiavdf.rules.
-      SUBSYSTEM=="usb", ATTR{idVendor}=="0403", ATTR{idProduct}=="601c", OWNER="{{ user }}", GROUP="{{ group }}", MODE="0660"
-  notify: restart-chia
-
-# Reapply on every deployment to repair already-connected boards even when
-# the rule is unchanged (for example, after a package upgrade or downgrade).
-- name: Reload HW VDF USB access rules
+# The package ships 99-chiavdf.rules without a postinst, so apply it to
+# boards that were enumerated before the rule existed.
+- name: Reload udev rules for the HW VDF package
   become: true
   ansible.builtin.command: udevadm control --reload-rules
-  changed_when: false
+  when: hwvdf_install is changed
+  changed_when: true
 
-- name: Apply HW VDF USB access to connected boards
+- name: Apply udev rules to connected HW VDF boards
   become: true
-  ansible.builtin.command:
-    argv:
-      - udevadm
-      - trigger
-      - --subsystem-match=usb
-      - --attr-match=idVendor=0403
-      - --attr-match=idProduct=601c
-  changed_when: false
-
-- name: Wait for HW VDF USB access rules to finish
-  become: true
-  ansible.builtin.command: udevadm settle --timeout=30
-  changed_when: false
+  ansible.builtin.command: udevadm trigger --settle --subsystem-match=usb --attr-match=idVendor=0403 --attr-match=idProduct=601c
+  when: hwvdf_install is changed
+  changed_when: true
 
 - name: Install iproute2 for HW VDF ASIC connection checks
   become: true
