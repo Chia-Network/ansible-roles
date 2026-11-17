@@ -18,6 +18,32 @@
   retries: 100
   until: hwvdf_install is success or ('Failed to lock apt for exclusive operation' not in hwvdf_install.msg and '/var/lib/dpkg/lock' not in hwvdf_install.msg)
 
+# The package ships 99-chiavdf.rules without a postinst, so apply it when
+# the package changes or a connected board does not have its mode yet.
+- name: Check connected HW VDF boards for the packaged USB mode
+  ansible.builtin.shell: |
+    for d in /sys/bus/usb/devices/*; do
+      grep -qx 0403 "$d/idVendor" 2>/dev/null && grep -qx 601c "$d/idProduct" || continue
+      [ "$(stat -c %a "$(printf /dev/bus/usb/%03d/%03d "$(cat "$d/busnum")" "$(cat "$d/devnum")")")" = 666 ] || exit 1
+    done
+  register: hwvdf_usb_mode
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Reload udev rules for the HW VDF package
+  become: true
+  ansible.builtin.command: udevadm control --reload-rules
+  when: hwvdf_install is changed or hwvdf_usb_mode.rc != 0
+  changed_when: true
+
+- name: Apply udev rules to connected HW VDF boards
+  become: true
+  ansible.builtin.command: udevadm trigger --settle --subsystem-match=usb --attr-match=idVendor=0403 --attr-match=idProduct=601c
+  when: hwvdf_install is changed or hwvdf_usb_mode.rc != 0
+  changed_when: true
+  notify: restart-chia
+
 - name: Install iproute2 for HW VDF ASIC connection checks
   become: true
   ansible.builtin.apt:
