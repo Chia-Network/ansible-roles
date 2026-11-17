@@ -42,6 +42,7 @@
   ansible.builtin.command: udevadm trigger --settle --subsystem-match=usb --attr-match=idVendor=0403 --attr-match=idProduct=601c
   when: hwvdf_install is changed or hwvdf_usb_mode.rc != 0
   changed_when: true
+  notify: restart-chia
 
 - name: Install iproute2 for HW VDF ASIC connection checks
   become: true
