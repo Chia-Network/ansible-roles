@@ -144,3 +144,10 @@ service user, free disk space, and for `local-external` that the volume is
 mounted. A refused cache directory or symlink must be moved aside by the
 operator before retry. A second successful run finds a non-stub database,
 downloads nothing, changes no files, and does not restart services.
+
+## Removing a periodic connect peer
+
+`chia_periodic_connect_peers` only adds cron entries. List a peer in
+`chia_periodic_connect_retired_peers` to remove its "Ensure connected to" entry
+on Linux. A peer that is still in `chia_periodic_connect_peers` is never
+removed.

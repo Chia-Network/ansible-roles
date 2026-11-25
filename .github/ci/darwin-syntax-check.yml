@@ -18,6 +18,8 @@
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-implementation-validate.yml
     - name: Import the Darwin Timelord.app tasks
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-timelord-app.yml
+    - name: Import the Darwin Timelord.app preflight tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-timelord-app-preflight.yml
     - name: Import the Darwin Timelord.app removal tasks
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-timelord-app-remove.yml
     - name: Import the Darwin Timelord.app stop tasks

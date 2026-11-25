@@ -37,6 +37,20 @@
           - names.index(gate) < names.index('Build the Darwin LaunchDaemon job list')
           - names.index(gate) < names.index('Ensure the timelord service user exists')
 
+    - name: The Timelord.app preflight runs before any service is stopped
+      vars:
+        names: "{{ darwin_tasks | map(attribute='name') | list }}"
+        preflight: Check the Timelord.app prerequisites before any service is stopped
+      ansible.builtin.assert:
+        that:
+          - darwin_tasks[names.index(preflight)]['ansible.builtin.include_tasks'] == 'darwin-timelord-app-preflight.yml'
+          - darwin_tasks[names.index(preflight)].when == 'chia_darwin_timelord_app_enabled | bool'
+          - names.index(preflight) < names.index('Install and apply the Darwin LaunchDaemons')
+          - names.index(preflight) < names.index('Install and configure Timelord.app')
+        fail_msg: >-
+          The Timelord.app preflight must run, gated on the app, before the
+          LaunchDaemons are applied.
+
     - name: Locate the production database seed include
       ansible.builtin.set_fact:
         darwin_db_seed_include: >-

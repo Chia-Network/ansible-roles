@@ -1,0 +1,19 @@
+---
+# Write a connection manifest for darwin-timelord-app-preflight.yml. The caller
+# sets manifest_peer_port and, for a bundle with RPC, manifest_rpc_port.
+- name: Write the connection manifest
+  ansible.builtin.copy:
+    content: |
+      schema_version = 1
+
+      [node]
+      host = "127.0.0.1"
+      port = {{ manifest_peer_port }}
+      {% if manifest_rpc_port is defined %}
+
+      [node.rpc]
+      host = "127.0.0.1"
+      port = {{ manifest_rpc_port }}
+      {% endif %}
+    dest: "{{ chia_darwin_timelord_app_bundle_path }}/connection.toml"
+    mode: "0600"
