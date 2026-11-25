@@ -26,9 +26,29 @@ alloy_chia_log_path: "{{ (alloy_darwin_chia_root if alloy_darwin_chia_root | len
 # Built-in log sources (opt-out)
 alloy_enable_syslog_source: true
 alloy_enable_fail2ban_source: "{{ ansible_os_family | default('') != 'Darwin' }}"
-alloy_enable_chia_source: true
+# Timelord.app (chia_darwin_timelord_implementation: timelord-app) ships its
+# own worker log and needs no chia-blockchain install on a remote-node
+# deployment, so the Chia debug log is only shipped when it can exist.
+alloy_timelord_app_active: >-
+  {{ ansible_os_family | default('') == 'Darwin'
+  and chia_darwin_timelord_implementation | default('') == 'timelord-app' }}
+alloy_enable_chia_source: >-
+  {{ not (alloy_timelord_app_active | bool
+  and chia_darwin_topology | default('') == 'remote-node') }}
+alloy_enable_timelord_app_source: "{{ alloy_timelord_app_active }}"
 
-# Chia log labels (only used when alloy_enable_chia_source is true)
+# Timelord.app worker log (only used when alloy_enable_timelord_app_source is
+# true). The app writes it under its private supervisor directory, owned by the
+# service user; the root Alloy daemon can read it. Rotated backups (.log.1 and
+# .log.2) are not shipped.
+alloy_timelord_app_config_dir: >-
+  {{ chia_darwin_timelord_app_config_dir
+  | default('/Users/' ~ (user | default('timelord')) ~ '/Library/Application Support/Timelord') }}
+alloy_timelord_app_log_path: "{{ alloy_timelord_app_config_dir }}/.config.toml-supervisor/worker.log"
+
+# Chia log labels (only used when alloy_enable_chia_source is true; the
+# application, component, network and group labels also apply to the
+# Timelord.app log)
 application: "chia-blockchain"
 component: "node"
 network: "mainnet"

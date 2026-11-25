@@ -60,11 +60,30 @@ it.
 All built-in sources are opt-out. Set the corresponding flag to `false` to
 exclude the source in the generated config.
 
-| Variable                       | Default | Description                                              |
-| ------------------------------ | ------- | -------------------------------------------------------- |
-| `alloy_enable_syslog_source`   | `true`  | Ship `/var/log/syslog` to Loki.                          |
-| `alloy_enable_fail2ban_source` | `true`  | Ship `/var/log/fail2ban.log` to Loki.                    |
-| `alloy_enable_chia_source`     | `true`  | Ship Chia debug logs (with multiline + JSON processing). |
+| Variable                           | Default   | Description                                              |
+| ---------------------------------- | --------- | -------------------------------------------------------- |
+| `alloy_enable_syslog_source`       | `true`    | Ship `/var/log/syslog` to Loki.                          |
+| `alloy_enable_fail2ban_source`     | `true`    | Ship `/var/log/fail2ban.log` to Loki.                    |
+| `alloy_enable_chia_source`         | `true`    | Ship Chia debug logs (with multiline + JSON processing). |
+| `alloy_enable_timelord_app_source` | see below | Ship the Timelord.app worker log (macOS).                |
+
+`alloy_enable_timelord_app_source` is `true` on macOS when
+`chia_darwin_timelord_implementation` is `timelord-app`, and
+`alloy_enable_chia_source` is `false` when that implementation also uses the
+`remote-node` topology, because no Chia debug log exists there. Both can be set
+explicitly.
+
+### Timelord.app
+
+These are only relevant when `alloy_enable_timelord_app_source` is `true`. The
+log gets the `job="timelord-app"` label and the `application`, `component`,
+`network` and `group` labels from the Chia section, plus
+`implementation="timelord-app"`.
+
+| Variable                        | Default                                           | Description                                                                                |
+| ------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `alloy_timelord_app_config_dir` | `chia_darwin_timelord_app_config_dir`             | App support directory; falls back to `/Users/<user>/Library/Application Support/Timelord`. |
+| `alloy_timelord_app_log_path`   | `<config dir>/.config.toml-supervisor/worker.log` | Worker diagnostics log. Rotated `.log.1` and `.log.2` files are not shipped.               |
 
 ### Chia
 

@@ -242,6 +242,112 @@
           - "{{ fleet_out }}/config.alloy"
       changed_when: false
 
+- name: Render the Darwin Alloy configuration for Timelord.app
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../alloy/defaults/main.yml
+    - ../../chia-blockchain/defaults/main.yml
+  vars:
+    fleet_out: "{{ render_out | default('/tmp/darwin-fleet') }}/timelord-app"
+  tasks:
+    - name: Set the Darwin Timelord.app host variables
+      ansible.builtin.set_fact:
+        ansible_os_family: Darwin
+        ansible_hostname: darwin-app-test
+        user: timelord
+        chia_root: /Users/timelord/.chia/mainnet
+        network: mainnet
+        component: timelord
+
+    - name: Create the render directories
+      ansible.builtin.file:
+        path: "{{ fleet_out }}/{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - remote-node
+        - local-external
+        - chia-blockchain
+
+    - name: Render the Alloy config for each Darwin implementation
+      vars:
+        chia_darwin_timelord_implementation: "{{ item.implementation }}"
+        chia_darwin_topology: "{{ item.topology }}"
+      ansible.builtin.template:
+        src: ../../alloy/templates/config.alloy.j2
+        dest: "{{ fleet_out }}/{{ item.name }}/config.alloy"
+        mode: "0644"
+      loop:
+        - name: remote-node
+          implementation: timelord-app
+          topology: remote-node
+        - name: local-external
+          implementation: timelord-app
+          topology: local-external
+        - name: chia-blockchain
+          implementation: chia-blockchain
+          topology: local-external
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Read the rendered Alloy configs
+      ansible.builtin.slurp:
+        src: "{{ fleet_out }}/{{ item }}/config.alloy"
+      loop:
+        - remote-node
+        - local-external
+        - chia-blockchain
+      register: app_alloy_rendered
+
+    - name: Timelord.app ships its worker log and only ships the Chia log when it exists
+      vars:
+        remote: "{{ app_alloy_rendered.results[0].content | b64decode }}"
+        local: "{{ app_alloy_rendered.results[1].content | b64decode }}"
+        python: "{{ app_alloy_rendered.results[2].content | b64decode }}"
+        app_log: /Users/timelord/Library/Application Support/Timelord/.config.toml-supervisor/worker.log
+      ansible.builtin.assert:
+        that:
+          - '''loki.source.file "timelord_app"'' in remote'
+          - "app_log in remote"
+          - '''job            = "timelord-app"'' in remote'
+          - '''implementation = "timelord-app"'' in remote'
+          - "'/log/debug.log' not in remote"
+          - "'chia-watchdog.log' in remote"
+          - '''loki.source.file "timelord_app"'' in local'
+          - "'/Users/timelord/.chia/mainnet/log/debug.log' in local"
+          - "'timelord_app' not in python"
+          - "'/Users/timelord/.chia/mainnet/log/debug.log' in python"
+        fail_msg: >-
+          The Darwin Alloy config must ship the Timelord.app worker log for the
+          timelord-app implementation, drop the Chia debug log on remote-node,
+          and stay unchanged for the chia-blockchain implementation.
+
+    - name: The Timelord.app Alloy block labels are valid and unique
+      ansible.builtin.command:
+        argv:
+          - python3
+          - "{{ playbook_dir }}/check_alloy_labels.py"
+          - --require-label
+          - timelord_app
+          - --require-job
+          - timelord-app
+          - "{{ fleet_out }}/remote-node/config.alloy"
+      changed_when: false
+
+    - name: The Timelord.app Alloy configs pass alloy validate
+      ansible.builtin.command:
+        argv:
+          - alloy
+          - validate
+          - "{{ fleet_out }}/{{ item }}/config.alloy"
+      loop:
+        - remote-node
+        - local-external
+        - chia-blockchain
+      changed_when: false
+
 - name: Render the Darwin smartctl_exporter LaunchDaemon
   hosts: localhost
   connection: local
