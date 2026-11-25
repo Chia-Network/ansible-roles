@@ -1,0 +1,8 @@
+---
+# Remove a leftover directory from a 1.0.1 installer workaround that was never
+# written on a host. Absent is a no-op.
+- name: Remove a leftover Timelord.app installer directory
+  become: true
+  ansible.builtin.file:
+    path: "{{ chia_darwin_timelord_app_retired_installer_dir }}"
+    state: absent

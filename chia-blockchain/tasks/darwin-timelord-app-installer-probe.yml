@@ -1,7 +1,8 @@
 ---
 # Build a scratch Timelord.app config from the connection bundle with the
-# installed app, and have its installer read it. Included from
-# darwin-timelord-app-preflight.yml before anything is stopped.
+# installed app, and run the vendor installer's `plan`. Included from
+# darwin-timelord-app-preflight.yml before anything is stopped. `plan`
+# changes nothing; it only reads the config and prints the job.
 - name: Build and check a scratch Timelord.app config
   vars:
     chia_darwin_timelord_app_installer_config: "{{ chia_darwin_timelord_app_stage_dir }}/preflight/config.toml"
@@ -39,8 +40,20 @@
         HOME: "{{ chia_darwin_home }}"
       changed_when: false
 
-    - name: Have the installer read the scratch config
-      ansible.builtin.include_tasks: darwin-timelord-app-installer.yml
+    - name: Have the vendor installer read the scratch config
+      become: true
+      ansible.builtin.command:
+        argv:
+          - /bin/bash
+          - "{{ chia_darwin_timelord_app_installer }}"
+          - plan
+          - --app
+          - "{{ chia_darwin_timelord_app_path }}"
+          - --config
+          - "{{ chia_darwin_timelord_app_installer_config }}"
+          - --user
+          - "{{ user }}"
+      changed_when: false
   rescue:
     - name: Stop before anything is stopped
       ansible.builtin.fail:

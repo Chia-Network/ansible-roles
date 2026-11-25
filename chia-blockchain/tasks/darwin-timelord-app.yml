@@ -290,12 +290,22 @@
     HOME: "{{ chia_darwin_home }}"
   changed_when: false
 
-# The installer is chosen, and has read this config, before the live config
-# or the registered job is replaced.
-- name: Choose the installer for the staged Timelord.app config
-  ansible.builtin.include_tasks: darwin-timelord-app-installer.yml
-  vars:
-    chia_darwin_timelord_app_installer_config: "{{ chia_darwin_timelord_app_stage_config }}"
+# `plan` changes nothing: it makes the vendor installer read this config
+# before the live config or the registered job is replaced.
+- name: Have the vendor installer read the staged Timelord.app config
+  become: true
+  ansible.builtin.command:
+    argv:
+      - /bin/bash
+      - "{{ chia_darwin_timelord_app_installer }}"
+      - plan
+      - --app
+      - "{{ chia_darwin_timelord_app_path }}"
+      - --config
+      - "{{ chia_darwin_timelord_app_stage_config }}"
+      - --user
+      - "{{ user }}"
+  changed_when: false
   when: chia_darwin_timelord_app_manage_service | bool
 
 - name: Install the Timelord.app config
@@ -380,7 +390,7 @@
   ansible.builtin.command:
     argv:
       - /bin/bash
-      - "{{ chia_darwin_timelord_app_installer_effective | default(chia_darwin_timelord_app_installer) }}"
+      - "{{ chia_darwin_timelord_app_installer }}"
       - install
       - --app
       - "{{ chia_darwin_timelord_app_path }}"

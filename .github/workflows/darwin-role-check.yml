@@ -61,7 +61,7 @@ jobs:
       - name: Check the Darwin Timelord.app preflight
         run: ansible-playbook .github/ci/darwin-timelord-app-preflight.yml
 
-      - name: Check the Darwin Timelord.app installer choice
+      - name: Check the Darwin Timelord.app installer preflight
         run: ansible-playbook .github/ci/darwin-timelord-app-installer.yml
 
       - name: Install Grafana Alloy for config validation
