@@ -105,6 +105,72 @@
       identities created on the full-node host. Nothing has been stopped yet.
   when: not (chia_darwin_local_full_node | bool)
 
+# The manifest names the full node's peer port and, unless it is a peer-only
+# bundle, its RPC port. A node the Mac cannot reach would leave the app without
+# a node after the old stack is gone, so connect to both ports first. Only a TCP
+# connect is made; no TLS or chain request is sent.
+- name: Probe the remote node named in the connection bundle
+  when:
+    - not (chia_darwin_local_full_node | bool)
+    - chia_darwin_timelord_app_probe_node | bool
+  block:
+    - name: Read the node endpoints from the connection manifest
+      become: true
+      become_user: "{{ user }}"
+      ansible.builtin.command:
+        argv:
+          - "{{ ansible_python_interpreter | default(ansible_facts['python']['executable'] | default('/usr/bin/python3')) }}"
+          - -c
+          - |
+            import sys
+            try:
+                import tomllib
+            except ImportError:
+                sys.exit(3)
+            try:
+                with open(sys.argv[1], "rb") as f:
+                    node = tomllib.load(f)["node"]
+                print("peer", node["host"], int(node["port"]))
+                rpc = node.get("rpc")
+                if rpc is not None:
+                    print("rpc", rpc.get("host", node["host"]), int(rpc["port"]))
+            except Exception as e:
+                print(type(e).__name__, file=sys.stderr)
+                sys.exit(4)
+          - "{{ chia_darwin_timelord_app_bundle_source }}/{{ chia_darwin_timelord_app_bundle_manifest }}"
+      register: chia_darwin_timelord_app_endpoints
+      changed_when: false
+      failed_when: chia_darwin_timelord_app_endpoints.rc not in [0, 3]
+      check_mode: false
+
+    - name: Skip the node probe when the interpreter cannot read TOML
+      ansible.builtin.debug:
+        msg: >-
+          {{ ansible_python_interpreter | default('The module interpreter') }}
+          has no tomllib (Python 3.11 or later), so the node probe is skipped.
+      when: chia_darwin_timelord_app_endpoints.rc == 3
+
+    - name: Connect to the remote node from this host
+      ansible.builtin.wait_for:
+        host: "{{ item.split(' ')[1] }}"
+        port: "{{ item.split(' ')[2] | int }}"
+        connect_timeout: 5
+        timeout: "{{ chia_darwin_timelord_app_probe_timeout | int }}"
+      loop: "{{ chia_darwin_timelord_app_endpoints.stdout_lines }}"
+      loop_control:
+        label: "{{ item.split(' ')[0] }} {{ item.split(' ')[1] }}:{{ item.split(' ')[2] }}"
+      when: chia_darwin_timelord_app_endpoints.rc == 0
+  rescue:
+    - name: Stop before anything is stopped
+      ansible.builtin.fail:
+        msg: >-
+          The remote full node named in
+          {{ chia_darwin_timelord_app_bundle_source }}/{{ chia_darwin_timelord_app_bundle_manifest }}
+          could not be read or reached from this host
+          ({{ ansible_failed_result.results | default([]) | selectattr('failed', 'defined') | selectattr('failed') | map(attribute='msg') | list | first | default(ansible_failed_result.msg | default('unknown error'), true) }}).
+          Nothing has been stopped yet. Set
+          chia_darwin_timelord_app_probe_node to false to skip this check.
+
 - name: Inspect a pre-staged Timelord.app disk image
   become: true
   become_user: "{{ user }}"

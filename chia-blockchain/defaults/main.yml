@@ -670,6 +670,11 @@ chia_darwin_timelord_app_bundle_source: >-
   if chia_darwin_timelord_app_bundle_src | length > 0
   else chia_darwin_timelord_app_bundle_path }}
 chia_darwin_timelord_app_bundle_manifest: connection.toml
+# Before anything is stopped, connect to the node host and the peer and RPC
+# ports named in the manifest. Set false to skip, for example when the node is
+# only reachable through a tunnel that is not up during the run.
+chia_darwin_timelord_app_probe_node: true
+chia_darwin_timelord_app_probe_timeout: 10
 chia_darwin_timelord_app_bundle_fingerprint_file: "{{ chia_darwin_timelord_app_config_dir }}/.ansible-bundle.sha256"
 chia_darwin_timelord_app_managed_marker: "{{ chia_darwin_etc_dir }}/timelord-app-managed"
 # Set true to replace the complete app config from the role template. That also

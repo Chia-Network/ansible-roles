@@ -249,6 +249,15 @@ node, timelord and ASIC jobs are still running. The `remote-node` bundle
 directory must stay on the Mac: the manifest is checked on every run, and a
 changed bundle is re-imported by its fingerprint.
 
+For `remote-node` the preflight also connects, from the Mac, to the node host and
+the peer port named in `connection.toml`, and to its RPC port unless the bundle
+is peer-only. Only a TCP connect is made, so an unreachable node stops the run
+before anything is stopped. The check needs Python 3.11 or later for `tomllib`
+on the module interpreter and is skipped with a message otherwise. Set
+`chia_darwin_timelord_app_probe_node: false` to skip it, for example when the
+RPC endpoint is an SSH tunnel that is not up during the run;
+`chia_darwin_timelord_app_probe_timeout` sets the wait per port (10 seconds).
+
 The app owns the timelord worker and every ASIC USB client, so the role refuses
 `timelord-app` with `chia_darwin_enable_hw_vdf: true` (the derived default is
 false). Board discovery, automatic tuning, and the
