@@ -383,6 +383,15 @@
   when:
     - chia_periodic_connect_peers | length > 0
 
+- name: Remove retired periodic peer connect cron entries
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.cron:
+    name: "Ensure connected to {{ item }}"
+    user: "{{ user }}"
+    state: absent
+  with_items: "{{ chia_periodic_connect_retired_peers | difference(chia_periodic_connect_peers) }}"
+
 - name: Set up script to generate new certs on first boot
   ansible.builtin.include_tasks: "cloudinit-certs.yml"
   when: chia_cloudinit_new_certs

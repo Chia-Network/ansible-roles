@@ -319,6 +319,9 @@ chia_periodic_connect_interval:
   minute: "*/5"
   hour: "*"
 chia_periodic_connect_peers: []
+# Linux only. Peers whose "Ensure connected to <peer>" cron entry is removed.
+# Dropping a peer from chia_periodic_connect_peers does not remove its entry.
+chia_periodic_connect_retired_peers: []
 
 # Set to false to limit connections to trusted nodes only (like localhost)
 chia_wallet_connect_to_unknown_peers: true
