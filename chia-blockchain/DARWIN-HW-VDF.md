@@ -234,12 +234,20 @@ default is `chia-blockchain`; the app release is pinned by
 `chia_darwin_timelord_app_version` and `chia_darwin_timelord_app_sha256`. The app
 is arm64-only, requires macOS 14 or later, and is verified with
 `codesign --verify --deep --strict` before it is moved into
-`/Applications/Timelord.app`. The upstream repository is private: set
-`chia_darwin_timelord_app_github_token` to use the GitHub API asset
-(`chia_darwin_timelord_app_asset_id`), use
+`/Applications/Timelord.app`. The release is public, so the default download
+needs no token. For a private mirror set `chia_darwin_timelord_app_github_token`
+to use the GitHub API asset (`chia_darwin_timelord_app_asset_id`), use
 `chia_darwin_timelord_app_dmg_url` for an internal mirror, or set
 `chia_darwin_timelord_app_download: false` and pre-stage the pinned DMG at
 `chia_darwin_timelord_app_dmg`. The checksum is always verified.
+
+The app prerequisites are checked before any service is stopped. When switching
+a Mac from the Python timelord to the app, the role verifies the connection
+bundle (a readable manifest) and stages the checksum-verified disk image first,
+so a missing bundle or a bad image fails the run while the current daemon, full
+node, timelord and ASIC jobs are still running. The `remote-node` bundle
+directory must stay on the Mac: the manifest is checked on every run, and a
+changed bundle is re-imported by its fingerprint.
 
 The app owns the timelord worker and every ASIC USB client, so the role refuses
 `timelord-app` with `chia_darwin_enable_hw_vdf: true` (the derived default is

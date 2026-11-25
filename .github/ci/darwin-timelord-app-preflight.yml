@@ -1,0 +1,109 @@
+---
+# Exercise chia-blockchain/tasks/darwin-timelord-app-preflight.yml against a
+# temporary home: a missing or unreadable connection manifest and a bad
+# pre-staged disk image must stop the run, and a good bundle and image must
+# pass. No Mac, launchd job, or network is touched.
+- name: Check the Timelord.app preflight without a Mac
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+  tasks:
+    - name: Create a temporary home
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: " timelord app preflight"
+      register: preflight_temp
+
+    - name: Point the role at the temporary home
+      ansible.builtin.set_fact:
+        user: "{{ lookup('env', 'USER') | default('runner', true) }}"
+        chia_darwin_home: "{{ preflight_temp.path }}/home"
+        chia_darwin_group: "{{ lookup('pipe', 'id -gn') }}"
+        chia_darwin_timelord_app_path: "{{ preflight_temp.path }}/Applications/Timelord.app"
+        chia_darwin_timelord_implementation: timelord-app
+        chia_darwin_topology: remote-node
+        chia_darwin_timelord_app_download: false
+        chia_darwin_timelord_app_bundle_path: "{{ preflight_temp.path }}/bundle"
+        chia_darwin_timelord_app_sha256: "{{ 'pinned image' | hash('sha256') }}"
+
+    - name: Derive the job capabilities
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-jobs.yml
+
+    - name: A missing connection manifest stops the run before anything is stopped
+      block:
+        - name: Run the preflight with no bundle
+          ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-timelord-app-preflight.yml
+        - name: The preflight must not pass
+          ansible.builtin.fail:
+            msg: The preflight accepted a missing connection manifest.
+      rescue:
+        - name: The failure names the manifest and says nothing was stopped
+          ansible.builtin.assert:
+            that:
+              - "'must contain a readable connection.toml' in ansible_failed_result.msg"
+              - "'Nothing has been stopped yet' in ansible_failed_result.msg"
+
+    - name: Create the connection bundle directory
+      ansible.builtin.file:
+        path: "{{ chia_darwin_timelord_app_bundle_path }}"
+        state: directory
+        mode: "0700"
+
+    - name: Create a connection bundle
+      ansible.builtin.copy:
+        content: "schema_version = 1\n"
+        dest: "{{ chia_darwin_timelord_app_bundle_path }}/connection.toml"
+        mode: "0600"
+
+    - name: A missing pre-staged disk image stops the run
+      block:
+        - name: Run the preflight with no disk image
+          ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-timelord-app-preflight.yml
+        - name: The preflight must not pass
+          ansible.builtin.fail:
+            msg: The preflight accepted a missing disk image.
+      rescue:
+        - name: The failure names the disk image
+          ansible.builtin.assert:
+            that:
+              - "'is missing or does not match' in ansible_failed_result.msg"
+
+    - name: Stage a disk image with the wrong content
+      ansible.builtin.copy:
+        content: "not the pinned image"
+        dest: "{{ chia_darwin_timelord_app_dmg }}"
+        mode: "0644"
+
+    - name: A pre-staged disk image with the wrong checksum stops the run
+      block:
+        - name: Run the preflight with a wrong disk image
+          ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-timelord-app-preflight.yml
+        - name: The preflight must not pass
+          ansible.builtin.fail:
+            msg: The preflight accepted a disk image with the wrong checksum.
+      rescue:
+        - name: The failure names the disk image
+          ansible.builtin.assert:
+            that:
+              - "'is missing or does not match' in ansible_failed_result.msg"
+
+    - name: Stage the pinned disk image
+      ansible.builtin.copy:
+        content: "pinned image"
+        dest: "{{ chia_darwin_timelord_app_dmg }}"
+        mode: "0644"
+
+    - name: A good bundle and disk image pass the preflight
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-timelord-app-preflight.yml
+
+    - name: The preflight decided an install is needed and changed no service
+      ansible.builtin.assert:
+        that:
+          - chia_darwin_timelord_app_needs_install | bool
+
+    - name: Remove the temporary home
+      ansible.builtin.file:
+        path: "{{ preflight_temp.path }}"
+        state: absent

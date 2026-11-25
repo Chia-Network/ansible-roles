@@ -1,0 +1,152 @@
+---
+# Everything that can fail before the old stack is touched. darwin.yml includes
+# this file before it boots out the Python daemon, full node, timelord and
+# hw-vdf jobs, so a missing connection bundle or a bad disk image stops the run
+# while the existing timelord is still running. These tasks only read the host,
+# create the app's own directories, and stage the verified disk image and the
+# controller-side bundle; nothing here stops or changes a running service.
+- name: Ensure the Timelord.app directories exist
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ chia_darwin_companion_download_dir }}"
+      mode: "0755"
+    - path: "{{ chia_darwin_timelord_app_dmg | dirname }}"
+      mode: "0755"
+    - path: "{{ chia_darwin_timelord_app_config_dir }}"
+      mode: "0700"
+    - path: "{{ chia_darwin_timelord_app_stage_dir }}"
+      mode: "0700"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Inspect the installed Timelord.app
+  ansible.builtin.stat:
+    path: "{{ chia_darwin_timelord_app_path }}"
+  register: chia_darwin_timelord_app_stat
+
+- name: Read the installed Timelord.app version
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/plutil
+      - -extract
+      - CFBundleShortVersionString
+      - raw
+      - -o
+      - "-"
+      - "{{ chia_darwin_timelord_app_path }}/Contents/Info.plist"
+  register: chia_darwin_timelord_app_version_output
+  changed_when: false
+  failed_when: false
+  when: chia_darwin_timelord_app_stat.stat.exists | default(false)
+
+- name: Verify the installed Timelord.app signature
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/codesign
+      - --verify
+      - --deep
+      - --strict
+      - "{{ chia_darwin_timelord_app_path }}"
+  register: chia_darwin_timelord_app_signature
+  changed_when: false
+  failed_when: false
+  when: chia_darwin_timelord_app_stat.stat.exists | default(false)
+
+- name: Inspect the installed Timelord.app service helper
+  ansible.builtin.stat:
+    path: "{{ chia_darwin_timelord_app_service_binary }}"
+  register: chia_darwin_timelord_app_helper_stat
+
+- name: Decide whether Timelord.app must be installed
+  ansible.builtin.set_fact:
+    chia_darwin_timelord_app_needs_install: >-
+      {{ not (chia_darwin_timelord_app_stat.stat.exists | default(false)) or
+      (chia_darwin_timelord_app_version_output.stdout | default('') | trim) !=
+      chia_darwin_timelord_app_version or
+      (chia_darwin_timelord_app_signature.rc | default(1) | int) != 0 or
+      not (chia_darwin_timelord_app_helper_stat.stat.exists | default(false)) }}
+  changed_when: false
+
+- name: Copy the controller-side Timelord.app connection bundle
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.copy:
+    src: "{{ chia_darwin_timelord_app_bundle_src }}/"
+    dest: "{{ chia_darwin_timelord_app_bundle_dest }}"
+    owner: "{{ user }}"
+    group: "{{ chia_darwin_group }}"
+    mode: "0600"
+    directory_mode: "0700"
+  when:
+    - not (chia_darwin_local_full_node | bool)
+    - chia_darwin_timelord_app_bundle_src | length > 0
+
+- name: Check for the Timelord.app connection manifest
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.stat:
+    path: "{{ chia_darwin_timelord_app_bundle_source }}/{{ chia_darwin_timelord_app_bundle_manifest }}"
+  register: chia_darwin_timelord_app_bundle_manifest_stat
+  when: not (chia_darwin_local_full_node | bool)
+
+- name: Require the Timelord.app connection manifest
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_timelord_app_bundle_manifest_stat.stat.isreg | default(false)
+      - chia_darwin_timelord_app_bundle_manifest_stat.stat.readable | default(false)
+    fail_msg: >-
+      {{ chia_darwin_timelord_app_bundle_source }} must contain a readable
+      {{ chia_darwin_timelord_app_bundle_manifest }} and the peer/RPC client
+      identities created on the full-node host. Nothing has been stopped yet.
+  when: not (chia_darwin_local_full_node | bool)
+
+- name: Inspect a pre-staged Timelord.app disk image
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.stat:
+    path: "{{ chia_darwin_timelord_app_dmg }}"
+    checksum_algorithm: sha256
+  register: chia_darwin_timelord_app_staged_dmg
+  when:
+    - chia_darwin_timelord_app_needs_install | bool
+    - not (chia_darwin_timelord_app_download | bool)
+
+- name: Require the pinned pre-staged Timelord.app disk image
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_timelord_app_staged_dmg.stat.exists | default(false)
+      - >-
+        (chia_darwin_timelord_app_staged_dmg.stat.checksum | default('')) ==
+        chia_darwin_timelord_app_sha256
+    fail_msg: >-
+      chia_darwin_timelord_app_download is false, but
+      {{ chia_darwin_timelord_app_dmg }} is missing or does not match
+      sha256 {{ chia_darwin_timelord_app_sha256 }}.
+  when:
+    - chia_darwin_timelord_app_needs_install | bool
+    - not (chia_darwin_timelord_app_download | bool)
+
+- name: Download the Timelord.app disk image
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.get_url:
+    url: >-
+      {{ chia_darwin_timelord_app_api_url
+      if chia_darwin_timelord_app_github_token | length > 0
+      else chia_darwin_timelord_app_dmg_url }}
+    dest: "{{ chia_darwin_timelord_app_dmg }}"
+    checksum: "sha256:{{ chia_darwin_timelord_app_sha256 }}"
+    headers: >-
+      {{ {'Authorization': 'Bearer ' ~ chia_darwin_timelord_app_github_token,
+      'Accept': 'application/octet-stream'}
+      if chia_darwin_timelord_app_github_token | length > 0 else {} }}
+    mode: "0644"
+  no_log: "{{ chia_darwin_timelord_app_github_token | length > 0 }}"
+  when:
+    - chia_darwin_timelord_app_needs_install | bool
+    - chia_darwin_timelord_app_download | bool

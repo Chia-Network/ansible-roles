@@ -150,6 +150,12 @@
     - "{{ chia_darwin_etc_dir }}"
     - "{{ chia_darwin_log_dir }}"
 
+# Fail on a missing connection bundle or a bad disk image now, while the
+# current daemon, full node, timelord and ASIC jobs are still running.
+- name: Check the Timelord.app prerequisites before any service is stopped
+  when: chia_darwin_timelord_app_enabled | bool
+  ansible.builtin.include_tasks: darwin-timelord-app-preflight.yml
+
 - name: Remove a previously role-managed Timelord.app service
   when: not (chia_darwin_timelord_app_enabled | bool)
   ansible.builtin.include_tasks: darwin-timelord-app-remove.yml
