@@ -264,83 +264,43 @@
               - chia_darwin_timelord_app_installer_effective == chia_darwin_timelord_app_installer
               - not installer_unneeded_shim.stat.exists
 
-    - name: A different vendor installer failure stops the run
-      block:
-        - name: Replace the vendor installer with one that fails otherwise
-          ansible.builtin.copy:
-            dest: "{{ chia_darwin_timelord_app_installer }}"
-            mode: "0755"
-            content: |
-              #!/bin/bash
-              echo 'Unsafe log path.' >&2
-              exit 1
-        - name: Choose the installer for the config
-          ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-timelord-app-installer.yml
-          vars:
-            chia_darwin_timelord_app_installer_config: "{{ installer_config }}"
-        - name: The run must not pass
-          ansible.builtin.fail:
-            msg: An unrelated installer failure was accepted.
-      rescue:
-        - name: The failure carries the installer's error
-          ansible.builtin.assert:
-            that:
-              - "'Unsafe log path.' in ansible_failed_result.msg"
+    - name: A broken vendor installer or a config on another network stops the run
+      ansible.builtin.include_tasks: darwin-timelord-app-installer-refusal.yml
+      vars:
+        installer_refusal: "{{ item }}"
+      loop:
+        - name: a different vendor installer failure
+          installer: |
+            #!/bin/bash
+            echo 'Unsafe log path.' >&2
+            exit 1
+          accepted: An unrelated installer failure was accepted.
+          expected: Unsafe log path.
+        - name: an installer that changed its node.network line
+          installer: |
+            #!/bin/bash
+            echo 'error: node.network' >&2
+            exit 1
+          accepted: An unrecognised installer was accepted.
+          expected: Update the role for this Timelord.app version
+        - name: a config on another network
+          config: |
+            schema_version = 1
 
-    - name: An installer that changed its node.network line stops the run
-      block:
-        - name: Replace the vendor installer with one that reads node.network elsewhere
-          ansible.builtin.copy:
-            dest: "{{ chia_darwin_timelord_app_installer }}"
-            mode: "0755"
-            content: |
-              #!/bin/bash
-              echo 'error: node.network' >&2
-              exit 1
-        - name: Choose the installer for the config
-          ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-timelord-app-installer.yml
-          vars:
-            chia_darwin_timelord_app_installer_config: "{{ installer_config }}"
-        - name: The run must not pass
-          ansible.builtin.fail:
-            msg: An unrecognised installer was accepted.
-      rescue:
-        - name: The failure says the role must be updated
-          ansible.builtin.assert:
-            that:
-              - "'Update the role for this Timelord.app version' in ansible_failed_result.msg"
+            [node]
+            host = "node.example"
+            port = 58444
+            network = "testnet11"
+            certificate = "/identities/client.crt"
+            private_key = "/identities/client.key"
+            ca_certificate = "/identities/ca.crt"
 
-    - name: A config on another network stops the run
-      block:
-        - name: Write a testnet11 config
-          ansible.builtin.copy:
-            dest: "{{ installer_config }}"
-            mode: "0600"
-            content: |
-              schema_version = 1
-
-              [node]
-              host = "node.example"
-              port = 58444
-              network = "testnet11"
-              certificate = "/identities/client.crt"
-              private_key = "/identities/client.key"
-              ca_certificate = "/identities/ca.crt"
-
-              [service]
-              status_listen = "127.0.0.1:9257"
-        - name: Choose the installer for the config
-          ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-timelord-app-installer.yml
-          vars:
-            chia_darwin_timelord_app_installer_config: "{{ installer_config }}"
-        - name: The run must not pass
-          ansible.builtin.fail:
-            msg: A config on the wrong network was accepted.
-      rescue:
-        - name: The failure names the network
-          ansible.builtin.assert:
-            that:
-              - "'is not on the mainnet network' in ansible_failed_result.msg"
+            [service]
+            status_listen = "127.0.0.1:9257"
+          accepted: A config on the wrong network was accepted.
+          expected: is not on the mainnet network
+      loop_control:
+        label: "{{ item.name }}"
 
     - name: Remove the temporary directory
       become: true
