@@ -123,32 +123,41 @@
           - -c
           - |
             import sys
+
+            def unquote(raw):
+                raw = raw.strip()
+                if (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
+                    return raw[1:-1]
+                return raw
+
             try:
-                import tomllib
-            except ImportError:
-                sys.exit(3)
-            try:
-                with open(sys.argv[1], "rb") as f:
-                    node = tomllib.load(f)["node"]
+                sections = {}
+                current = None
+                with open(sys.argv[1], encoding="utf-8") as handle:
+                    for line in handle:
+                        line = line.split("#", 1)[0].strip()
+                        if not line:
+                            continue
+                        if line.startswith("[") and line.endswith("]"):
+                            current = line[1:-1].strip()
+                            sections.setdefault(current, {})
+                            continue
+                        if current is None or "=" not in line:
+                            continue
+                        key, raw = line.split("=", 1)
+                        sections[current][key.strip()] = unquote(raw)
+                node = sections["node"]
                 print("peer", node["host"], int(node["port"]))
-                rpc = node.get("rpc")
+                rpc = sections.get("node.rpc")
                 if rpc is not None:
                     print("rpc", rpc.get("host", node["host"]), int(rpc["port"]))
             except Exception as e:
-                print(type(e).__name__, file=sys.stderr)
+                print("%s: %s" % (type(e).__name__, e), file=sys.stderr)
                 sys.exit(4)
           - "{{ chia_darwin_timelord_app_bundle_source }}/{{ chia_darwin_timelord_app_bundle_manifest }}"
       register: chia_darwin_timelord_app_endpoints
       changed_when: false
-      failed_when: chia_darwin_timelord_app_endpoints.rc not in [0, 3]
       check_mode: false
-
-    - name: Skip the node probe when the interpreter cannot read TOML
-      ansible.builtin.debug:
-        msg: >-
-          {{ ansible_python_interpreter | default('The module interpreter') }}
-          has no tomllib (Python 3.11 or later), so the node probe is skipped.
-      when: chia_darwin_timelord_app_endpoints.rc == 3
 
     - name: Connect to the remote node from this host
       ansible.builtin.wait_for:
@@ -159,7 +168,6 @@
       loop: "{{ chia_darwin_timelord_app_endpoints.stdout_lines }}"
       loop_control:
         label: "{{ item.split(' ')[0] }} {{ item.split(' ')[1] }}:{{ item.split(' ')[2] }}"
-      when: chia_darwin_timelord_app_endpoints.rc == 0
   rescue:
     - name: Stop before anything is stopped
       ansible.builtin.fail:
@@ -167,7 +175,7 @@
           The remote full node named in
           {{ chia_darwin_timelord_app_bundle_source }}/{{ chia_darwin_timelord_app_bundle_manifest }}
           could not be read or reached from this host
-          ({{ ansible_failed_result.results | default([]) | selectattr('failed', 'defined') | selectattr('failed') | map(attribute='msg') | list | first | default(ansible_failed_result.msg | default('unknown error'), true) }}).
+          ({{ ansible_failed_result.stderr | default(ansible_failed_result.results | default([]) | selectattr('failed', 'defined') | selectattr('failed') | map(attribute='msg') | list | first | default(ansible_failed_result.msg | default('unknown error'), true), true) }}).
           Nothing has been stopped yet. Set
           chia_darwin_timelord_app_probe_node to false to skip this check.
 

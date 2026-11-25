@@ -251,11 +251,11 @@ changed bundle is re-imported by its fingerprint.
 
 For `remote-node` the preflight also connects, from the Mac, to the node host and
 the peer port named in `connection.toml`, and to its RPC port unless the bundle
-is peer-only. Only a TCP connect is made, so an unreachable node stops the run
-before anything is stopped. The check needs Python 3.11 or later for `tomllib`
-on the module interpreter and is skipped with a message otherwise. Set
-`chia_darwin_timelord_app_probe_node: false` to skip it, for example when the
-RPC endpoint is an SSH tunnel that is not up during the run;
+is peer-only. Only a TCP connect is made, so an unreachable node, or a manifest
+that cannot be read, stops the run before anything is stopped. The host and
+ports are read from the manifest without a TOML library. Set
+`chia_darwin_timelord_app_probe_node: false` to skip the check, for example when
+the RPC endpoint is an SSH tunnel that is not up during the run;
 `chia_darwin_timelord_app_probe_timeout` sets the wait per port (10 seconds).
 
 The app owns the timelord worker and every ASIC USB client, so the role refuses
