@@ -179,6 +179,19 @@
           Nothing has been stopped yet. Set
           chia_darwin_timelord_app_probe_node to false to skip this check.
 
+# An installed app can already read the bundle and report the connection that
+# its installer will be asked to register. Build a scratch config in the app's
+# own directory and have the installer read it, so a config the installer
+# rejects stops the run here and not after the old stack is gone. A host
+# without the pinned app yet cannot run this; the same check runs again before
+# the live config is replaced. The running service is not touched.
+- name: Check the installed Timelord.app against the connection bundle
+  ansible.builtin.include_tasks: darwin-timelord-app-installer-probe.yml
+  when:
+    - not (chia_darwin_local_full_node | bool)
+    - not (chia_darwin_timelord_app_needs_install | bool)
+    - chia_darwin_timelord_app_probe_installer | bool
+
 - name: Inspect a pre-staged Timelord.app disk image
   become: true
   become_user: "{{ user }}"

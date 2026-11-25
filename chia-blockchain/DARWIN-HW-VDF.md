@@ -258,6 +258,24 @@ ports are read from the manifest without a TOML library. Set
 the RPC endpoint is an SSH tunnel that is not up during the run;
 `chia_darwin_timelord_app_probe_timeout` sets the wait per port (10 seconds).
 
+Timelord.app 1.0.1's `install-service.sh` reads `node.network` from
+`timelord-service configuration`, but that command prints a credentialed
+connection under `connections.profiles` and never as `node`, so the vendor
+script exits 1 on every usable config. The role runs the installer's `plan`
+(which changes nothing) on the staged config before the live config or the
+registered job is replaced. If `plan` fails only on `node.network`, the role
+checks that the config's active connection is on its `network` variable, writes
+a root-owned copy of the installer to `chia_darwin_timelord_app_installer_shim`
+with that one line replaced by the role's network, and registers with the copy.
+Any other failure, or a vendor script whose `node.network` line differs from the
+one the role replaces, stops the run. A vendor installer that accepts the
+config is used unchanged. When the app is already installed at the pinned
+version, the preflight builds a scratch config from the bundle with
+`timelord-service import-node` and runs the same check before anything is
+stopped; on a host without the app the check runs after the install, before
+registration. Set `chia_darwin_timelord_app_probe_installer: false` to skip the
+scratch check.
+
 The app owns the timelord worker and every ASIC USB client, so the role refuses
 `timelord-app` with `chia_darwin_enable_hw_vdf: true` (the derived default is
 false). Board discovery, automatic tuning, and the

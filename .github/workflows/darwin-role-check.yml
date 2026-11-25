@@ -47,6 +47,7 @@ jobs:
           ansible-playbook --syntax-check .github/ci/darwin-fleet-roles.yml
           ansible-playbook --syntax-check .github/ci/darwin-timelord-app.yml
           ansible-playbook --syntax-check .github/ci/darwin-timelord-app-preflight.yml
+          ansible-playbook --syntax-check .github/ci/darwin-timelord-app-installer.yml
 
       - name: Check Darwin restart and pip assumptions
         run: ansible-playbook .github/ci/darwin-assumptions.yml
@@ -59,6 +60,9 @@ jobs:
 
       - name: Check the Darwin Timelord.app preflight
         run: ansible-playbook .github/ci/darwin-timelord-app-preflight.yml
+
+      - name: Check the Darwin Timelord.app installer choice
+        run: ansible-playbook .github/ci/darwin-timelord-app-installer.yml
 
       - name: Install Grafana Alloy for config validation
         run: |

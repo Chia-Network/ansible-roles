@@ -1,0 +1,130 @@
+---
+# Choose the installer that will register the Timelord.app job for a config.
+# install-service.sh 1.0.1 extracts node.network from `timelord-service
+# configuration`, but that command prints a credentialed connection under
+# connections.profiles and never as node, so the vendor script exits 1 on every
+# usable config. `plan` reads the config and prints the job without changing
+# anything. When the vendor installer accepts the config it is used as is;
+# when it fails only on node.network, a root-owned copy that takes the network
+# from the role's network variable is used instead, after the config's active
+# connection is checked against that variable. Callers set
+# chia_darwin_timelord_app_installer_config to the config to check; the chosen
+# script is left in chia_darwin_timelord_app_installer_effective.
+- name: Read the connection that the Timelord.app config will use
+  become: true
+  become_user: "{{ user }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ chia_darwin_timelord_app_service_binary }}"
+      - configuration
+      - --config
+      - "{{ chia_darwin_timelord_app_installer_config }}"
+  environment:
+    HOME: "{{ chia_darwin_home }}"
+  register: chia_darwin_timelord_app_installer_configuration
+  changed_when: false
+  check_mode: false
+
+- name: Require an active connection on the configured network
+  vars:
+    configuration: "{{ chia_darwin_timelord_app_installer_configuration.stdout | from_json }}"
+    profiles: "{{ configuration.connections.profiles | default([]) }}"
+    active: >-
+      {{ profiles | selectattr('id', 'equalto', configuration.connections.active_id | default('')) | list }}
+  ansible.builtin.assert:
+    that:
+      - configuration.node is defined or active | length == 1
+      - (configuration.node | default(active[0].node)).network == network
+    fail_msg: >-
+      {{ chia_darwin_timelord_app_installer_config }} has no active
+      connection, or its active connection is not on the {{ network }} network
+      that this role registers the app for.
+
+- name: Have the vendor installer read the config
+  become: true
+  ansible.builtin.command:
+    argv:
+      - /bin/bash
+      - "{{ chia_darwin_timelord_app_installer }}"
+      - plan
+      - --app
+      - "{{ chia_darwin_timelord_app_path }}"
+      - --config
+      - "{{ chia_darwin_timelord_app_installer_config }}"
+      - --user
+      - "{{ user }}"
+  register: chia_darwin_timelord_app_installer_vendor_plan
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Use the vendor installer
+  ansible.builtin.set_fact:
+    chia_darwin_timelord_app_installer_effective: "{{ chia_darwin_timelord_app_installer }}"
+  when: chia_darwin_timelord_app_installer_vendor_plan.rc == 0
+
+- name: Take the network from the role when the vendor installer cannot
+  when: chia_darwin_timelord_app_installer_vendor_plan.rc != 0
+  vars:
+    vendor_line: |-
+      NETWORK="$(printf '%s' "$CONFIG_JSON" | plutil -extract node.network raw -o - -)" || exit 1
+  block:
+    - name: Require the known node.network failure
+      ansible.builtin.assert:
+        that:
+          - "'node.network' in chia_darwin_timelord_app_installer_vendor_plan.stderr"
+        fail_msg: >-
+          {{ chia_darwin_timelord_app_installer }} rejected
+          {{ chia_darwin_timelord_app_installer_config }}:
+          {{ chia_darwin_timelord_app_installer_vendor_plan.stderr | default('no error text', true) }}
+
+    - name: Read the vendor installer
+      ansible.builtin.slurp:
+        src: "{{ chia_darwin_timelord_app_installer }}"
+      register: chia_darwin_timelord_app_installer_source
+
+    - name: Require the installer line that reads node.network
+      ansible.builtin.assert:
+        that:
+          - (chia_darwin_timelord_app_installer_source.content | b64decode).count(vendor_line) == 1
+        fail_msg: >-
+          {{ chia_darwin_timelord_app_installer }} fails on node.network, but
+          not at the line this role replaces. Update the role for this Timelord.app version.
+
+    - name: Create the directory for the installer copy
+      become: true
+      ansible.builtin.file:
+        path: "{{ chia_darwin_timelord_app_installer_shim | dirname }}"
+        state: directory
+        owner: root
+        group: "{{ chia_darwin_timelord_app_installer_shim_group }}"
+        mode: "0755"
+
+    - name: Write the installer copy that takes the network from the role
+      become: true
+      ansible.builtin.copy:
+        content: "{{ (chia_darwin_timelord_app_installer_source.content | b64decode).replace(vendor_line, 'NETWORK=' ~ (network | quote)) }}"
+        dest: "{{ chia_darwin_timelord_app_installer_shim }}"
+        owner: root
+        group: "{{ chia_darwin_timelord_app_installer_shim_group }}"
+        mode: "0755"
+
+    - name: Have the installer copy read the config
+      become: true
+      ansible.builtin.command:
+        argv:
+          - /bin/bash
+          - "{{ chia_darwin_timelord_app_installer_shim }}"
+          - plan
+          - --app
+          - "{{ chia_darwin_timelord_app_path }}"
+          - --config
+          - "{{ chia_darwin_timelord_app_installer_config }}"
+          - --user
+          - "{{ user }}"
+      changed_when: false
+      check_mode: false
+
+    - name: Use the installer copy
+      ansible.builtin.set_fact:
+        chia_darwin_timelord_app_installer_effective: "{{ chia_darwin_timelord_app_installer_shim }}"
