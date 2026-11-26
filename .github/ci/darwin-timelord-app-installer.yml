@@ -1,0 +1,236 @@
+---
+# Exercise the Timelord.app installer preflight and leftover-directory cleanup
+# against fake helpers. The fake service and installer follow Timelord.app
+# 1.0.2: `launchd-values` supplies the network, and install-service.sh `plan`
+# reads that instead of node.network. No Mac, launchd job, or network is
+# touched.
+- name: Check the Timelord.app installer preflight without a Mac
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../../chia-blockchain/defaults/main.yml
+  tasks:
+    - name: Create a temporary directory
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: " timelord app installer"
+      register: installer_temp
+
+    - name: Point the role at the fake app
+      ansible.builtin.set_fact:
+        user: "{{ lookup('env', 'USER') | default('runner', true) }}"
+        chia_darwin_group: "{{ lookup('pipe', 'id -gn') }}"
+        chia_darwin_home: "{{ installer_temp.path }}/home"
+        chia_darwin_local_full_node: false
+        chia_timelord_full_node_peer_host: node.example
+        full_node_port: 8444
+        chia_darwin_timelord_app_path: "{{ installer_temp.path }}/Timelord.app"
+        chia_darwin_timelord_app_service_binary: "{{ installer_temp.path }}/Timelord.app/Contents/Helpers/timelord-service"
+        chia_darwin_timelord_app_installer: "{{ installer_temp.path }}/Timelord.app/Contents/Resources/install-service.sh"
+        chia_darwin_timelord_app_retired_installer_dir: "{{ installer_temp.path }}/libexec/chia-timelord-app"
+        chia_darwin_timelord_app_stage_dir: "{{ installer_temp.path }}/stage"
+        chia_darwin_timelord_app_bundle_source: "{{ installer_temp.path }}/bundle"
+        installer_config: "{{ installer_temp.path }}/config.toml"
+
+    - name: Create the fake app directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ chia_darwin_timelord_app_service_binary | dirname }}"
+        - "{{ chia_darwin_timelord_app_installer | dirname }}"
+        - "{{ chia_darwin_timelord_app_bundle_source }}"
+
+    - name: Install the fake service helper
+      ansible.builtin.copy:
+        dest: "{{ chia_darwin_timelord_app_service_binary }}"
+        mode: "0755"
+        content: |
+          #!/usr/bin/env python3
+          import json, sys, tomllib
+
+          if sys.argv[1] == "import-node":
+              config_path, manifest = sys.argv[3], sys.argv[5]
+              try:
+                  open(manifest).close()
+              except OSError as error:
+                  sys.exit("Reading %s: %s" % (manifest, error.strerror))
+              text = open(config_path).read().replace(
+                  'server_name = "chia.net"\n',
+                  'server_name = "chia.net"\ncertificate = "/identities/client.crt"\n'
+                  'private_key = "/identities/client.key"\n'
+                  'ca_certificate = "/identities/ca.crt"\n',
+                  1,
+              )
+              open(config_path, "w").write(text)
+              sys.exit(0)
+
+          assert sys.argv[1] == "launchd-values" and sys.argv[2] == "--config"
+          with open(sys.argv[3], "rb") as handle:
+              config = tomllib.load(handle)
+          connections = config.get("connections") or {}
+          profiles = connections.get("profiles") or []
+          active = connections.get("active_id")
+          if profiles:
+              node = next(profile["node"] for profile in profiles if profile["id"] == active)
+          else:
+              node = config.get("node") or {}
+          service = config.get("service") or {}
+          print(
+              json.dumps(
+                  {
+                      "network": node.get("network", "mainnet"),
+                      "supervisor_observability_listen": service.get(
+                          "supervisor_observability_listen", "127.0.0.1:9259"
+                      ),
+                      "status_listen": service.get("status_listen", "127.0.0.1:9257"),
+                  }
+              )
+          )
+
+    # The installer's plan reads launchd-values, as Timelord.app 1.0.2 does.
+    - name: Install the fake vendor installer
+      ansible.builtin.copy:
+        dest: "{{ chia_darwin_timelord_app_installer }}"
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          set -euo pipefail
+          while (($#)); do
+            case "$1" in
+              --config) config="$2"; shift 2 ;;
+              *) shift ;;
+            esac
+          done
+          LAUNCHD_VALUES="$("{{ chia_darwin_timelord_app_service_binary }}" launchd-values --config "$config")"
+          NETWORK="$(printf '%s' "$LAUNCHD_VALUES" | python3 -c 'import json, sys; print(json.load(sys.stdin)["network"])')"
+          echo "plan for $NETWORK"
+
+    - name: Write a config with a credentialed connections profile
+      ansible.builtin.copy:
+        dest: "{{ installer_config }}"
+        mode: "0600"
+        content: |
+          schema_version = 1
+
+          [connections]
+          active_id = "connection-1"
+
+          [[connections.profiles]]
+          id = "connection-1"
+          name = "Mainnet · node.example:8444"
+
+          [connections.profiles.node]
+          host = "node.example"
+          port = 8444
+          network = "mainnet"
+          server_name = "chia.net"
+          certificate = "/identities/client.crt"
+          private_key = "/identities/client.key"
+          ca_certificate = "/identities/ca.crt"
+
+          [service]
+          status_listen = "127.0.0.1:9257"
+          supervisor_observability_listen = "0.0.0.0:9259"
+
+    - name: The vendor installer accepts the profile config
+      ansible.builtin.command:
+        argv:
+          - /bin/bash
+          - "{{ chia_darwin_timelord_app_installer }}"
+          - plan
+          - --app
+          - "{{ chia_darwin_timelord_app_path }}"
+          - --config
+          - "{{ installer_config }}"
+          - --user
+          - "{{ user }}"
+      register: installer_profile_plan
+      changed_when: false
+
+    - name: The vendor installer planned for the profile network
+      ansible.builtin.assert:
+        that:
+          - installer_profile_plan.rc == 0
+          - installer_profile_plan.stdout == "plan for mainnet"
+
+    - name: Create the connection bundle manifest
+      ansible.builtin.copy:
+        dest: "{{ chia_darwin_timelord_app_bundle_source }}/connection.toml"
+        content: "schema_version = 1\n"
+        mode: "0600"
+
+    - name: The preflight probe accepts a bundle the installer can read
+      ansible.builtin.include_role:
+        name: chia-blockchain-test
+        tasks_from: darwin-timelord-app-installer-probe.yml
+
+    - name: Look for the scratch directory
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_timelord_app_stage_dir }}/preflight"
+      register: installer_probe_scratch
+
+    - name: The probe left no scratch directory
+      ansible.builtin.assert:
+        that:
+          - not installer_probe_scratch.stat.exists
+
+    - name: A bundle the app cannot import stops the run before anything is stopped
+      block:
+        - name: Remove the connection bundle manifest
+          ansible.builtin.file:
+            path: "{{ chia_darwin_timelord_app_bundle_source }}/connection.toml"
+            state: absent
+        - name: Run the probe with no manifest
+          ansible.builtin.include_role:
+            name: chia-blockchain-test
+            tasks_from: darwin-timelord-app-installer-probe.yml
+        - name: The probe must not pass
+          ansible.builtin.fail:
+            msg: The probe accepted a bundle the app cannot import.
+      rescue:
+        - name: The failure says nothing was stopped
+          ansible.builtin.assert:
+            that:
+              - "'Nothing has been stopped yet' in ansible_failed_result.msg"
+              - "'could not turn the connection bundle' in ansible_failed_result.msg"
+
+    - name: Look for the scratch directory after the failure
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_timelord_app_stage_dir }}/preflight"
+      register: installer_probe_failed_scratch
+
+    - name: The failed probe left no scratch directory
+      ansible.builtin.assert:
+        that:
+          - not installer_probe_failed_scratch.stat.exists
+
+    - name: Create a leftover installer directory
+      ansible.builtin.file:
+        path: "{{ chia_darwin_timelord_app_retired_installer_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Remove the leftover installer directory
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-timelord-app-retired-installer.yml
+
+    - name: Look for the leftover installer directory
+      ansible.builtin.stat:
+        path: "{{ chia_darwin_timelord_app_retired_installer_dir }}"
+      register: installer_retired
+
+    - name: The leftover installer directory was removed
+      ansible.builtin.assert:
+        that:
+          - not installer_retired.stat.exists
+
+    - name: Removing an absent leftover installer directory is a no-op
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-timelord-app-retired-installer.yml
+
+    - name: Remove the temporary directory
+      become: true
+      ansible.builtin.file:
+        path: "{{ installer_temp.path }}"
+        state: absent

@@ -179,6 +179,22 @@
           Nothing has been stopped yet. Set
           chia_darwin_timelord_app_probe_node to false to skip this check.
 
+- name: Remove a leftover Timelord.app installer directory
+  ansible.builtin.include_tasks: darwin-timelord-app-retired-installer.yml
+
+# An installed app can already read the bundle and run the vendor installer's
+# `plan` on a scratch config imported from it, so a config the installer
+# rejects stops the run here and not after the old stack is gone. A host
+# without the pinned app yet cannot run this; after a version change the same
+# `plan` runs on the staged config before the job is registered. The running
+# service is not touched.
+- name: Check the installed Timelord.app against the connection bundle
+  ansible.builtin.include_tasks: darwin-timelord-app-installer-probe.yml
+  when:
+    - not (chia_darwin_local_full_node | bool)
+    - not (chia_darwin_timelord_app_needs_install | bool)
+    - chia_darwin_timelord_app_probe_installer | bool
+
 - name: Inspect a pre-staged Timelord.app disk image
   become: true
   become_user: "{{ user }}"

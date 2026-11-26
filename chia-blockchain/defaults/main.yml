@@ -598,18 +598,20 @@ chia_darwin_periodic_connect_interval_seconds: 300
 # updates the node section through the app's own local-node/import-node commands
 # and leaves hardware state alone.
 #
-# Release: https://github.com/Chia-Network/timelord-app/releases/tag/v1.0.1
+# Release: https://github.com/Chia-Network/timelord-app/releases/tag/v1.0.2
 # The DMG is arm64, requires macOS 14 or later, and is signed and notarized.
 # The upstream repository is public, so the release URL below needs no token.
-chia_darwin_timelord_app_version: "1.0.1"
-chia_darwin_timelord_app_sha256: "4ac4f8118672dd63bad78aba89d11c7899d8345c9c456cca5b4a4d729544316d"
+# 1.0.2's install-service.sh reads the network from `timelord-service
+# launchd-values`, so a credentialed connections.profiles config works.
+chia_darwin_timelord_app_version: "1.0.2"
+chia_darwin_timelord_app_sha256: "888d1b0ca5c20e1811388d6cd3b1f770eb227afd8e2574c8f0b6b61418c28674"
 chia_darwin_timelord_app_dmg_name: "Timelord-{{ chia_darwin_timelord_app_version }}-macos-arm64.dmg"
 chia_darwin_timelord_app_dmg_url: >-
   https://github.com/Chia-Network/timelord-app/releases/download/v{{ chia_darwin_timelord_app_version }}/{{ chia_darwin_timelord_app_dmg_name }}
 # A private mirror of the release needs the API endpoint with Accept:
 # application/octet-stream and a token. Update the asset ID with the version
 # and checksum.
-chia_darwin_timelord_app_asset_id: "790875701"
+chia_darwin_timelord_app_asset_id: "793610826"
 chia_darwin_timelord_app_api_url: >-
   https://api.github.com/repos/Chia-Network/timelord-app/releases/assets/{{ chia_darwin_timelord_app_asset_id }}
 chia_darwin_timelord_app_dmg: "{{ chia_darwin_companion_download_dir }}/timelord-app-{{ chia_darwin_timelord_app_version }}/{{ chia_darwin_timelord_app_dmg_name }}"
@@ -627,6 +629,13 @@ chia_darwin_timelord_app_supervisor_binary: "{{ chia_darwin_timelord_app_helpers
 chia_darwin_timelord_app_client_binary: "{{ chia_darwin_timelord_app_helpers_dir }}/hw_vdf_client"
 chia_darwin_timelord_app_driver_library: "{{ chia_darwin_timelord_app_path }}/Contents/Frameworks/libftd2xx.dylib"
 chia_darwin_timelord_app_installer: "{{ chia_darwin_timelord_app_path }}/Contents/Resources/install-service.sh"
+# A short-lived 1.0.1 workaround would have written a patched installer here.
+# The role never created it on a host; remove the directory if it is present.
+chia_darwin_timelord_app_retired_installer_dir: /usr/local/libexec/chia-timelord-app
+# Before anything is stopped, build a scratch config from the connection bundle
+# with the installed pinned app and run the vendor installer's `plan`, which
+# changes nothing. Set false to skip.
+chia_darwin_timelord_app_probe_installer: true
 # Fixed by the vendor installer; do not put chia_darwin_launchd_prefix here.
 chia_darwin_timelord_app_service_label: net.chia.timelord.supervisor
 chia_darwin_timelord_app_config_dir: "{{ chia_darwin_home }}/Library/Application Support/Timelord"
