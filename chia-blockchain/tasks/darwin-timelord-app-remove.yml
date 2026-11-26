@@ -21,3 +21,18 @@
       ansible.builtin.file:
         path: "{{ chia_darwin_timelord_app_managed_marker }}"
         state: absent
+
+- name: Remove stale Timelord.app user quiesce helpers
+  become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ chia_darwin_bin_dir }}/timelord-app-quit.sh"
+    - "{{ chia_darwin_bin_dir }}/timelord-app-evict-supervisor.sh"
+
+- name: Remove the Timelord.app quiesce helper
+  become: true
+  ansible.builtin.file:
+    path: "{{ chia_darwin_timelord_app_quiesce_dir }}"
+    state: absent
