@@ -638,8 +638,16 @@ chia_darwin_timelord_app_retired_installer_dir: /usr/local/libexec/chia-timelord
 chia_darwin_timelord_app_probe_installer: true
 # Fixed by the vendor installer; do not put chia_darwin_launchd_prefix here.
 chia_darwin_timelord_app_service_label: net.chia.timelord.supervisor
+# The GUI bundle id. A GUI started outside launchd can own a supervisor and the
+# owner.lock below, so the role quits it and evicts the unlabeled supervisor
+# before replacing the bundle or registering the service.
+chia_darwin_timelord_app_bundle_id: net.chia.timelord.mac
 chia_darwin_timelord_app_config_dir: "{{ chia_darwin_home }}/Library/Application Support/Timelord"
 chia_darwin_timelord_app_config: "{{ chia_darwin_timelord_app_config_dir }}/config.toml"
+chia_darwin_timelord_app_supervisor_lock: "{{ chia_darwin_timelord_app_config_dir }}/.config.toml-supervisor/owner.lock"
+chia_darwin_timelord_app_quit_script: "{{ chia_darwin_bin_dir }}/timelord-app-quit.sh"
+chia_darwin_timelord_app_evict_script: "{{ chia_darwin_bin_dir }}/timelord-app-evict-supervisor.sh"
+chia_darwin_timelord_app_quit_timeout: 10
 chia_darwin_timelord_app_stage_dir: "{{ chia_darwin_timelord_app_config_dir }}/.ansible"
 chia_darwin_timelord_app_stage_config: "{{ chia_darwin_timelord_app_stage_dir }}/config.toml"
 chia_darwin_timelord_app_status_listen: 127.0.0.1:9257

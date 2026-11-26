@@ -385,6 +385,11 @@
       not (chia_darwin_timelord_app_managed.stat.exists | default(false)))) }}
   changed_when: false
 
+# The GUI can start another user-session supervisor after the bundle swap.
+- name: Quit Timelord.app and evict an unlabeled supervisor before registering
+  when: chia_darwin_timelord_app_install_service | bool
+  ansible.builtin.include_tasks: darwin-timelord-app-quiesce.yml
+
 - name: Register the Timelord.app background service
   become: true
   ansible.builtin.command:
