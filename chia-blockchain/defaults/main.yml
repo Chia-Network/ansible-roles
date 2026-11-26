@@ -598,20 +598,20 @@ chia_darwin_periodic_connect_interval_seconds: 300
 # updates the node section through the app's own local-node/import-node commands
 # and leaves hardware state alone.
 #
-# Release: https://github.com/Chia-Network/timelord-app/releases/tag/v1.0.3
+# Release: https://github.com/Chia-Network/timelord-app/releases/tag/v1.0.4
 # The DMG is arm64, requires macOS 14 or later, and is signed and notarized.
 # The upstream repository is public, so the release URL below needs no token.
 # install-service.sh reads the network from `timelord-service
 # launchd-values`, so a credentialed connections.profiles config works.
-chia_darwin_timelord_app_version: "1.0.3"
-chia_darwin_timelord_app_sha256: "cdc8e59c6ff70826b1cd2d888de7caa467e1419a7f4e135413ff3c67b3281344"
+chia_darwin_timelord_app_version: "1.0.4"
+chia_darwin_timelord_app_sha256: "b0ce654b8993c82e555524b6ed1b6bb8620b0e07cb899e2d6ab70b983c9b1268"
 chia_darwin_timelord_app_dmg_name: "Timelord-{{ chia_darwin_timelord_app_version }}-macos-arm64.dmg"
 chia_darwin_timelord_app_dmg_url: >-
   https://github.com/Chia-Network/timelord-app/releases/download/v{{ chia_darwin_timelord_app_version }}/{{ chia_darwin_timelord_app_dmg_name }}
 # A private mirror of the release needs the API endpoint with Accept:
 # application/octet-stream and a token. Update the asset ID with the version
 # and checksum.
-chia_darwin_timelord_app_asset_id: "794018517"
+chia_darwin_timelord_app_asset_id: "795098373"
 chia_darwin_timelord_app_api_url: >-
   https://api.github.com/repos/Chia-Network/timelord-app/releases/assets/{{ chia_darwin_timelord_app_asset_id }}
 chia_darwin_timelord_app_dmg: "{{ chia_darwin_companion_download_dir }}/timelord-app-{{ chia_darwin_timelord_app_version }}/{{ chia_darwin_timelord_app_dmg_name }}"

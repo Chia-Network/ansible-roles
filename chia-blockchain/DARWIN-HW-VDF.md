@@ -258,7 +258,7 @@ ports are read from the manifest without a TOML library. Set
 the RPC endpoint is an SSH tunnel that is not up during the run;
 `chia_darwin_timelord_app_probe_timeout` sets the wait per port (10 seconds).
 
-The role pins Timelord.app 1.0.3. That release's `install-service.sh` reads
+The role pins Timelord.app 1.0.4. That release's `install-service.sh` reads
 the network from `timelord-service launchd-values`, which uses the same load
 path as the service, so a credentialed `connections.profiles` config works.
 The role always registers with the vendor installer. When the pinned app is
