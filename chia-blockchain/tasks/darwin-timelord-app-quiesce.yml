@@ -4,69 +4,27 @@
 # restoring that supervisor; evicting any unlabeled supervisor then clears a
 # lock that install-service.sh check-owner would reject. One root-owned helper
 # handles both steps and only signals the service user's processes.
-- name: Remove stale Timelord.app user quiesce helpers
-  become: true
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - "{{ chia_darwin_bin_dir }}/timelord-app-quit.sh"
-    - "{{ chia_darwin_bin_dir }}/timelord-app-evict-supervisor.sh"
-
-- name: List the Timelord.app quiesce parent directories
-  ansible.builtin.set_fact:
-    chia_darwin_timelord_app_quiesce_parent_paths: >-
-      {{
-        [
-          chia_darwin_timelord_app_quiesce_dir,
-          chia_darwin_timelord_app_quiesce_dir | dirname,
-          chia_darwin_timelord_app_quiesce_dir | dirname | dirname,
-          chia_darwin_timelord_app_quiesce_dir | dirname | dirname | dirname
-        ] | reject('equalto', '/') | unique | list
-      }}
-  changed_when: false
-
-- name: Stat the Timelord.app quiesce parent directories
-  become: true
-  ansible.builtin.stat:
-    path: "{{ item }}"
-  loop: "{{ chia_darwin_timelord_app_quiesce_parent_paths }}"
-  register: chia_darwin_timelord_app_quiesce_parent_stats
-
-- name: Refuse unsafe existing Timelord.app quiesce parent directories
+- name: Refuse a Timelord.app stop timeout below the vendor worst case
   ansible.builtin.assert:
     that:
-      - (item.stat.exists | default(false)) is false or
-        (item.stat.pw_name | default('')) == 'root'
-      - (item.stat.exists | default(false)) is false or
-        (item.stat.wgrp | default(true)) is false
-      - (item.stat.exists | default(false)) is false or
-        (item.stat.woth | default(true)) is false
+      - chia_darwin_timelord_app_stop_timeout | int >= 35
     fail_msg: >-
-      {{ item.item }} must be root-owned with neither group nor world write
-      permission when it already exists.
-  loop: "{{ chia_darwin_timelord_app_quiesce_parent_stats.results }}"
-  loop_control:
-    label: "{{ item.item }}"
+      chia_darwin_timelord_app_stop_timeout must be at least 35 seconds so a
+      retiring supervisor can stop its worker (vendor worst case about 34.1 s)
+      before quiesce escalates to SIGKILL.
 
-- name: Create missing Timelord.app quiesce parent directories
-  become: true
-  ansible.builtin.file:
-    path: "{{ item.item }}"
-    state: directory
-    owner: root
-    group: wheel
-    mode: "0755"
-  loop: "{{ chia_darwin_timelord_app_quiesce_parent_stats.results }}"
-  loop_control:
-    label: "{{ item.item }}"
-  when: not (item.stat.exists | default(false))
+- name: Ensure the Timelord.app quiesce directory is root-owned
+  ansible.builtin.include_tasks: darwin-root-owned-dirs.yml
+  vars:
+    chia_darwin_root_owned_dirs:
+      - path: /usr/local/libexec/chia-timelord-app-quiesce
+        mode: "0755"
 
 - name: Install the Timelord.app quiesce helper
   become: true
   ansible.builtin.copy:
     src: darwin/timelord-app-quiesce.sh
-    dest: "{{ chia_darwin_timelord_app_quiesce_script }}"
+    dest: /usr/local/libexec/chia-timelord-app-quiesce/timelord-app-quiesce.sh
     owner: root
     group: wheel
     mode: "0755"
@@ -75,14 +33,12 @@
   become: true
   ansible.builtin.command:
     argv:
-      - "{{ chia_darwin_timelord_app_quiesce_script }}"
+      - /usr/local/libexec/chia-timelord-app-quiesce/timelord-app-quiesce.sh
       - --user
       - "{{ user }}"
       - --app
       - "{{ chia_darwin_timelord_app_path }}"
-      - --supervisor
-      - "{{ chia_darwin_timelord_app_supervisor_binary }}"
       - --timeout
-      - "{{ chia_darwin_timelord_app_quiesce_timeout }}"
+      - "{{ chia_darwin_timelord_app_stop_timeout }}"
   register: chia_darwin_timelord_app_quiesce
   changed_when: "'changed=true' in chia_darwin_timelord_app_quiesce.stdout"

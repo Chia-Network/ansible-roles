@@ -7,12 +7,13 @@ setup() {
 	APP="$BATS_TEST_TMPDIR/Timelord.app"
 	GUI="$APP/Contents/MacOS/Timelord"
 	SUPERVISOR="$APP/Contents/Helpers/timelord-supervisor"
+	WORKER="$APP/Contents/Helpers/timelord-service"
 	LOCK="$BATS_TEST_TMPDIR/owner.lock"
 	PIDS="$BATS_TEST_TMPDIR/pids"
 	mkdir -p "$BIN" "$(dirname "$GUI")" "$(dirname "$SUPERVISOR")"
 	: >"$LOCK"
 	: >"$PIDS"
-	export BIN APP GUI SUPERVISOR LOCK PIDS
+	export BIN APP GUI SUPERVISOR WORKER LOCK PIDS
 	export PATH="$BIN:/usr/bin:/bin:/usr/sbin:/sbin"
 }
 
@@ -54,12 +55,34 @@ start_lock_opener() {
 	track "$!"
 }
 
+start_late_argv0() {
+	local name=$1 delay=$2 pidfile=$3 late
+	(
+		sleep "$delay"
+		bash -c 'exec -a "$1" sleep 60' _ "$name" >/dev/null 2>&1 &
+		late=$!
+		printf '%s\n' "$late" >"$pidfile"
+		printf '%s\n' "$late" >>"$PIDS"
+	) &
+}
+
+start_session_argv0() {
+	local name=$1 pidfile=$2
+	setsid bash -c 'printf "%s\n" "$$" >"$2"; exec -a "$1" sleep 60' _ "$name" "$pidfile" \
+		>/dev/null 2>&1 &
+	track "$!"
+	for _ in $(seq 1 50); do
+		[ -s "$pidfile" ] && break
+		sleep 0.05
+	done
+	track "$(cat "$pidfile")"
+}
+
 run_helper() {
 	run "$HELPER" \
 		--user "$(id -un)" \
 		--app "$APP" \
-		--supervisor "$SUPERVISOR" \
-		--timeout 1
+		--timeout "${1:-1}"
 }
 
 @test "quiesce is a no-op when nothing matches" {
@@ -68,9 +91,9 @@ run_helper() {
 	[[ "$output" == *"changed=false"* ]]
 }
 
-@test "quiesce TERMs the GUI and its supervisor" {
+@test "quiesce TERMs the GUI and a supervisor with trailing arguments" {
 	gui=$(start_argv0 "$GUI")
-	supervisor=$(start_argv0 "$SUPERVISOR")
+	supervisor=$(start_argv0 "$SUPERVISOR run --config x")
 	sleep 0.2
 	run_helper
 	[ "$status" -eq 0 ]
@@ -83,27 +106,28 @@ run_helper() {
 	fi
 }
 
-@test "quiesce does not wait on a hanging osascript" {
-	cat >"$BIN/osascript" <<'EOF'
-#!/usr/bin/env bash
-printf '%s\n' "$*" >>"${OSASCRIPT_LOG:?}"
-sleep 60
-EOF
-	chmod +x "$BIN/osascript"
-	OSASCRIPT_LOG="$BATS_TEST_TMPDIR/osascript.log"
-	export OSASCRIPT_LOG
-	gui=$(start_argv0 "$GUI")
-	sleep 0.2
-	start=$(date +%s)
-	run_helper
-	elapsed=$(($(date +%s) - start))
-	[ "$status" -eq 0 ]
-	[[ "$output" == *"changed=true"* ]]
-	[ "$elapsed" -lt 5 ]
-	[ ! -e "$OSASCRIPT_LOG" ]
-	if kill -0 "$gui" 2>/dev/null; then
+@test "quiesce does not TERM a supervisor whose argv[0] only shares the prefix" {
+	exact=$(start_argv0 "$SUPERVISOR")
+	foo=$(start_argv0 "$SUPERVISOR-foo")
+	out="$BATS_TEST_TMPDIR/boundary.out"
+	"$HELPER" \
+		--user "$(id -un)" \
+		--app "$APP" \
+		--timeout 2 >"$out" 2>&1 &
+	helper_pid=$!
+	sleep 0.5
+	if kill -0 "$foo" 2>/dev/null; then :; else false; fi
+	if kill -0 "$exact" 2>/dev/null; then false; fi
+	wait "$helper_pid"
+	[ "$?" -eq 0 ]
+	[[ "$(cat "$out")" == *"changed=true"* ]]
+	if kill -0 "$foo" 2>/dev/null; then
 		false
 	fi
+}
+
+@test "quiesce does not invoke osascript" {
+	! grep -q osascript "$HELPER"
 }
 
 @test "quiesce KILLs a process that ignores TERM" {
@@ -120,28 +144,80 @@ EOF
 	fi
 }
 
+@test "quiesce KILLs a worker that appears during the TERM wait" {
+	gui=$(start_ignoring_term "$GUI")
+	late_pid="$BATS_TEST_TMPDIR/late.pid"
+	start_late_argv0 "$WORKER" 0.5 "$late_pid"
+	run_helper 2
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"changed=true"* ]]
+	late=$(cat "$late_pid")
+	if kill -0 "$late" 2>/dev/null; then
+		false
+	fi
+	if kill -0 "$gui" 2>/dev/null; then
+		false
+	fi
+}
+
+@test "quiesce KILLs an orphaned worker in its own process group" {
+	supervisor=$(start_ignoring_term "$SUPERVISOR run --config x")
+	worker_pid="$BATS_TEST_TMPDIR/worker.pid"
+	start_session_argv0 "$WORKER --serve" "$worker_pid"
+	worker=$(cat "$worker_pid")
+	sleep 0.2
+	run_helper 2
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"changed=true"* ]]
+	if kill -0 "$worker" 2>/dev/null; then
+		false
+	fi
+	if kill -0 "$supervisor" 2>/dev/null; then
+		false
+	fi
+}
+
 @test "quiesce fails when a matched process remains" {
-	cat >"$BIN/pgrep" <<'EOF'
+	cat >"$BIN/pgrep" <<'PGREP'
 #!/usr/bin/env bash
 [ "${1:-}" = "-U" ] && [ "${3:-}" = "-f" ] || exit 1
 [ "${2:-}" = "${FAKE_UID:?}" ] || exit 1
 case "${4:-}" in
-*"/Contents/MacOS/"* | *"/Contents/Helpers/timelord-supervisor"*) ;;
+*"/Contents/"*) printf '999999\n' ;;
 *) exit 1 ;;
 esac
-printf '999999\n'
-EOF
+PGREP
 	chmod +x "$BIN/pgrep"
 	FAKE_UID=$(id -un)
 	export FAKE_UID
 	run "$HELPER" \
 		--user "$FAKE_UID" \
 		--app "$APP" \
-		--supervisor "$SUPERVISOR" \
 		--timeout 1
 	[ "$status" -ne 0 ]
 	[[ "$output" == *"quiesce failed"* ]]
 	[[ "$output" == *"999999"* ]]
+}
+
+@test "quiesce reports unchanged when every match exits before it is signalled" {
+	cat >"$BIN/pgrep" <<'PGREP'
+#!/usr/bin/env bash
+[ "${1:-}" = "-U" ] && [ "${3:-}" = "-f" ] || exit 1
+[ "${2:-}" = "${FAKE_UID:?}" ] || exit 1
+case "${4:-}" in
+*"/Contents/MacOS/"* | *"/Contents/Helpers/timelord-supervisor"*) printf '999999\n' ;;
+*) exit 1 ;;
+esac
+PGREP
+	chmod +x "$BIN/pgrep"
+	FAKE_UID=$(id -un)
+	export FAKE_UID
+	run "$HELPER" \
+		--user "$FAKE_UID" \
+		--app "$APP" \
+		--timeout 1
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"changed=false"* ]]
 }
 
 @test "quiesce ignores later argv mentions and unescaped paths" {
@@ -181,7 +257,6 @@ EOF
 	run "$HELPER" \
 		--user "$other_user" \
 		--app "$APP" \
-		--supervisor "$SUPERVISOR" \
 		--timeout 1
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"changed=false"* ]]

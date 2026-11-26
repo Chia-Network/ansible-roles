@@ -25,6 +25,8 @@
         watchdog_text: "{{ lookup('file', role_dir ~ '/templates/darwin/chia-watchdog.sh.j2') }}"
         watchdog_plist_text: "{{ lookup('file', role_dir ~ '/templates/darwin/chia-watchdog.plist.j2') }}"
         launchd_plist_text: "{{ lookup('file', role_dir ~ '/templates/darwin/launchdaemon.plist.j2') }}"
+        root_owned_dirs_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-root-owned-dirs.yml') }}"
+        quiesce_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-timelord-app-quiesce.yml') }}"
 
     - name: Parse the Darwin task files
       ansible.builtin.set_fact:
@@ -81,18 +83,29 @@
     - name: The watchdog parent check covers both configured paths
       ansible.builtin.assert:
         that:
-          - "'chia_darwin_watchdog_parent_paths' in companions_text"
+          - "'darwin-root-owned-dirs.yml' in companions_text"
           - "'chia_darwin_watchdog_script | dirname' in companions_text"
-          - "'chia_darwin_watchdog_conf_dir | dirname' in companions_text"
+          - "'chia_darwin_watchdog_conf_dir' in companions_text"
           - "'Restrict the watchdog config directory' in companions_text"
+          - "'darwin-root-owned-dirs.yml' in quiesce_text"
+          - "'follow: true' in root_owned_dirs_text"
+          - "'Compute every ancestor of the requested root-owned directories' in root_owned_dirs_text"
+          - "'parts[:i]' in root_owned_dirs_text"
+          - "'islnk | default(false)' in root_owned_dirs_text"
+          - "'item.stat.exists | default(false)' in root_owned_dirs_text"
+          - "'item.stat.isdir | default(false)' in root_owned_dirs_text"
           - >-
-            "item.stat.pw_name | default('') == 'root'" in companions_text
-          - "'not (item.stat.wgrp | default(true))' in companions_text"
-          - "'not (item.stat.woth | default(true))' in companions_text"
+            "(item.stat.pw_name | default('')) == 'root'" in root_owned_dirs_text
+          - "'not (item.stat.wgrp | default(true))' in root_owned_dirs_text"
+          - "'not (item.stat.woth | default(true))' in root_owned_dirs_text"
         fail_msg: >-
-          The watchdog parent check must cover the configured script and conf
-          directory chains and refuse an existing directory unless it is
-          root-owned and not group- or world-writable.
+          The watchdog parent check must include the shared
+          darwin-root-owned-dirs.yml from the companion and Timelord.app
+          quiesce tasks, pass both the script and conf directory paths, keep the
+          config-directory restriction, and refuse an existing path unless it
+          follows symlinks to a root-owned directory with neither group nor
+          world write permission (dangling symlinks and non-directories are
+          refused).
 
     - name: The role includes the shared LaunchDaemon apply path
       ansible.builtin.assert:

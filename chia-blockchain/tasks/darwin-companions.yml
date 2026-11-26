@@ -206,56 +206,14 @@
 - name: Install the watchdog
   when: chia_darwin_enable_watchdog | bool
   block:
-    - name: List the watchdog parent directories
-      ansible.builtin.set_fact:
-        chia_darwin_watchdog_parent_paths: >-
-          {{
-            [
-              chia_darwin_watchdog_script | dirname,
-              chia_darwin_watchdog_script | dirname | dirname,
-              chia_darwin_watchdog_script | dirname | dirname | dirname,
-              chia_darwin_watchdog_script | dirname | dirname | dirname | dirname,
-              chia_darwin_watchdog_conf_dir,
-              chia_darwin_watchdog_conf_dir | dirname,
-              chia_darwin_watchdog_conf_dir | dirname | dirname,
-              chia_darwin_watchdog_conf_dir | dirname | dirname | dirname
-            ] | reject('equalto', '/') | unique | list
-          }}
-      changed_when: false
-
-    - name: Stat the watchdog parent directories
-      become: true
-      ansible.builtin.stat:
-        path: "{{ item }}"
-      loop: "{{ chia_darwin_watchdog_parent_paths }}"
-      register: chia_darwin_watchdog_parent_stats
-
-    - name: Refuse unsafe existing watchdog parent directories
-      ansible.builtin.assert:
-        that:
-          - not (item.stat.exists | default(false)) or
-            (item.stat.pw_name | default('') == 'root' and
-            not (item.stat.wgrp | default(true)) and
-            not (item.stat.woth | default(true)))
-        fail_msg: >-
-          {{ item.item }} must be root-owned and not group- or world-writable
-          when it already exists.
-      loop: "{{ chia_darwin_watchdog_parent_stats.results }}"
-      loop_control:
-        label: "{{ item.item }}"
-
-    - name: Create missing watchdog parent directories
-      become: true
-      ansible.builtin.file:
-        path: "{{ item.item }}"
-        state: directory
-        owner: root
-        group: wheel
-        mode: "{{ '0700' if item.item == chia_darwin_watchdog_conf_dir else '0755' }}"
-      loop: "{{ chia_darwin_watchdog_parent_stats.results }}"
-      loop_control:
-        label: "{{ item.item }}"
-      when: not (item.stat.exists | default(false))
+    - name: Ensure the watchdog directories are root-owned
+      ansible.builtin.include_tasks: darwin-root-owned-dirs.yml
+      vars:
+        chia_darwin_root_owned_dirs:
+          - path: "{{ chia_darwin_watchdog_script | dirname }}"
+            mode: "0755"
+          - path: "{{ chia_darwin_watchdog_conf_dir }}"
+            mode: "0700"
 
     - name: Restrict the watchdog config directory
       become: true
