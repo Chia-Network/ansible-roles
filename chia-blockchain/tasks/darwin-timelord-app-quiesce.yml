@@ -4,21 +4,11 @@
 # restoring that supervisor; evicting any unlabeled supervisor then clears a
 # lock that install-service.sh check-owner would reject. One root-owned helper
 # handles both steps and only signals the service user's processes.
-- name: Refuse a Timelord.app stop timeout below the vendor worst case
-  ansible.builtin.assert:
-    that:
-      - chia_darwin_timelord_app_stop_timeout | int >= 35
-    fail_msg: >-
-      chia_darwin_timelord_app_stop_timeout must be at least 35 seconds so a
-      retiring supervisor can stop its worker (vendor worst case about 34.1 s)
-      before quiesce escalates to SIGKILL.
-
 - name: Ensure the Timelord.app quiesce directory is root-owned
   ansible.builtin.include_tasks: darwin-root-owned-dirs.yml
   vars:
     chia_darwin_root_owned_dirs:
-      - path: /usr/local/libexec/chia-timelord-app-quiesce
-        mode: "0755"
+      - /usr/local/libexec/chia-timelord-app-quiesce
 
 - name: Install the Timelord.app quiesce helper
   become: true

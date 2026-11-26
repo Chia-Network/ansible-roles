@@ -210,10 +210,8 @@
       ansible.builtin.include_tasks: darwin-root-owned-dirs.yml
       vars:
         chia_darwin_root_owned_dirs:
-          - path: "{{ chia_darwin_watchdog_script | dirname }}"
-            mode: "0755"
-          - path: "{{ chia_darwin_watchdog_conf_dir }}"
-            mode: "0700"
+          - "{{ chia_darwin_watchdog_script | dirname }}"
+          - "{{ chia_darwin_watchdog_conf_dir }}"
 
     - name: Restrict the watchdog config directory
       become: true

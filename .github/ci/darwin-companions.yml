@@ -25,7 +25,6 @@
         watchdog_text: "{{ lookup('file', role_dir ~ '/templates/darwin/chia-watchdog.sh.j2') }}"
         watchdog_plist_text: "{{ lookup('file', role_dir ~ '/templates/darwin/chia-watchdog.plist.j2') }}"
         launchd_plist_text: "{{ lookup('file', role_dir ~ '/templates/darwin/launchdaemon.plist.j2') }}"
-        root_owned_dirs_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-root-owned-dirs.yml') }}"
         quiesce_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-timelord-app-quiesce.yml') }}"
 
     - name: Parse the Darwin task files
@@ -80,7 +79,7 @@
           Companion plists must go through chia_job.plist_template so the
           watchdog can keep its own plist.
 
-    - name: The watchdog parent check covers both configured paths
+    - name: The watchdog parent check is wired to both configured paths
       ansible.builtin.assert:
         that:
           - "'darwin-root-owned-dirs.yml' in companions_text"
@@ -88,24 +87,11 @@
           - "'chia_darwin_watchdog_conf_dir' in companions_text"
           - "'Restrict the watchdog config directory' in companions_text"
           - "'darwin-root-owned-dirs.yml' in quiesce_text"
-          - "'follow: true' in root_owned_dirs_text"
-          - "'Compute every ancestor of the requested root-owned directories' in root_owned_dirs_text"
-          - "'parts[:i]' in root_owned_dirs_text"
-          - "'islnk | default(false)' in root_owned_dirs_text"
-          - "'item.stat.exists | default(false)' in root_owned_dirs_text"
-          - "'item.stat.isdir | default(false)' in root_owned_dirs_text"
-          - >-
-            "(item.stat.pw_name | default('')) == 'root'" in root_owned_dirs_text
-          - "'not (item.stat.wgrp | default(true))' in root_owned_dirs_text"
-          - "'not (item.stat.woth | default(true))' in root_owned_dirs_text"
         fail_msg: >-
           The watchdog parent check must include the shared
           darwin-root-owned-dirs.yml from the companion and Timelord.app
-          quiesce tasks, pass both the script and conf directory paths, keep the
-          config-directory restriction, and refuse an existing path unless it
-          follows symlinks to a root-owned directory with neither group nor
-          world write permission (dangling symlinks and non-directories are
-          refused).
+          quiesce tasks, pass both the script and conf directory paths, and keep
+          the config-directory restriction.
 
     - name: The role includes the shared LaunchDaemon apply path
       ansible.builtin.assert:
@@ -235,6 +221,150 @@
         fail_msg: >-
           Missing companion template:
           {{ companion_templates.results | rejectattr('stat.exists') | map(attribute='item') | list | join(', ') }}
+
+- name: Test the Darwin root-owned directory check behavior
+  # Exercise the production include against a temporary tree under a safe
+  # root-owned parent. The fixtures need root ownership, so this play uses
+  # become; the include itself has no test-only ownership override.
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Create a temporary root-owned test tree
+      become: true
+      ansible.builtin.tempfile:
+        state: directory
+        path: /opt
+        prefix: darwin-root-owned-dirs.
+      register: root_owned_temp
+
+    - name: Ensure the wheel group exists for the macOS fixture
+      become: true
+      ansible.builtin.group:
+        name: wheel
+        state: present
+
+    - name: Exercise the shared root-owned directory check
+      block:
+        - name: Create a group-writable fixture directory
+          become: true
+          ansible.builtin.file:
+            path: "{{ root_owned_temp.path }}/group-writable"
+            state: directory
+            owner: root
+            group: wheel
+            mode: "0775"
+
+        - name: Create a world-writable fixture directory
+          become: true
+          ansible.builtin.file:
+            path: "{{ root_owned_temp.path }}/world-writable"
+            state: directory
+            owner: root
+            group: wheel
+            mode: "0777"
+
+        - name: Create a dangling symlink fixture
+          become: true
+          ansible.builtin.file:
+            path: "{{ root_owned_temp.path }}/dangling"
+            src: "{{ root_owned_temp.path }}/missing-target"
+            state: link
+            force: true
+            owner: root
+            group: wheel
+
+        - name: Create a non-directory fixture
+          become: true
+          ansible.builtin.copy:
+            content: "not a directory\n"
+            dest: "{{ root_owned_temp.path }}/plain-file"
+            owner: root
+            group: wheel
+            mode: "0644"
+
+        - name: Create an unsafe parent for the symlink target
+          become: true
+          ansible.builtin.file:
+            path: "{{ root_owned_temp.path }}/unsafe-parent"
+            state: directory
+            owner: root
+            group: wheel
+            mode: "0777"
+
+        - name: Create a safe directory inside the unsafe parent
+          become: true
+          ansible.builtin.file:
+            path: "{{ root_owned_temp.path }}/unsafe-parent/safe-target"
+            state: directory
+            owner: root
+            group: wheel
+            mode: "0755"
+
+        - name: Link to the safe directory
+          become: true
+          ansible.builtin.file:
+            path: "{{ root_owned_temp.path }}/link-to-safe"
+            src: "{{ root_owned_temp.path }}/unsafe-parent/safe-target"
+            state: link
+            owner: root
+            group: wheel
+
+        - name: Refuse unsafe root-owned directory cases
+          ansible.builtin.include_tasks: darwin-root-owned-dirs-refused.yml
+          loop:
+            - name: group-writable directory
+              path: "{{ root_owned_temp.path }}/group-writable"
+            - name: world-writable directory
+              path: "{{ root_owned_temp.path }}/world-writable"
+            - name: dangling symlink
+              path: "{{ root_owned_temp.path }}/dangling"
+            - name: non-directory
+              path: "{{ root_owned_temp.path }}/plain-file"
+            - name: symlink into an unsafe parent
+              path: "{{ root_owned_temp.path }}/link-to-safe/child"
+          loop_control:
+            loop_var: root_owned_case
+            label: "{{ root_owned_case.name }}"
+
+        - name: Accept a clean root-owned 0755 chain
+          vars:
+            chia_darwin_root_owned_dirs:
+              - "{{ root_owned_temp.path }}/safe/chain"
+          block:
+            - name: Run the shared check against a clean chain
+              ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-root-owned-dirs.yml
+            - name: Inspect the created clean chain
+              become: true
+              ansible.builtin.stat:
+                path: "{{ item }}"
+                follow: false
+              loop:
+                - "{{ root_owned_temp.path }}/safe"
+                - "{{ root_owned_temp.path }}/safe/chain"
+              register: root_owned_safe_stats
+            - name: Require the clean chain to be created root-owned at 0755
+              ansible.builtin.assert:
+                that:
+                  - root_owned_safe_stats.results[0].stat.isdir | default(false)
+                  - not (root_owned_safe_stats.results[0].stat.islnk | default(false))
+                  - (root_owned_safe_stats.results[0].stat.pw_name | default('')) == 'root'
+                  - root_owned_safe_stats.results[1].stat.isdir | default(false)
+                  - not (root_owned_safe_stats.results[1].stat.islnk | default(false))
+                  - (root_owned_safe_stats.results[1].stat.pw_name | default('')) == 'root'
+                  - root_owned_safe_stats.results[1].stat.mode == '0755'
+          rescue:
+            - name: Report that the clean chain was refused
+              ansible.builtin.fail:
+                msg: >-
+                  The shared check refused a clean root-owned 0755 chain:
+                  {{ ansible_failed_result.msg | default('unknown error') }}
+      always:
+        - name: Remove the temporary root-owned test tree
+          become: true
+          ansible.builtin.file:
+            path: "{{ root_owned_temp.path }}"
+            state: absent
 
 - name: Check the Darwin sudo policy guard
   # The same opt-in also allows the service user to be the CI/SSH login with

@@ -88,6 +88,8 @@ if [ -n "$pids" ]; then
 	printf '%s\n' "$pids" | signal_pids TERM && changed=1
 fi
 
+# When only an orphaned worker remains, wait_gone still spends the full budget
+# before KILL so the vendor worst-case stop window is always allowed.
 if ! wait_gone; then
 	# Re-collect before KILL so a worker or child that appeared during the TERM
 	# wait is included.

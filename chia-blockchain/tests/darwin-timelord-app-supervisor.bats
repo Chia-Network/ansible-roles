@@ -116,12 +116,55 @@ run_helper() {
 		--timeout 2 >"$out" 2>&1 &
 	helper_pid=$!
 	sleep 0.5
-	if kill -0 "$foo" 2>/dev/null; then :; else false; fi
+	kill -0 "$foo" 2>/dev/null
 	if kill -0 "$exact" 2>/dev/null; then false; fi
 	wait "$helper_pid"
-	[ "$?" -eq 0 ]
 	[[ "$(cat "$out")" == *"changed=true"* ]]
+}
+
+@test "quiesce prefix-KILLs a supervisor whose argv[0] only shares the prefix" {
+	foo=$(start_argv0 "$SUPERVISOR-foo")
+	sleep 0.2
+	run_helper 1
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"changed=true"* ]]
 	if kill -0 "$foo" 2>/dev/null; then
+		false
+	fi
+}
+
+@test "quiesce does not SIGKILL a supervisor that exits gracefully" {
+	graceful_log="$BATS_TEST_TMPDIR/graceful.log"
+	cat >"$BIN/graceful-supervisor" <<'SUPERVISOR'
+#!/bin/bash
+trap 'sleep 1.5; printf "graceful\n" >>"$1"; exit 0' TERM
+while :; do sleep 0.1; done
+SUPERVISOR
+	chmod +x "$BIN/graceful-supervisor"
+	bash -c 'exec -a "$1" bash "$2" "$3"' _ "$SUPERVISOR" "$BIN/graceful-supervisor" "$graceful_log" \
+		>/dev/null 2>&1 &
+	pid=$!
+	track "$pid"
+	sleep 0.2
+	run_helper 3
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"changed=true"* ]]
+	[ -f "$graceful_log" ]
+	[[ "$(cat "$graceful_log")" == *graceful* ]]
+	if kill -0 "$pid" 2>/dev/null; then
+		false
+	fi
+}
+
+@test "quiesce reports changed when only the prefix KILL removes an orphan worker" {
+	worker_pid="$BATS_TEST_TMPDIR/worker.pid"
+	start_session_argv0 "$WORKER --serve" "$worker_pid"
+	worker=$(cat "$worker_pid")
+	sleep 0.2
+	run_helper 1
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"changed=true"* ]]
+	if kill -0 "$worker" 2>/dev/null; then
 		false
 	fi
 }

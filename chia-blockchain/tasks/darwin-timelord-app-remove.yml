@@ -22,18 +22,18 @@
         path: "{{ chia_darwin_timelord_app_managed_marker }}"
         state: absent
 
-- name: Remove the Timelord.app quiesce helper
-  become: true
-  ansible.builtin.file:
-    path: /usr/local/libexec/chia-timelord-app-quiesce/timelord-app-quiesce.sh
-    state: absent
+    - name: Remove the Timelord.app quiesce helper
+      become: true
+      ansible.builtin.file:
+        path: /usr/local/libexec/chia-timelord-app-quiesce/timelord-app-quiesce.sh
+        state: absent
 
-- name: Remove the empty Timelord.app quiesce directory
-  become: true
-  ansible.builtin.command:
-    argv:
-      - /bin/rmdir
-      - /usr/local/libexec/chia-timelord-app-quiesce
-  register: chia_darwin_timelord_app_quiesce_rmdir
-  changed_when: chia_darwin_timelord_app_quiesce_rmdir.rc == 0
-  failed_when: false
+    - name: Remove the empty Timelord.app quiesce directory
+      become: true
+      ansible.builtin.command:
+        argv:
+          - /bin/rmdir
+          - /usr/local/libexec/chia-timelord-app-quiesce
+      register: chia_darwin_timelord_app_quiesce_rmdir
+      changed_when: chia_darwin_timelord_app_quiesce_rmdir.rc == 0
+      failed_when: false
