@@ -1,0 +1,22 @@
+---
+- name: Refuse the {{ root_owned_case.name }}
+  vars:
+    chia_darwin_root_owned_dirs:
+      - "{{ root_owned_case.path }}"
+  block:
+    - name: Run the shared check against the {{ root_owned_case.name }}
+      ansible.builtin.include_tasks: ../../chia-blockchain/tasks/darwin-root-owned-dirs.yml
+    - name: The {{ root_owned_case.name }} must be refused
+      ansible.builtin.fail:
+        msg: The shared check accepted the {{ root_owned_case.name }}.
+  rescue:
+    - name: Confirm the {{ root_owned_case.name }} was refused
+      ansible.builtin.assert:
+        that:
+          - >-
+            (ansible_failed_result.results | default([])
+            | map(attribute='msg', default='') | join(' '))
+            is search('must be a root-owned directory')
+        fail_msg: >-
+          The {{ root_owned_case.name }} was refused for an unexpected reason:
+          {{ ansible_failed_result.msg }}

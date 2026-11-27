@@ -12,6 +12,8 @@
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-local-external-root.yml
     - name: Import the Darwin companion tasks
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-companions.yml
+    - name: Import the shared Darwin root-owned directory tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-root-owned-dirs.yml
     - name: Import the Darwin job-list tasks
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-jobs.yml
     - name: Import the Darwin implementation checks
@@ -24,6 +26,8 @@
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-timelord-app-remove.yml
     - name: Import the Darwin Timelord.app stop tasks
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-timelord-app-stop.yml
+    - name: Import the Darwin Timelord.app quiesce tasks
+      ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-timelord-app-quiesce.yml
     - name: Import the Darwin Timelord.app unload-wait tasks
       ansible.builtin.import_tasks: ../../chia-blockchain/tasks/darwin-timelord-app-wait.yml
     - name: Import the Darwin hw-vdf board tasks

@@ -1,6 +1,15 @@
 ---
 # The single Darwin allow-list. darwin.yml includes this before it derives jobs
 # or changes the host; the CI harness includes it with synthetic facts.
+- name: Refuse a Timelord.app stop timeout below the vendor worst case
+  ansible.builtin.assert:
+    that:
+      - chia_darwin_timelord_app_stop_timeout | int >= 35
+    fail_msg: >-
+      chia_darwin_timelord_app_stop_timeout must be at least 35 seconds so a
+      retiring supervisor can stop its worker (vendor worst case about 34.1 s)
+      before quiesce escalates to SIGKILL.
+
 - name: Require a supported Darwin combination
   ansible.builtin.assert:
     that:

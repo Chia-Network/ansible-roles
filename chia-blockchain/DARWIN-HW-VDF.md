@@ -269,6 +269,10 @@ host without the app yet, the same `plan` runs on the staged config before the
 job is registered. Set `chia_darwin_timelord_app_probe_installer: false` to
 skip the scratch check.
 
+An upgrade, or a switch back to `chia-blockchain`, quits a running Timelord.app
+GUI and any unlabeled user-session supervisor, and does not relaunch the GUI.
+Only the background service is started again, by the vendor installer.
+
 The app owns the timelord worker and every ASIC USB client, so the role refuses
 `timelord-app` with `chia_darwin_enable_hw_vdf: true` (the derived default is
 false). Board discovery, automatic tuning, and the

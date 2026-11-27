@@ -1,0 +1,63 @@
+---
+# Ensure each requested path and the ancestors below the filesystem root exist
+# as root-owned directories with no group or world write permission. The walk
+# starts at the top-level directory (for example /usr), not at / itself. Stat
+# without follow is lstat, and a symlink is not a directory, so a symlink
+# anywhere in the chain is refused even when its target looks safe. Callers pass
+# chia_darwin_root_owned_dirs as a plain list of paths; missing paths are created
+# at 0755 with owner root and group wheel. A caller that needs a tighter mode
+# sets it on the leaf path in its own task.
+- name: Compute the ancestors of the requested root-owned paths
+  ansible.builtin.set_fact:
+    chia_darwin_root_owned_dir_ancestors: >-
+      {%- set ns = namespace(paths=[]) -%}
+      {%- for path in chia_darwin_root_owned_dirs -%}
+        {%- set parts = path.split('/') -%}
+        {%- for i in range(2, parts | length + 1) -%}
+          {%- set ancestor = parts[:i] | join('/') -%}
+          {%- if ancestor not in ns.paths -%}
+            {%- set ns.paths = ns.paths + [ancestor] -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endfor -%}
+      {{ ns.paths }}
+
+- name: Stat the root-owned directory ancestors
+  become: true
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ chia_darwin_root_owned_dir_ancestors }}"
+  loop_control:
+    label: "{{ item }}"
+  register: chia_darwin_root_owned_dir_stats
+
+- name: Refuse unsafe existing root-owned directory ancestors
+  ansible.builtin.assert:
+    that:
+      - not (item.stat.exists | default(false)) or
+        (item.stat.isdir | default(false))
+      - not (item.stat.exists | default(false)) or
+        (item.stat.pw_name | default('')) == 'root'
+      - not (item.stat.exists | default(false)) or
+        not (item.stat.wgrp | default(true))
+      - not (item.stat.exists | default(false)) or
+        not (item.stat.woth | default(true))
+    fail_msg: >-
+      {{ item.item }} must be a root-owned directory with neither group nor
+      world write permission, and must not be a symlink, when it exists.
+  loop: "{{ chia_darwin_root_owned_dir_stats.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Create missing root-owned directories
+  become: true
+  ansible.builtin.file:
+    path: "{{ item.item }}"
+    state: directory
+    owner: root
+    group: wheel
+    mode: "0755"
+  loop: "{{ chia_darwin_root_owned_dir_stats.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: not (item.stat.exists | default(false))

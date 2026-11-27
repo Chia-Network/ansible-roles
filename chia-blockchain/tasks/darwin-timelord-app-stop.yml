@@ -37,3 +37,8 @@
 
 - name: Wait for the Timelord.app service to unload
   ansible.builtin.include_tasks: darwin-timelord-app-wait.yml
+
+# The label is gone now, so any supervisor that still holds owner.lock is a
+# user-session process started by the GUI rather than the launchd job.
+- name: Quit Timelord.app and evict an unlabeled supervisor
+  ansible.builtin.include_tasks: darwin-timelord-app-quiesce.yml
