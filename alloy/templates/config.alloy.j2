@@ -85,6 +85,26 @@ loki.process "chia" {
   forward_to = [loki.write.default.receiver]
 }
 {% endif %}
+{% if alloy_enable_timelord_app_source | bool %}
+
+// ── Timelord.app ─────────────────────────────────────────────────────────────
+
+loki.source.file "timelord_app" {
+  targets = [
+    {
+      __path__       = "{{ alloy_timelord_app_log_path }}",
+      job            = "timelord-app",
+      application    = "{{ application }}",
+      component      = "{{ component }}",
+      implementation = "timelord-app",
+      network        = "{{ network }}",
+      group          = "{{ group_tag }}",
+      host           = "{{ ansible_hostname | default('localhost') }}",
+    },
+  ]
+  forward_to = [loki.write.default.receiver]
+}
+{% endif %}
 
 // ── Extra log files ──────────────────────────────────────────────────────────
 {% set platform_extra_log_files = (alloy_darwin_extra_log_files | default([])) if (ansible_os_family | default('')) == 'Darwin' else [] %}
