@@ -5,9 +5,6 @@
 # while the existing timelord is still running. These tasks only read the host,
 # create the app's own directories, and stage the verified disk image and the
 # controller-side bundle; nothing here stops or changes a running service.
-- name: Require a safe Timelord.app stop timeout
-  ansible.builtin.include_tasks: darwin-timelord-app-stop-timeout.yml
-
 - name: Ensure the Timelord.app directories exist
   become: true
   become_user: "{{ user }}"

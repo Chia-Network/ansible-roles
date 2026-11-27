@@ -1,6 +1,7 @@
 #!/bin/bash
 # Stop the Timelord.app GUI and any supervisor or worker owned by the service
-# user. Root-owned so it never runs from the service user's home directory.
+# user. Run as root through ansible.builtin.script, so it never runs from the
+# service user's home directory and is not installed on the host.
 set -u
 
 user=

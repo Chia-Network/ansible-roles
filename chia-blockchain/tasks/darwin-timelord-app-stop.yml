@@ -2,9 +2,6 @@
 # Unregister the vendor supervisor before replacing the app bundle or removing
 # the role-managed registration. The vendor remove is preferred because it also
 # removes the plist, but a failure must not leave the job loaded.
-- name: Require a safe Timelord.app stop timeout
-  ansible.builtin.include_tasks: darwin-timelord-app-stop-timeout.yml
-
 - name: Check for the vendor Timelord.app service installer
   ansible.builtin.stat:
     path: "{{ chia_darwin_timelord_app_installer }}"

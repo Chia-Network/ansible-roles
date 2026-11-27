@@ -25,7 +25,6 @@
         watchdog_text: "{{ lookup('file', role_dir ~ '/templates/darwin/chia-watchdog.sh.j2') }}"
         watchdog_plist_text: "{{ lookup('file', role_dir ~ '/templates/darwin/chia-watchdog.plist.j2') }}"
         launchd_plist_text: "{{ lookup('file', role_dir ~ '/templates/darwin/launchdaemon.plist.j2') }}"
-        quiesce_text: "{{ lookup('file', role_dir ~ '/tasks/darwin-timelord-app-quiesce.yml') }}"
 
     - name: Parse the Darwin task files
       ansible.builtin.set_fact:
@@ -84,14 +83,13 @@
         that:
           - "'darwin-root-owned-dirs.yml' in companions_text"
           - "'chia_darwin_watchdog_script | dirname' in companions_text"
-          - "'chia_darwin_watchdog_conf_dir' in companions_text"
+          - "'chia_darwin_watchdog_conf_dir | dirname' in companions_text"
           - "'Restrict the watchdog config directory' in companions_text"
-          - "'darwin-root-owned-dirs.yml' in quiesce_text"
         fail_msg: >-
           The watchdog parent check must include the shared
-          darwin-root-owned-dirs.yml from the companion and Timelord.app
-          quiesce tasks, pass both the script and conf directory paths, and keep
-          the config-directory restriction.
+          darwin-root-owned-dirs.yml from the companion tasks, pass the script
+          directory and the config directory's parent, and keep the
+          config-directory restriction that creates the leaf at 0700.
 
     - name: The role includes the shared LaunchDaemon apply path
       ansible.builtin.assert:
@@ -234,18 +232,60 @@
       become: true
       ansible.builtin.tempfile:
         state: directory
-        path: /opt
+        path: /
         prefix: darwin-root-owned-dirs.
       register: root_owned_temp
 
-    - name: Ensure the wheel group exists for the macOS fixture
-      become: true
-      ansible.builtin.group:
-        name: wheel
-        state: present
-
     - name: Exercise the shared root-owned directory check
       block:
+        - name: Ensure the wheel group exists for the macOS fixture
+          become: true
+          ansible.builtin.group:
+            name: wheel
+            state: present
+
+        - name: Make the temporary test parent root-owned at 0755
+          become: true
+          ansible.builtin.file:
+            path: "{{ root_owned_temp.path }}"
+            state: directory
+            owner: root
+            group: wheel
+            mode: "0755"
+
+        - name: Check for the unprivileged fixture account
+          become: true
+          ansible.builtin.command:
+            argv: [getent, passwd, nobody]
+          register: root_owned_nobody
+          changed_when: false
+          failed_when: false
+
+        - name: Check for the unprivileged fixture group
+          become: true
+          ansible.builtin.command:
+            argv: [getent, group, nogroup]
+          register: root_owned_nogroup
+          changed_when: false
+          failed_when: false
+
+        - name: Create the unprivileged fixture group when it is missing
+          become: true
+          ansible.builtin.group:
+            name: nogroup
+            system: true
+          when: root_owned_nogroup.rc != 0
+
+        - name: Create the unprivileged fixture account when it is missing
+          become: true
+          ansible.builtin.user:
+            name: nobody
+            group: nogroup
+            system: true
+            create_home: false
+            shell: /usr/sbin/nologin
+          when: root_owned_nobody.rc != 0
+
         - name: Create a group-writable fixture directory
           become: true
           ansible.builtin.file:
@@ -263,6 +303,24 @@
             owner: root
             group: wheel
             mode: "0777"
+
+        - name: Create a world-write-only fixture directory
+          become: true
+          ansible.builtin.file:
+            path: "{{ root_owned_temp.path }}/world-write-only"
+            state: directory
+            owner: root
+            group: wheel
+            mode: "0757"
+
+        - name: Create a non-root-owned fixture directory
+          become: true
+          ansible.builtin.file:
+            path: "{{ root_owned_temp.path }}/non-root-owned"
+            state: directory
+            owner: nobody
+            group: nogroup
+            mode: "0755"
 
         - name: Create a dangling symlink fixture
           become: true
@@ -310,6 +368,24 @@
             owner: root
             group: wheel
 
+        - name: Create a world-writable ancestor with a safe leaf
+          become: true
+          ansible.builtin.file:
+            path: "{{ root_owned_temp.path }}/unsafe-ancestor"
+            state: directory
+            owner: root
+            group: wheel
+            mode: "0777"
+
+        - name: Create a safe leaf under the world-writable ancestor
+          become: true
+          ansible.builtin.file:
+            path: "{{ root_owned_temp.path }}/unsafe-ancestor/leaf"
+            state: directory
+            owner: root
+            group: wheel
+            mode: "0755"
+
         - name: Refuse unsafe root-owned directory cases
           ansible.builtin.include_tasks: darwin-root-owned-dirs-refused.yml
           loop:
@@ -317,12 +393,18 @@
               path: "{{ root_owned_temp.path }}/group-writable"
             - name: world-writable directory
               path: "{{ root_owned_temp.path }}/world-writable"
+            - name: world-write-only directory
+              path: "{{ root_owned_temp.path }}/world-write-only"
+            - name: non-root-owned directory
+              path: "{{ root_owned_temp.path }}/non-root-owned"
             - name: dangling symlink
               path: "{{ root_owned_temp.path }}/dangling"
             - name: non-directory
               path: "{{ root_owned_temp.path }}/plain-file"
             - name: symlink into an unsafe parent
               path: "{{ root_owned_temp.path }}/link-to-safe/child"
+            - name: safe leaf under a world-writable ancestor
+              path: "{{ root_owned_temp.path }}/unsafe-ancestor/leaf"
           loop_control:
             loop_var: root_owned_case
             label: "{{ root_owned_case.name }}"

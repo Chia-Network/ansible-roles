@@ -2,33 +2,16 @@
 # The Timelord.app GUI can run outside launchd as the service user and start a
 # user-session supervisor that holds owner.lock. Quitting the GUI stops it from
 # restoring that supervisor; evicting any unlabeled supervisor then clears a
-# lock that install-service.sh check-owner would reject. One root-owned helper
-# handles both steps and only signals the service user's processes.
-- name: Ensure the Timelord.app quiesce directory is root-owned
-  ansible.builtin.include_tasks: darwin-root-owned-dirs.yml
-  vars:
-    chia_darwin_root_owned_dirs:
-      - /usr/local/libexec/chia-timelord-app-quiesce
-
-- name: Install the Timelord.app quiesce helper
-  become: true
-  ansible.builtin.copy:
-    src: darwin/timelord-app-quiesce.sh
-    dest: /usr/local/libexec/chia-timelord-app-quiesce/timelord-app-quiesce.sh
-    owner: root
-    group: wheel
-    mode: "0755"
-
+# lock that install-service.sh check-owner would reject. The role ships the
+# helper and runs it as root through ansible.builtin.script, so nothing is
+# installed on the host and it never runs from the service user's home.
 - name: Quit Timelord.app and evict an unlabeled supervisor
   become: true
-  ansible.builtin.command:
-    argv:
-      - /usr/local/libexec/chia-timelord-app-quiesce/timelord-app-quiesce.sh
-      - --user
-      - "{{ user }}"
-      - --app
-      - "{{ chia_darwin_timelord_app_path }}"
-      - --timeout
-      - "{{ chia_darwin_timelord_app_stop_timeout }}"
+  ansible.builtin.script:
+    cmd: >-
+      darwin/timelord-app-quiesce.sh
+      --user {{ user | quote }}
+      --app {{ chia_darwin_timelord_app_path | quote }}
+      --timeout {{ chia_darwin_timelord_app_stop_timeout | quote }}
   register: chia_darwin_timelord_app_quiesce
   changed_when: "'changed=true' in chia_darwin_timelord_app_quiesce.stdout"

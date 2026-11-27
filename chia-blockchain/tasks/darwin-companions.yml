@@ -211,7 +211,7 @@
       vars:
         chia_darwin_root_owned_dirs:
           - "{{ chia_darwin_watchdog_script | dirname }}"
-          - "{{ chia_darwin_watchdog_conf_dir }}"
+          - "{{ chia_darwin_watchdog_conf_dir | dirname }}"
 
     - name: Restrict the watchdog config directory
       become: true
